@@ -92,7 +92,8 @@ pilotés par l'appli, plongée à la place du conducteur dans l'onglet Entretien
 ├── outils/
 │   ├── assembler_308.mjs      ← étape 1 du modèle 3D (Node + gltf-transform)
 │   ├── finaliser_car_glb.py   ← étape 2 du modèle 3D (Python pur, sans dépendance)
-│   └── *.sh / analyse_gps.py  ← outils Mac (émulateur, mesures, GPS)
+│   ├── *.sh / analyse_gps.py  ← outils Mac (émulateur, mesures, GPS)
+│   └── obd/                   ← explorateur OBD en lecture seule (PC + vLinker), tests, fiche de séance
 ├── fyt-extraits/              ← APK FYT décompilées (référence CAN) — non publié
 └── diagnostic/                ← rapports CAN, ancien README
 ```
@@ -245,6 +246,9 @@ Simule ouvrants, phares, marche arrière, batterie faible, accélérations ; les
 4. Antibrouillards sur le CAN : codes non identifiés (profil Raise PSA décompilé dans `fyt-extraits/`).
 5. Son / DSP (alignement temporel, Focal AV, Pioneer AR, ampli TDA7851) : jamais commencé.
 6. Codes défaut OBD (mode 03 / effacement 04) : faciles à ajouter dans `Engine.kt` maintenant que le boîtier est là.
+7. **Onglet Diagnostic (v0.9)** : d'abord une séance d'exploration dans la voiture avec un PC et le vLinker
+   (`outils/obd/obd_explorer.py`, lecture seule garantie, fiche `outils/obd/SEANCE_OBD.md`) pour savoir ce que
+   la 308 donne vraiment (codes défaut, vanne EGR, FAP, kilométrage, état des feux par le BSI).
 
 ---
 

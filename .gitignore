@@ -6,8 +6,9 @@ modele-3d/plaque.png
 *.apk
 # - code décompilé des applis du fabricant de l'autoradio (propriété de FYT)
 fyt-extraits/
-# - journaux de trajets GPS et relevés CAN pris dans la voiture
+# - journaux de trajets GPS, relevés CAN et séances OBD pris dans la voiture (contiennent le VIN)
 logs/
+journaux/
 *.csv
 # - clés de signature : ne JAMAIS les publier
 *.keystore
