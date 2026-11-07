@@ -8,6 +8,20 @@
 > la plaque d'immatriculation, et la licence du modèle d'origine est à vérifier), `modele-3d/plaque.png`, et
 > `fyt-extraits/` (code décompilé des applis FYT, propriété du fabricant). Pour reconstruire le modèle, voir §5.
 
+## Aperçu
+
+La 308 en 3D telle que l'appli l'affiche : accueil en 3/4 avant, ouvrants animés d'après le CAN, phares et feux
+pilotés par l'appli, plongée à la place du conducteur dans l'onglet Entretien.
+*Rendus du modèle `car.glb` de l'appli (three.js, plaque factice « AB-123-CD ») ; captures de l'interface complète à venir.*
+
+| Accueil (3/4 avant, phares) | Ouvrants ouverts |
+|---|---|
+| ![308 en 3/4 avant, phares allumés](docs/captures/accueil-3-4-avant.png) | ![Portes, capot et coffre ouverts](docs/captures/portes-ouvertes.png) |
+| **3/4 arrière, feux allumés** | **Profil** |
+| ![308 en 3/4 arrière, feux arrière allumés](docs/captures/3-4-arriere.png) | ![308 de profil](docs/captures/profil.png) |
+| **Vue conducteur (onglet Entretien)** | |
+| ![Habitacle vu du siège conducteur : volant et compteurs](docs/captures/interieur.png) | |
+
 ---
 
 ## 0. Résumé en 30 secondes
