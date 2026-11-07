@@ -1,0 +1,89 @@
+16:50:24  APPLI com.android.cts.priv.ctsshim
+16:50:24  APPLI com.syu.carlink
+16:50:24     service exporté : com.syu.carlink.CarLinkService
+16:50:24  APPLI com.syu.carmark
+16:50:24  APPLI com.syu.frontvideo
+16:50:24  APPLI com.syu.settings
+16:50:24     service exporté : com.syu.broadcast.SideBarService
+16:50:24     fournisseur : com.syu.settingsProvider
+16:50:24  APPLI com.syu.canbusdvr
+16:50:24  APPLI com.android.carrierconfig
+16:50:24     service exporté : com.android.carrierconfig.DefaultCarrierConfigServiceEx
+16:50:24  APPLI com.syu.protocolupdate
+16:50:24     fournisseur : com.syu.protocolProvider
+16:50:24  APPLI com.syu.carui
+16:50:24  APPLI com.syu.guide
+16:50:24  APPLI com.syu.music
+16:50:24     service exporté : com.syu.music.MService
+16:50:24     service exporté : com.syu.music.BtavNextService
+16:50:24     service exporté : com.syu.music.BtavPrevService
+16:50:24     service exporté : com.syu.music.BtavPlayPauseService
+16:50:24  APPLI com.syu.radio
+16:50:24     service exporté : com.android.fmradio.FmService
+16:50:24     service exporté : com.pekall.fmradio.FMRadioService
+16:50:24     service exporté : com.syu.radio.broadcast.MyService
+16:50:24  APPLI com.syu.steer
+16:50:24  APPLI com.syu.video
+16:50:24     service exporté : com.syu.preloadimg.PreloadImage
+16:50:24  APPLI com.android.carrierdefaultapp
+16:50:24  APPLI com.syu.rightcamera
+16:50:24  APPLI com.fyt.screenbutton
+16:50:24     service exporté : com.fyt.screenbutton.ButtonService
+16:50:24  APPLI com.syu.canbus
+16:50:24     service exporté : com.syu.canbus.ServiceKeepAlive
+16:50:24  APPLI com.syu.av
+16:50:25  APPLI com.syu.bt
+16:50:25     service exporté : com.syu.broadcast.MyService
+16:50:25     service exporté : com.syu.broadcast.BtavNextService
+16:50:25     service exporté : com.syu.broadcast.BtavPrevService
+16:50:25     service exporté : com.syu.broadcast.BtavPlayPauseService
+16:50:25     service exporté : com.syu.preloadimg.PreloadImage
+16:50:25  APPLI com.syu.eq
+16:50:25     service exporté : com.syu.broadcast.MyService
+16:50:25  APPLI com.syu.ms
+16:50:25     service exporté : app.ToolkitService
+16:50:25     service exporté : app.ModuleService
+16:50:25     service exporté : com.android.fmradio.FmService
+16:50:25     fournisseur : com.syu.ms.provider
+16:50:25  APPLI com.syu.ps
+16:50:25     service exporté : app.ToolkitService
+16:50:25  APPLI com.syu.ss
+16:50:25     service exporté : app.ServiceKeepAlive
+16:50:25     service exporté : app.ToolkitService
+16:50:25     fournisseur : com.coagent.car.provider.call
+16:50:25  APPLI com.syu.tv
+16:50:25  APPLI com.syu.us
+16:50:25     service exporté : com.syu.us.ServiceMain
+16:50:25  APPLI com.android.cts.ctsshim
+16:50:25  APPLI com.syu.market
+16:50:25  APPLI com.syu.carradio
+16:50:25  APPLI com.syu.gallery
+16:50:25     service exporté : com.syu.preloadimg.PreloadImage
+16:50:25  APPLI com.syu.filemanager
+16:50:25     service exporté : com.syu.preloadimg.PreloadImage
+16:50:25  APPLI com.syu.calibration
+16:50:25     service exporté : com.syu.calibration.CaliService
+16:50:50  Écoute de 770 messages. Ouvre puis ferme la porte conducteur, puis le coffre.
+16:50:50  FYT : connecté au service com.syu.ms
+16:50:50  FYT : module 0 abonné (301 canaux)
+16:50:50  FYT : module 1 abonné (301 canaux)
+16:50:50  FYT : module 2 abonné (301 canaux)
+16:50:51  FYT : module 3 abonné (301 canaux)
+16:50:51  FYT : module 4 abonné (301 canaux)
+16:50:51  FYT : module 5 abonné (301 canaux)
+16:50:51  FYT : module 6 abonné (301 canaux)
+16:50:51  FYT : module 7 abonné (301 canaux)
+16:50:51  FYT : module 8 abonné (301 canaux)
+16:50:52  FYT : module 9 abonné (301 canaux)
+16:50:52  FYT : module 10 abonné (301 canaux)
+16:50:52  FYT : module 11 abonné (301 canaux)
+16:50:52  FYT : module 12 abonné (301 canaux)
+16:50:52  FYT : module 13 abonné (301 canaux)
+16:50:52  FYT : module 14 abonné (301 canaux)
+16:50:52  FYT : module 15 abonné (301 canaux)
+16:50:54  FYT module 0 canal 101 : i=[0] → i=[1]
+16:50:55  FYT module 0 canal 101 : i=[1] → i=[0]
+16:50:59  FYT module 0 canal 146 : i=[52] → i=[51]
+16:51  FYT module 0 canal 77 : null → i=[0,334,657]
+16:51  FYT module 0 canal 77 : i=[0,334,657] → i=[1,334,657]
+16:51  FYT : 616 canaux avaient une valeur

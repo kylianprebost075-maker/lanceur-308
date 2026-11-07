@@ -1,0 +1,18 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Plaque</title>
+<style>body{margin:0;background:#222}</style></head><body>
+<canvas id="c" width="1040" height="220"></canvas>
+<script>
+// Plaque française (format 520 × 110 mm, ici ×2 px/mm) : bandes bleues, « F » et étoiles UE, texte DIN.
+const c = document.getElementById('c'), g = c.getContext('2d');
+const W = 1040, H = 220, band = 90, blue = '#0b3fa8';
+g.fillStyle = '#fff'; g.fillRect(0, 0, W, H);
+g.fillStyle = blue; g.fillRect(0, 0, band, H); g.fillRect(W - band, 0, band, H);
+g.strokeStyle = '#111'; g.lineWidth = 6; g.strokeRect(3, 3, W - 6, H - 6);
+g.fillStyle = '#ffd200';
+for (let i = 0; i < 12; i++) { const a = i / 12 * 2 * Math.PI; g.beginPath(); g.arc(band / 2 + 26 * Math.cos(a), 70 + 26 * Math.sin(a), 4.5, 0, 7); g.fill(); }
+g.fillStyle = '#fff'; g.font = 'bold 70px "DIN Alternate", "DIN Condensed", Arial'; g.textAlign = 'center'; g.fillText('F', band / 2, 190);
+g.fillStyle = '#111'; g.font = 'bold 170px "DIN Condensed", "DIN Alternate", "Arial Narrow", Arial'; g.textBaseline = 'middle';
+// Texte de la plaque : plaque.html?texte=AB-123-CD (exemple par défaut ; la vraie plaque reste en local).
+g.fillText(new URLSearchParams(location.search).get('texte') || 'AB-123-CD', W / 2, H / 2 + 8);
+window.__png = c.toDataURL('image/png');
+</script></body></html>

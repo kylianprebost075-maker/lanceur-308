@@ -1,0 +1,4 @@
+car.glb — d'après « Peugeot 308 5-Door MK1 2007-2021 » par Merc_TV (szymonpasterczyk)
+https://sketchfab.com/3d-models/peugeot-308-5-door-mk1-2007-2021-ce299e549e594d029577d0b757f3aa87
+Licence CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/).
+Modifications : sélection des pièces phase 1, assemblage des roues, matériaux (peinture noire), allègement.

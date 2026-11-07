@@ -1,0 +1,20 @@
+package fr.p308.lanceur
+
+import android.app.Application
+import fr.p308.lanceur.drive.Chrono
+import fr.p308.lanceur.maintenance.Fuel
+import fr.p308.lanceur.maintenance.Maintenance
+import fr.p308.lanceur.vehicle.GpsMonitor
+import fr.p308.lanceur.vehicle.Vehicle
+
+class App : Application() {
+    override fun onCreate() {
+        super.onCreate()
+        UiPrefs.init(this)
+        Vehicle.init(this)
+        Maintenance.init(this)
+        Fuel.init(this)
+        Chrono.init(this)
+        GpsMonitor.init(this)
+    }
+}

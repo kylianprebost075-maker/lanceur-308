@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aperçu 308</title>
+<style>html,body{margin:0;height:100%;background:#141B31;overflow:hidden}canvas{display:block;width:100%;height:100%}
+#l{position:fixed;inset:0;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;pointer-events:none;font:12px sans-serif;color:#8C97B8}
+#l div{padding:6px}</style>
+<script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.160.0/examples/jsm/"}}</script>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="l"><div>3/4 avant</div><div>profil gauche</div><div>3/4 arrière</div><div>dessus</div></div>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+const file = new URLSearchParams(location.search).get('f') || 'car.glb';
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(devicePixelRatio);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#141B31');
+scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
+const sun = new THREE.DirectionalLight(0xffffff, 1.5); sun.position.set(3, 5, 4); scene.add(sun);
+const V = { tout: [[-4.6, 2.0, 5.6], [8.0, 0.9, 0], [4.6, 2.2, -5.6], [0, 9.5, 0.01]],
+  roues: [[3.2, -0.15, 1.3, 0, -0.15, 1.3], [3.2, -0.15, -1.3, 0, -0.15, -1.3], [-3.2, -0.15, 1.3, 0, -0.15, 1.3], [6.0, -0.1, 0.01]],
+  // Positions en repère du modèle (non centré) : tête du conducteur et points regardés.
+  interieur: [[0.34, 1.10, -0.10, 0.30, 0.98, 1.6, 1], [0.34, 1.10, -0.10, 1.8, 0.9, 0.6, 1], [0.34, 1.10, -0.10, -0.6, 0.95, 0.9, 1], [-3.0, 1.2, 3.8]],
+  plaques: [[0.0, -0.35, 3.0, 0, -0.4, 1.5], [0.0, -0.3, -3.0, 0, -0.35, -1.5], [-3.6, 0.5, 4.6], [3.6, 0.6, -4.6]],
+  detail: [[0.01, 0.3, 7.0], [9.0, 0.0, 0.01], [0.01, 0.4, -7.0], [-3.6, 0.5, 4.6]] };
+const views = V[new URLSearchParams(location.search).get('v') || 'tout'];
+const cams = views.map(() => new THREE.PerspectiveCamera(32, 1, 0.05, 100));
+new GLTFLoader().load(file, (g) => {
+  const box = new THREE.Box3().setFromObject(g.scene);
+  const size = box.getSize(new THREE.Vector3()), center = box.getCenter(new THREE.Vector3());
+  g.scene.position.sub(center); window.__center = center;
+  // ?ouvert=1 : ouvre tous les ouvrants autour de leurs charnières et allume les antibrouillards.
+  if (new URLSearchParams(location.search).get('ouvert')) {
+    const A = { charniere_porte_AVG: ['z', -62], charniere_porte_AVD: ['z', 62], charniere_porte_ARG: ['z', -62],
+      charniere_porte_ARD: ['z', 62], charniere_coffre: ['x', 78], charniere_capot: ['x', -48] };
+    g.scene.traverse((o) => {
+      if (A[o.name]) o.rotation[A[o.name][0]] = THREE.MathUtils.degToRad(A[o.name][1]);
+      if (o.material?.name === 'antibrouillard') { o.material.emissive.set(1, 0.95, 0.75); o.material.emissiveIntensity = 3; }
+      if (o.material?.name === 'phare_avant') { o.material.emissive.set(1, 0.96, 0.86); o.material.emissiveIntensity = 6; }
+      if (o.material?.name === 'vitre_phare_avant') { o.material.emissive.set(1, 0.95, 0.85); o.material.emissiveIntensity = 1.8; }
+      if (o.material?.name === 'feu_position_ar') { o.material.emissive.set(1, 0.04, 0.02); o.material.emissiveIntensity = 3.5; }
+    });
+  }
+  scene.add(g.scene);
+  window.__size = size.toArray().map((v) => +v.toFixed(3));
+  draw();
+});
+function draw() {
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  renderer.setSize(w, h, false);
+  renderer.setScissorTest(true);
+  views.forEach((p, i) => {
+    const x = (i % 2) * w / 2, y = (i < 2 ? h / 2 : 0);
+    renderer.setViewport(x, y, w / 2, h / 2); renderer.setScissor(x, y, w / 2, h / 2);
+    const c = cams[i]; c.aspect = (w / 2) / (h / 2); const o = p[6] ? window.__center : new THREE.Vector3();
+    c.fov = p[6] ? 60 : 32; c.near = p[6] ? 0.01 : 0.05;
+    c.position.set(p[0] - o.x, p[1] - o.y, p[2] - o.z); c.lookAt((p[3] || 0) - o.x, (p[4] || 0) - o.y, (p[5] || 0) - o.z); c.updateProjectionMatrix();
+    renderer.render(scene, c);
+  });
+  window.__ready = true;
+}
+addEventListener('resize', draw);
+</script>
+</body>
+</html>

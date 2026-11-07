@@ -1,0 +1,25 @@
+LANCEUR 308 — PROCÉDURE (version 0.8)
+
+1. INSTALLER
+   - Branche la clé USB sur l'autoradio.
+   - Ouvre le gestionnaire de fichiers → Lanceur308.apk (à la racine ou dans 308-2).
+   - Touche le fichier → Installer (par-dessus l'ancienne version, rien à désinstaller).
+   - Ouvre Lanceur 308. Réglages : Mode démo DÉSACTIVÉ.
+
+2. BOÎTIER OBD Vgate vLinker MC+
+   - Branche le vLinker sur la prise OBD (sous le volant, à gauche), mets le contact.
+   - Onglet Moteur : la connexion BLE est automatique (« vLinker MC-IOS »), sans appairage.
+     Si besoin, appuie sur « Rechercher OBD ».
+   - Si ça ne marche toujours pas : Paramètres Bluetooth de l'autoradio → appairer
+     « vLinker MC-Android », code 1234, puis « Rechercher OBD ».
+   - Le message affiché dans l'onglet Moteur dit où ça bloque : prends-le en photo.
+
+3. À VÉRIFIER APRÈS L'INSTALLATION
+   - Accueil : la 308 en 3D est nette, sans blocs gris au-dessus ou en dessous.
+   - Entretien : la caméra plonge à la place du conducteur (volant + compteurs).
+   - Phares : la tuile Phares change Auto / Allumés / Éteints.
+
+4. GPS / CARPLAY (en passager)
+   - Véhicule → GPS, clé USB branchée sur l'autoradio.
+   - Quand Waze/Plans se fige : bouton orange « Waze / Plans vient de se figer ».
+   - Fin du trajet : « Copier le journal sur la clé USB ».

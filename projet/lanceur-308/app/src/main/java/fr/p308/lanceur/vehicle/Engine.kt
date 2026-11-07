@@ -1,0 +1,578 @@
+package fr.p308.lanceur.vehicle
+
+import android.Manifest
+import android.annotation.SuppressLint
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothGatt
+import android.bluetooth.BluetoothGattCallback
+import android.bluetooth.BluetoothGattCharacteristic
+import android.bluetooth.BluetoothGattDescriptor
+import android.bluetooth.BluetoothManager
+import android.bluetooth.BluetoothProfile
+import android.bluetooth.BluetoothSocket
+import android.bluetooth.le.ScanCallback
+import android.bluetooth.le.ScanResult
+import android.bluetooth.le.ScanSettings
+import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import java.io.Closeable
+import java.io.IOException
+import java.util.UUID
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
+import kotlin.math.PI
+import kotlin.math.max
+import kotlin.math.roundToInt
+
+data class EngineState(
+    val status: String = "Adaptateur OBD non connecté",
+    val connected: Boolean = false,
+    val rpm: Int? = null,
+    val loadPct: Int? = null,
+    val speedKmh: Int? = null,
+    val coolantC: Int? = null,
+    val boostBar: Float? = null,
+    /** Tension mesurée par le calculateur (PID 42) ou par le boîtier Vgate (ATRV), utile pour l'alerte batterie. */
+    val voltage: Float? = null,
+    val torqueNm: Int? = null,
+    val powerCh: Int? = null,
+    val peakCh: Int = 0,
+)
+
+/** Couple maxi du 1.6 HDi 110 (DV6TED4) selon le régime : 240 Nm à 1 750 tr/min, 110 ch à 4 000 tr/min. */
+private val TORQUE_CURVE = listOf(
+    800 to 120, 1000 to 150, 1500 to 215, 1750 to 240, 2750 to 240,
+    3000 to 232, 3500 to 213, 4000 to 191, 4500 to 160, 5000 to 120,
+)
+
+fun maxTorqueNm(rpm: Int): Float {
+    if (rpm <= TORQUE_CURVE.first().first) return TORQUE_CURVE.first().second.toFloat()
+    if (rpm >= TORQUE_CURVE.last().first) return TORQUE_CURVE.last().second.toFloat()
+    val (r1, t1) = TORQUE_CURVE.last { it.first <= rpm }
+    val (r2, t2) = TORQUE_CURVE.first { it.first > rpm }
+    return t1 + (t2 - t1) * (rpm - r1).toFloat() / (r2 - r1)
+}
+
+/** Puissance estimée : charge calculée (PID 04) × couple maxi au régime courant. */
+fun estimate(rpm: Int, loadPct: Int): Pair<Int, Int> {
+    val torque = maxTorqueNm(rpm) * loadPct / 100f
+    val kw = torque * rpm * 2 * PI / 60_000
+    return torque.roundToInt() to (kw * 1.35962).roundToInt()
+}
+
+/**
+ * Données moteur lues sur la prise OBD2 (optimisé pour Vgate vLinker MC+ Bluetooth, compatible iCar Pro 2S / ELM327) :
+ * - Bluetooth Low Energy (« vLinker MC-IOS », service E7810A71) sans aucun appairage requis sur les autoradios FYT !
+ * - Bluetooth classique SPP (« vLinker MC-Android », code 1234) s'il est appairé dans Android.
+ */
+object Engine {
+    private val _state = MutableStateFlow(EngineState())
+    val state: StateFlow<EngineState> = _state.asStateFlow()
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var job: Job? = null
+
+    private val SPP_UUID: UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
+    private val CCCD_UUID: UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
+    // Services UART BLE connus : Vgate vLinker MC+/FS/BM (E7810A71, 1 seule caractéristique bidirectionnelle),
+    // Vgate iCar Pro / 2S (18F0, FFF0) et adaptateurs OBD BLE courants.
+    private val VLINKER_SERVICE = UUID.fromString("e7810a71-73ae-499d-8c15-faa9aef0c3f2")
+    private val VLINKER_CHAR = UUID.fromString("bef8d6c9-9c21-4c9e-b632-bd58c1009f9f")
+    private val BLE_SERVICE_UUIDS = listOf(
+        VLINKER_SERVICE,
+        UUID.fromString("000018f0-0000-1000-8000-00805f9b34fb"),
+        UUID.fromString("0000fff0-0000-1000-8000-00805f9b34fb"),
+        UUID.fromString("0000ffe0-0000-1000-8000-00805f9b34fb"),
+        UUID.fromString("6e400001-b5a3-f393-e0a9-e50e24dcca9e"),
+    )
+    private val VGATE_NOTIFY = UUID.fromString("00002af0-0000-1000-8000-00805f9b34fb")
+    private val VGATE_WRITE = UUID.fromString("00002af1-0000-1000-8000-00805f9b34fb")
+
+    // « VLINK » couvre « vLinker MC-Android », « vLinker MC-IOS », « IOS-Vlink », « Android-Vlink ».
+    private val NAMES = listOf(
+        "VLINKER", "VLINK", "V-LINK", "VGATE", "ICAR",
+        "OBD", "ELM", "LELINK", "KONNWEI", "VEEPEAK", "OBDLINK", "CARISTA",
+    )
+
+    fun start(ctx: Context) {
+        if (job?.isActive == true) return
+        job = scope.launch { connectLoop(ctx.applicationContext) }
+    }
+
+    /** Relance immédiatement la recherche Bluetooth / BLE (bouton « Rechercher OBD »). */
+    fun reconnectNow(ctx: Context) {
+        if (Vehicle.demo) return
+        job?.cancel()
+        job = null
+        start(ctx)
+    }
+
+    fun resetPeak() = _state.update { it.copy(peakCh = 0) }
+
+    fun startDemo() {
+        job?.cancel()
+        job = scope.launch {
+            var t = 0.0
+            while (isActive) {
+                val c = t % 24.0
+                val speed = when {
+                    c < 3 -> 0.0
+                    c < 15 -> 125 * (1 - kotlin.math.exp(-(c - 3) / 5.5)) / (1 - kotlin.math.exp(-12 / 5.5))
+                    else -> 125 * (1 - (c - 15) / 9)
+                }
+                val accelerating = c in 3.0..15.0
+                val rpm = if (speed < 1) 820 else (1300 + (speed % 45) * 60).roundToInt().coerceIn(900, 4400)
+                val load = if (accelerating) 85 else if (speed < 1) 12 else 20
+                publish(rpm, load, speed = speed.roundToInt(), coolant = 88, boost = load / 100f * 1.1f, voltage = 14.1f)
+                fr.p308.lanceur.drive.Speed.report(speed.toFloat(), fromObd = true)
+                _state.update { it.copy(status = "Démo", connected = true) }
+                t += 0.2
+                delay(200)
+            }
+        }
+    }
+
+    fun stopDemo(ctx: Context) {
+        job?.cancel()
+        job = null
+        _state.value = EngineState(peakCh = _state.value.peakCh)
+        start(ctx)
+    }
+
+    private fun publish(rpm: Int?, load: Int?, speed: Int? = null, coolant: Int? = null, boost: Float? = null, voltage: Float? = null) {
+        _state.update { s ->
+            val (torque, power) = if (rpm != null && load != null) estimate(rpm, load) else (null to null)
+            s.copy(
+                rpm = rpm ?: s.rpm, loadPct = load ?: s.loadPct,
+                speedKmh = speed ?: s.speedKmh, coolantC = coolant ?: s.coolantC, boostBar = boost ?: s.boostBar,
+                voltage = voltage ?: s.voltage,
+                torqueNm = torque ?: s.torqueNm, powerCh = power ?: s.powerCh,
+                peakCh = max(s.peakCh, power ?: 0),
+            )
+        }
+    }
+
+    private fun status(text: String, connected: Boolean = false) =
+        _state.update { it.copy(status = text, connected = connected) }
+
+    private fun prefs(ctx: Context) = ctx.getSharedPreferences("vehicle", Context.MODE_PRIVATE)
+
+    private suspend fun connectLoop(ctx: Context) {
+        while (currentCoroutineContext().isActive) {
+            try {
+                val transport = openTransport(ctx)
+                if (transport == null) {
+                    delay(8_000)
+                    continue
+                }
+                transport.use { session(it) }
+            } catch (e: IOException) {
+                status("OBD déconnecté (${e.message ?: "veille"}) — nouvel essai…")
+            } catch (_: SecurityException) {
+                status("Autorisation Bluetooth ou Localisation refusée")
+            } catch (e: Exception) {
+                if (!currentCoroutineContext().isActive) return
+                status("OBD : ${e.message ?: "erreur"} — nouvel essai…")
+            }
+            _state.update { EngineState(status = it.status, peakCh = it.peakCh) }
+            delay(6_000)
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private suspend fun openTransport(ctx: Context): ElmTransport? {
+        if (Build.VERSION.SDK_INT >= 31 &&
+            ctx.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
+        ) {
+            status("Autorisation Bluetooth manquante")
+            return null
+        }
+        val adapter = ctx.getSystemService(BluetoothManager::class.java)?.adapter
+        if (adapter == null || !adapter.isEnabled) {
+            status("Bluetooth Android inactif sur l'autoradio")
+            return null
+        }
+
+        // 1. Reconnexion BLE directe si on connaît déjà l'adresse MAC du Vgate iCar Pro 2S.
+        val savedMac = prefs(ctx).getString("obdBleMac", null)
+        if (!savedMac.isNullOrBlank() && BluetoothAdapter.checkBluetoothAddress(savedMac)) {
+            val savedDev = runCatching { adapter.getRemoteDevice(savedMac) }.getOrNull()
+            if (savedDev != null) {
+                status("Reconnexion BLE à ${savedDev.name ?: "boîtier OBD"}…")
+                runCatching { BleTransport.connect(ctx, savedDev) }.getOrNull()?.let { return it }
+                // Boîtier mémorisé absent (ex : ancien boîtier prêté) : on l'oublie pour ne plus perdre 5 s à chaque essai.
+                prefs(ctx).edit().remove("obdBleMac").apply()
+            }
+        }
+
+        // 2. Adaptateur déjà appairé dans Android (ex : Android-Vlink en SPP, ou bascule auto en BLE si SPP bloqué par FYT).
+        val bonded = adapter.bondedDevices?.filter { d -> matchesObdName(d.name) }.orEmpty()
+        for (dev in bonded) {
+            if (dev.type != BluetoothDevice.DEVICE_TYPE_LE) {
+                status("Connexion SPP à ${dev.name ?: dev.address}…")
+                val spp = runCatching { SppTransport.connect(dev) }.getOrNull()
+                if (spp != null) return spp
+            }
+            status("Connexion BLE à ${dev.name ?: dev.address}…")
+            val ble = runCatching { BleTransport.connect(ctx, dev) }.getOrNull()
+            if (ble != null) {
+                prefs(ctx).edit().putString("obdBleMac", dev.address).apply()
+                return ble
+            }
+        }
+
+        // 3. Scan Bluetooth Low Energy automatique (capte « IOS-Vlink » du Vgate iCar Pro 2S sans aucun appairage !).
+        status("Recherche vLinker / OBD (BLE)…")
+        val scanned = scanBleAdapter(ctx, adapter, timeoutMs = 5_500L)
+        if (scanned != null) {
+            val label = scanned.second
+            status("Connexion BLE à $label…")
+            val ble = BleTransport.connect(ctx, scanned.first, labelOverride = label)
+            prefs(ctx).edit().putString("obdBleMac", scanned.first.address).apply()
+            return ble
+        }
+
+        status("Aucun boîtier OBD détecté (branche le vLinker et mets le contact)")
+        return null
+    }
+
+    private fun matchesObdName(name: String?): Boolean =
+        !name.isNullOrBlank() && NAMES.any { name.contains(it, ignoreCase = true) }
+
+    @SuppressLint("MissingPermission")
+    private suspend fun scanBleAdapter(ctx: Context, adapter: BluetoothAdapter, timeoutMs: Long): Pair<BluetoothDevice, String>? {
+        if (Build.VERSION.SDK_INT >= 31 &&
+            ctx.checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED
+        ) return null
+        val scanner = adapter.bluetoothLeScanner ?: return null
+        val found = AtomicReference<Pair<BluetoothDevice, String>?>(null)
+
+        val cb = object : ScanCallback() {
+            override fun onScanResult(callbackType: Int, result: ScanResult) {
+                if (found.get() != null) return
+                val dev = result.device ?: return
+                val rec = result.scanRecord
+                val advName = rec?.deviceName?.takeIf { it.isNotBlank() } ?: dev.name
+                val uuids = rec?.serviceUuids?.map { it.uuid }.orEmpty()
+                val matchUuid = uuids.any { it in BLE_SERVICE_UUIDS }
+                if (matchesObdName(advName) || matchUuid) {
+                    found.compareAndSet(null, dev to (advName ?: "Vgate BLE"))
+                }
+            }
+        }
+
+        val settings = ScanSettings.Builder()
+            .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+            .build()
+        val started = runCatching { scanner.startScan(null, settings, cb) }.isSuccess
+        if (!started) return null
+        try {
+            var elapsed = 0L
+            while (elapsed < timeoutMs && found.get() == null && currentCoroutineContext().isActive) {
+                delay(150)
+                elapsed += 150
+            }
+        } finally {
+            runCatching { scanner.stopScan(cb) }
+        }
+        return found.get()
+    }
+
+    private suspend fun session(elm: ElmTransport) {
+        elm.cmd("ATZ", 3000)
+        delay(300) // le vLinker MC+ redémarre sa puce après ATZ
+        // ATAT1 = délais adaptatifs (plus de PID par seconde), ATST64 = 400 ms max d'attente calculateur.
+        listOf("ATE0", "ATL0", "ATS0", "ATH0", "ATAT1", "ATST64").forEach { elm.cmd(it, 1500) }
+        // 308 T7 2007 : CAN ISO 15765-4 11 bits 500 kbit/s (protocole 6) → connexion immédiate,
+        // sinon recherche automatique (ATSP0) pour tout autre véhicule.
+        elm.cmd("ATSP6", 1500)
+        if (elm.pid("00", 4000) == null) {
+            elm.cmd("ATSP0", 1500)
+            if (elm.pid("00", 8000) == null) throw IOException("calculateur muet (mets le contact)")
+        }
+        status("Connecté à ${elm.name}", connected = true)
+        val baro = elm.pid("33")?.firstOrNull() ?: 101
+        var n = 0
+        while (currentCoroutineContext().isActive) {
+            val rpm = elm.pid("0C")?.let { (it[0] * 256 + it[1]) / 4 }
+            val load = elm.pid("04")?.let { it[0] * 100 / 255 }
+            val speed = if (n % 2 == 0) elm.pid("0D")?.get(0) else null
+            speed?.let { fr.p308.lanceur.drive.Speed.report(it.toFloat(), fromObd = true) }
+            if (n % 10 == 1) {
+                val coolant = elm.pid("05")?.let { it[0] - 40 }
+                val boost = elm.pid("0B")?.let { (it[0] - baro) / 100f }
+                // Sur 308 1.6 HDi (EDC16C34), le PID 42 est souvent absent : ATRV lit directement le 12V du Vgate !
+                val volts = elm.pid("42")?.let { (it[0] * 256 + it[1]) / 1000f } ?: elm.readBatteryVolts()
+                if (Vehicle.state.value.outsideTempC == null) {
+                    elm.pid("46")?.firstOrNull()?.let { raw ->
+                        val extC = raw - 40
+                        if (extC in -35..60) {
+                            Vehicle.update { s -> if (s.outsideTempC == null) s.copy(outsideTempC = extC.toFloat()) else s }
+                        }
+                    }
+                }
+                publish(rpm, load, speed, coolant, boost, volts)
+            } else {
+                publish(rpm, load, speed)
+            }
+            n++
+        }
+    }
+
+    /** Interface commune ELM327 (Bluetooth classique SPP ou Bluetooth Low Energy GATT). */
+    private abstract class ElmTransport(val name: String) : Closeable {
+        abstract fun cmd(command: String, timeoutMs: Long = 1500): String
+
+        fun pid(pid: String, timeoutMs: Long = 1500): IntArray? {
+            val hex = cmd("01$pid", timeoutMs).uppercase().filter { it.isLetterOrDigit() }
+            val i = hex.indexOf("41$pid")
+            if (i < 0) return null
+            val data = hex.substring(i + 4).chunked(2).takeWhile { it.length == 2 }.mapNotNull { it.toIntOrNull(16) }
+            return data.toIntArray().takeIf { it.isNotEmpty() }
+        }
+
+        fun readBatteryVolts(): Float? {
+            val resp = cmd("ATRV", 1200)
+            val v = VOLTS_REGEX.find(resp)?.groupValues?.get(1)?.replace(',', '.')?.toFloatOrNull()
+            return v?.takeIf { it in 8.0f..18.5f }
+        }
+
+        companion object {
+            private val VOLTS_REGEX = Regex("(\\d{1,2}[.,]\\d{1,2})")
+        }
+    }
+
+    /** Transport Bluetooth classique RFCOMM SPP (Android-Vlink). */
+    private class SppTransport(private val socket: BluetoothSocket, label: String) : ElmTransport(label) {
+        private val input = socket.inputStream
+        private val output = socket.outputStream
+
+        override fun cmd(command: String, timeoutMs: Long): String {
+            output.write("$command\r".toByteArray(Charsets.US_ASCII))
+            output.flush()
+            val sb = StringBuilder()
+            val deadline = System.currentTimeMillis() + timeoutMs
+            while (System.currentTimeMillis() < deadline) {
+                if (input.available() > 0) {
+                    val c = input.read()
+                    if (c < 0) throw IOException("socket fermé")
+                    if (c == '>'.code) break
+                    sb.append(c.toChar())
+                } else {
+                    Thread.sleep(5)
+                }
+            }
+            return sb.toString()
+        }
+
+        override fun close() {
+            runCatching { socket.close() }
+        }
+
+        companion object {
+            @SuppressLint("MissingPermission")
+            fun connect(device: BluetoothDevice): SppTransport {
+                val sock = runCatching { device.createRfcommSocketToServiceRecord(SPP_UUID).also { it.connect() } }
+                    .getOrElse { device.createInsecureRfcommSocketToServiceRecord(SPP_UUID).also { it.connect() } }
+                return SppTransport(sock, "${device.name ?: "OBD"} (SPP)")
+            }
+        }
+    }
+
+    /** Transport Bluetooth Low Energy GATT (Vgate iCar Pro 2S « IOS-Vlink » : service 18F0 / 2AF0 / 2AF1 ou FFF0). */
+    @SuppressLint("MissingPermission")
+    @Suppress("PLATFORM_CLASS_MAPPED_TO_KOTLIN")
+    private class BleTransport(
+        private val gatt: BluetoothGatt,
+        private val writeChar: BluetoothGattCharacteristic,
+        private val rxLock: java.lang.Object,
+        private val rxBuf: StringBuilder,
+        private val stateRef: AtomicReference<Boolean>,
+        private val writeLatchRef: AtomicReference<CountDownLatch?>,
+        label: String,
+    ) : ElmTransport(label) {
+
+        @Suppress("DEPRECATION")
+        override fun cmd(command: String, timeoutMs: Long): String {
+            if (!stateRef.get()) throw IOException("BLE déconnecté")
+            synchronized(rxLock) { rxBuf.setLength(0) }
+
+            val payload = "$command\r".toByteArray(Charsets.US_ASCII)
+            val props = writeChar.properties
+            val writeNoResp = (props and BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE) != 0
+            var offset = 0
+            while (offset < payload.size) {
+                val end = minOf(offset + 20, payload.size)
+                val chunk = payload.copyOfRange(offset, end)
+                val latch = CountDownLatch(1)
+                writeLatchRef.set(latch)
+                writeChar.writeType = if (writeNoResp) {
+                    BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
+                } else {
+                    BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+                }
+                writeChar.value = chunk
+                if (!gatt.writeCharacteristic(writeChar)) {
+                    Thread.sleep(15)
+                    if (!gatt.writeCharacteristic(writeChar)) throw IOException("échec écriture BLE")
+                }
+                latch.await(450, TimeUnit.MILLISECONDS)
+                offset = end
+            }
+
+            val deadline = System.currentTimeMillis() + timeoutMs
+            synchronized(rxLock) {
+                while (System.currentTimeMillis() < deadline) {
+                    if (!stateRef.get()) throw IOException("BLE déconnecté")
+                    val idx = rxBuf.indexOf(">")
+                    if (idx >= 0) return rxBuf.substring(0, idx)
+                    val rem = deadline - System.currentTimeMillis()
+                    if (rem > 0) rxLock.wait(minOf(rem, 40L))
+                }
+                return rxBuf.toString()
+            }
+        }
+
+        override fun close() {
+            stateRef.set(false)
+            synchronized(rxLock) { rxLock.notifyAll() }
+            runCatching { gatt.disconnect() }
+            runCatching { gatt.close() }
+        }
+
+        companion object {
+            @Suppress("DEPRECATION", "PLATFORM_CLASS_MAPPED_TO_KOTLIN")
+            fun connect(ctx: Context, device: BluetoothDevice, labelOverride: String? = null): BleTransport {
+                val rxLock = java.lang.Object()
+                val rxBuf = StringBuilder()
+                val alive = AtomicReference(false)
+                val readyLatch = CountDownLatch(1)
+                val descLatch = CountDownLatch(1)
+                val writeLatchRef = AtomicReference<CountDownLatch?>(null)
+                var notifyFound: BluetoothGattCharacteristic? = null
+                var writeFound: BluetoothGattCharacteristic? = null
+
+                fun appendRx(bytes: ByteArray) {
+                    if (bytes.isEmpty()) return
+                    synchronized(rxLock) {
+                        rxBuf.append(String(bytes, Charsets.US_ASCII))
+                        if (rxBuf.indexOf(">") >= 0) rxLock.notifyAll()
+                    }
+                }
+
+                val callback = object : BluetoothGattCallback() {
+                    override fun onConnectionStateChange(g: BluetoothGatt, status: Int, newState: Int) {
+                        if (newState == BluetoothProfile.STATE_CONNECTED) {
+                            alive.set(true)
+                            g.discoverServices()
+                        } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                            alive.set(false)
+                            readyLatch.countDown()
+                            descLatch.countDown()
+                            writeLatchRef.get()?.countDown()
+                            synchronized(rxLock) { rxLock.notifyAll() }
+                        }
+                    }
+
+                    override fun onServicesDiscovered(g: BluetoothGatt, status: Int) {
+                        if (status == BluetoothGatt.GATT_SUCCESS) {
+                            val pair = pickUartCharacteristics(g)
+                            if (pair != null) {
+                                notifyFound = pair.first
+                                writeFound = pair.second
+                            }
+                        }
+                        readyLatch.countDown()
+                    }
+
+                    override fun onDescriptorWrite(g: BluetoothGatt, descriptor: BluetoothGattDescriptor, status: Int) {
+                        descLatch.countDown()
+                    }
+
+                    override fun onCharacteristicWrite(g: BluetoothGatt, characteristic: BluetoothGattCharacteristic, status: Int) {
+                        writeLatchRef.get()?.countDown()
+                    }
+
+                    @Deprecated("Appelée sur Android 8..12")
+                    override fun onCharacteristicChanged(g: BluetoothGatt, characteristic: BluetoothGattCharacteristic) {
+                        val v = characteristic.value ?: return
+                        appendRx(v)
+                    }
+
+                    override fun onCharacteristicChanged(g: BluetoothGatt, characteristic: BluetoothGattCharacteristic, value: ByteArray) {
+                        appendRx(value)
+                    }
+                }
+
+                val gatt = device.connectGatt(ctx, false, callback, BluetoothDevice.TRANSPORT_LE)
+                    ?: throw IOException("GATT indisponible")
+
+                val ok = readyLatch.await(5_000, TimeUnit.MILLISECONDS) && alive.get()
+                val nChar = notifyFound
+                val wChar = writeFound
+                if (!ok || nChar == null || wChar == null) {
+                    runCatching { gatt.disconnect() }
+                    runCatching { gatt.close() }
+                    throw IOException("service UART BLE introuvable")
+                }
+
+                gatt.setCharacteristicNotification(nChar, true)
+                nChar.getDescriptor(CCCD_UUID)?.let { cccd ->
+                    val useIndicate = (nChar.properties and BluetoothGattCharacteristic.PROPERTY_NOTIFY) == 0 &&
+                        (nChar.properties and BluetoothGattCharacteristic.PROPERTY_INDICATE) != 0
+                    cccd.value = if (useIndicate) {
+                        BluetoothGattDescriptor.ENABLE_INDICATION_VALUE
+                    } else {
+                        BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+                    }
+                    if (gatt.writeDescriptor(cccd)) {
+                        descLatch.await(1_500, TimeUnit.MILLISECONDS)
+                    }
+                }
+
+                val label = "${labelOverride ?: device.name ?: "Vgate"} (BLE)"
+                return BleTransport(gatt, wChar, rxLock, rxBuf, alive, writeLatchRef, label)
+            }
+
+            private fun pickUartCharacteristics(gatt: BluetoothGatt): Pair<BluetoothGattCharacteristic, BluetoothGattCharacteristic>? {
+                val services = gatt.services.orEmpty()
+                val ordered = BLE_SERVICE_UUIDS.mapNotNull { gatt.getService(it) } +
+                    services.filter { s ->
+                        val u = s.uuid.toString().lowercase()
+                        !u.startsWith("00001800") && !u.startsWith("00001801") && !u.startsWith("0000180a")
+                    }
+                for (svc in ordered.distinctBy { it.uuid }) {
+                    val chars = svc.characteristics.orEmpty()
+                    // Priorité explicite : vLinker MC+ (BEF8D6C9 = notify + write sur la même caractéristique),
+                    // puis Vgate iCar Pro / 2S (2AF0 = notify, 2AF1 = write).
+                    svc.getCharacteristic(VLINKER_CHAR)?.let { c -> return c to c }
+                    val nChar = svc.getCharacteristic(VGATE_NOTIFY) ?: chars.firstOrNull {
+                        (it.properties and (BluetoothGattCharacteristic.PROPERTY_NOTIFY or BluetoothGattCharacteristic.PROPERTY_INDICATE)) != 0
+                    }
+                    val wChar = svc.getCharacteristic(VGATE_WRITE) ?: chars.firstOrNull {
+                        it != nChar && (it.properties and (BluetoothGattCharacteristic.PROPERTY_WRITE or BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE)) != 0
+                    } ?: chars.firstOrNull {
+                        (it.properties and (BluetoothGattCharacteristic.PROPERTY_WRITE or BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE)) != 0
+                    }
+                    if (nChar != null && wChar != null) return nChar to wChar
+                }
+                return null
+            }
+        }
+    }
+}

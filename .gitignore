@@ -1,0 +1,23 @@
+# Fichiers gardés sur le PC mais jamais publiés
+# - modèles 3D : contiennent la plaque d'immatriculation, et la licence du modèle d'origine est à vérifier
+*.glb
+modele-3d/plaque.png
+# - APK compilées (embarquent le modèle 3D)
+*.apk
+# - code décompilé des applis du fabricant de l'autoradio (propriété de FYT)
+fyt-extraits/
+# - journaux de trajets GPS et relevés CAN pris dans la voiture
+logs/
+*.csv
+# - clés de signature : ne JAMAIS les publier
+*.keystore
+*.jks
+
+# Compilation
+.gradle/
+build/
+local.properties
+.idea/
+*.iml
+node_modules/
+__pycache__/
