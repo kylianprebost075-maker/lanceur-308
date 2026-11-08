@@ -79,10 +79,14 @@ object Trip {
     }
 }
 
-enum class ChronoMode(val label: String, val from: Float, val to: Float) {
-    ZERO_100("0 → 100 km/h", 0f, 100f),
-    R80_120("80 → 120 km/h", 80f, 120f),
+/** [minS] : temps en dessous duquel la mesure est forcément fausse (bien plus rapide qu'une supercar). */
+enum class ChronoMode(val label: String, val from: Float, val to: Float, val minS: Float) {
+    ZERO_100("0 → 100 km/h", 0f, 100f, 2.5f),
+    R80_120("80 → 120 km/h", 80f, 120f, 1.5f),
 }
+
+/** Accélération maximale crédible : 45 km/h par seconde (environ 1,3 g). Au-delà, la vitesse a « sauté ». */
+private const val MAX_KMH_PER_S = 45f
 
 enum class ChronoPhase { WAITING, READY, RUNNING, DONE }
 
@@ -105,7 +109,7 @@ object Chrono {
 
     fun init(ctx: Context) {
         prefs = ctx.getSharedPreferences("chrono", Context.MODE_PRIVATE)
-        val best = ChronoMode.entries.mapNotNull { m -> prefs.getFloat(m.name, 0f).takeIf { it > 0f }?.let { m to it } }.toMap()
+        val best = ChronoMode.entries.mapNotNull { m -> prefs.getFloat(m.name, 0f).takeIf { it >= m.minS }?.let { m to it } }.toMap()
         _state.update { it.copy(best = best) }
     }
 
@@ -123,10 +127,28 @@ object Chrono {
         return prevNanos + ((nanos - prevNanos) * f).toLong()
     }
 
+    /**
+     * Vrai si la vitesse a augmenté plus vite qu'une voiture ne le peut depuis la mesure précédente
+     * (saut du GPS, mesure manquée, mode démo) : la mesure en cours n'est alors pas fiable.
+     */
+    private fun jumped(kmh: Float, nanos: Long): Boolean {
+        if (prevKmh < 0f || kmh <= prevKmh) return false
+        val dt = (nanos - prevNanos) / 1e9f
+        if (dt <= 0f) return true
+        return (kmh - prevKmh) / dt > MAX_KMH_PER_S && kmh - prevKmh > 10f
+    }
+
     @Synchronized
     fun feed(kmh: Float, nanos: Long) {
         val s = _state.value
         val m = s.mode
+        if (jumped(kmh, nanos) && (s.phase == ChronoPhase.READY || s.phase == ChronoPhase.RUNNING)) {
+            // Départ ou chrono faussé : on annule et on attend de pouvoir réarmer proprement.
+            _state.update { it.copy(phase = ChronoPhase.WAITING, elapsedS = 0f) }
+            prevKmh = kmh
+            prevNanos = nanos
+            return
+        }
         when (s.phase) {
             ChronoPhase.WAITING, ChronoPhase.DONE -> {
                 val armed = if (m == ChronoMode.ZERO_100) kmh < 1f else kmh in 40f..(m.from - 2f)
@@ -156,6 +178,11 @@ object Chrono {
     }
 
     private fun finish(seconds: Float) {
+        if (seconds < _state.value.mode.minS) {
+            // Temps impossible : jamais affiché comme résultat ni gardé comme record.
+            _state.update { it.copy(phase = ChronoPhase.WAITING, elapsedS = 0f, resultS = null) }
+            return
+        }
         _state.update { s ->
             val best = s.best[s.mode]
             val newBest = if (best == null || seconds < best) seconds.also { prefs.edit().putFloat(s.mode.name, it).apply() } else best
