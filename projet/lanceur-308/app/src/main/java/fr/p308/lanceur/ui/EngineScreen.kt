@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import fr.p308.lanceur.maintenance.fmtKm
 import fr.p308.lanceur.vehicle.Engine
+import fr.p308.lanceur.vehicle.ShiftAdvice
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import java.util.Locale
 import kotlin.math.cos
@@ -53,7 +54,7 @@ import kotlin.math.sin
 private const val MAX_CH = 120f
 private const val MAX_RPM = 5000f
 
-private enum class EngineTab(val label: String) { POWER("Puissance"), CHRONO("Chrono"), TRIP("Trajet") }
+private enum class EngineTab(val label: String) { POWER("Puissance"), DIAG("Diagnostic"), CHRONO("Chrono"), TRIP("Trajet") }
 
 @Composable
 fun EngineScreen() {
@@ -63,6 +64,7 @@ fun EngineScreen() {
         Box(Modifier.weight(1f)) {
             when (tab) {
                 EngineTab.POWER -> PowerPanel()
+                EngineTab.DIAG -> DiagPanel()
                 EngineTab.CHRONO -> ChronoPanel()
                 EngineTab.TRIP -> TripPanel()
             }
@@ -97,7 +99,13 @@ private fun PowerPanel() {
             }
             PowerGauge(e.powerCh, e.torqueNm, Modifier.weight(1f).fillMaxWidth())
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Pic : ${e.peakCh} ch", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                Text("Pic : ${e.peakCh} ch", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.width(12.dp))
+                Text(
+                    listOfNotNull(e.advice.gear?.let { "Rapport ${ShiftAdvice.ordinal(it)}" }, e.advice.text.ifEmpty { null }).joinToString("  ·  "),
+                    fontSize = 15.sp, color = if (e.advice.kind == ShiftAdvice.Kind.UP) C.Green else C.Orange,
+                    maxLines = 1, modifier = Modifier.weight(1f),
+                )
                 TextButton(onClick = Engine::resetPeak) { Text("Remettre à zéro") }
             }
             Text("Vgate vLinker MC+ : branche-le et mets le contact, la connexion BLE (vLinker MC-IOS) est automatique sans appairage.", fontSize = 11.sp, color = C.Sub)

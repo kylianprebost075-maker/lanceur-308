@@ -52,7 +52,49 @@ data class EngineState(
     val torqueNm: Int? = null,
     val powerCh: Int? = null,
     val peakCh: Int = 0,
+    /** Rapport estimé et conseil de passage (calculés, voir ShiftAdvice). */
+    val advice: ShiftAdvice.Advice = ShiftAdvice.Advice(null, ShiftAdvice.Kind.NONE),
 )
+
+/** Résultat de la dernière lecture des codes défaut (onglet Moteur → Diagnostic). */
+data class DiagState(
+    val busy: Boolean = false,
+    val status: String = "Pas encore lu",
+    val readAtMs: Long? = null,
+    val stored: List<String> = emptyList(),
+    val pending: List<String> = emptyList(),
+    val permanent: List<String> = emptyList(),
+    /** Kilométrage lu dans le calculateur moteur (EDC16C34, identifiant 21 10). */
+    val ecuKm: Int? = null,
+)
+
+/** Codes défaut d'une réponse aux modes 03 / 07 / 0A (en-têtes masqués, trames « 0: … » comprises). */
+internal fun parseDtcs(resp: String, modeByte: Int): List<String> {
+    val hex = buildString {
+        for (raw in resp.uppercase().split('\r', '\n')) {
+            var t = raw.replace(" ", "").trim()
+            if (t.isEmpty()) continue
+            if (Regex("^[0-9A-F]:").containsMatchIn(t)) t = t.substring(2)
+            else if (Regex("^[0-9A-F]{3}$").matches(t)) continue // longueur totale d'une réponse multi-trames
+            if (!Regex("^[0-9A-F]+$").matches(t)) continue
+            append(t)
+        }
+    }
+    val bytes = hex.chunked(2).filter { it.length == 2 }.map { it.toInt(16) }
+    val start = bytes.indexOf(modeByte)
+    if (start < 0) return emptyList()
+    val payload = bytes.drop(start)
+    val pairs = if (payload.size % 2 == 0) payload.drop(2) else payload.drop(1)
+    val codes = mutableListOf<String>()
+    var i = 0
+    while (i + 1 < pairs.size) {
+        val a = pairs[i]
+        val b = pairs[i + 1]
+        if (a != 0 || b != 0) codes += "PCBU"[a shr 6] + "${(a shr 4) and 3}" + "%X".format(a and 0xF) + "%02X".format(b)
+        i += 2
+    }
+    return codes.distinct()
+}
 
 /** Couple maxi du 1.6 HDi 110 (DV6TED4) selon le régime : 240 Nm à 1 750 tr/min, 110 ch à 4 000 tr/min. */
 private val TORQUE_CURVE = listOf(
@@ -83,6 +125,31 @@ fun estimate(rpm: Int, loadPct: Int): Pair<Int, Int> {
 object Engine {
     private val _state = MutableStateFlow(EngineState())
     val state: StateFlow<EngineState> = _state.asStateFlow()
+
+    private val _diag = MutableStateFlow(DiagState())
+    val diag: StateFlow<DiagState> = _diag.asStateFlow()
+
+    private enum class DiagRequest { READ, CLEAR }
+
+    @Volatile
+    private var diagRequest: DiagRequest? = null
+
+    /**
+     * Demande une lecture des codes défaut (et du kilométrage moteur), faite par la boucle OBD au prochain tour.
+     * `clear = true` efface d'abord les codes (mode 04 normalisé), toujours après confirmation à l'écran.
+     */
+    fun requestDiag(clear: Boolean = false) {
+        if (Vehicle.demo) {
+            _diag.value = DiagState(status = "Démo : aucun code défaut", readAtMs = System.currentTimeMillis(), ecuKm = 140_721)
+            return
+        }
+        if (!_state.value.connected) {
+            _diag.update { it.copy(busy = false, status = "Boîtier OBD non connecté : branche le vLinker et mets le contact") }
+            return
+        }
+        diagRequest = if (clear) DiagRequest.CLEAR else DiagRequest.READ
+        _diag.update { it.copy(busy = true, status = if (clear) "Effacement des codes…" else "Lecture des codes…") }
+    }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var job: Job? = null
@@ -157,12 +224,17 @@ object Engine {
     private fun publish(rpm: Int?, load: Int?, speed: Int? = null, coolant: Int? = null, boost: Float? = null, voltage: Float? = null) {
         _state.update { s ->
             val (torque, power) = if (rpm != null && load != null) estimate(rpm, load) else (null to null)
+            val r = rpm ?: s.rpm
+            val l = load ?: s.loadPct
+            val v = speed ?: s.speedKmh
+            val c = coolant ?: s.coolantC
             s.copy(
-                rpm = rpm ?: s.rpm, loadPct = load ?: s.loadPct,
-                speedKmh = speed ?: s.speedKmh, coolantC = coolant ?: s.coolantC, boostBar = boost ?: s.boostBar,
+                rpm = r, loadPct = l,
+                speedKmh = v, coolantC = c, boostBar = boost ?: s.boostBar,
                 voltage = voltage ?: s.voltage,
                 torqueNm = torque ?: s.torqueNm, powerCh = power ?: s.powerCh,
                 peakCh = max(s.peakCh, power ?: 0),
+                advice = ShiftAdvice.advise(r, v, l, c),
             )
         }
     }
@@ -190,6 +262,8 @@ object Engine {
                 status("OBD : ${e.message ?: "erreur"} — nouvel essai…")
             }
             _state.update { EngineState(status = it.status, peakCh = it.peakCh) }
+            diagRequest = null
+            _diag.update { if (it.busy) it.copy(busy = false, status = "OBD déconnecté pendant la lecture : réessaie") else it }
             delay(6_000)
         }
     }
@@ -306,20 +380,30 @@ object Engine {
             if (elm.pid("00", 8000) == null) throw IOException("calculateur muet (mets le contact)")
         }
         status("Connecté à ${elm.name}", connected = true)
-        val baro = elm.pid("33")?.firstOrNull() ?: 101
+        // Kilométrage du calculateur moteur (relevé le 08/11/2026 : identique au compteur) → kilométrage d'entretien.
+        runCatching { readEcuKm(elm) }.getOrNull()?.let { km ->
+            applyEcuKm(km)
+            _diag.update { it.copy(ecuKm = km) }
+        }
+        val baro = elm.pid("33", minBytes = 1)?.firstOrNull() ?: 101
         var n = 0
         while (currentCoroutineContext().isActive) {
-            val rpm = elm.pid("0C")?.let { (it[0] * 256 + it[1]) / 4 }
-            val load = elm.pid("04")?.let { it[0] * 100 / 255 }
-            val speed = if (n % 2 == 0) elm.pid("0D")?.get(0) else null
+            diagRequest?.let { req ->
+                diagRequest = null
+                runDiag(elm, req)
+            }
+            // minBytes : une réponse tronquée (bruit Bluetooth) est ignorée au lieu de couper la connexion.
+            val rpm = elm.pid("0C", minBytes = 2)?.let { (it[0] * 256 + it[1]) / 4 }
+            val load = elm.pid("04", minBytes = 1)?.let { it[0] * 100 / 255 }
+            val speed = if (n % 2 == 0) elm.pid("0D", minBytes = 1)?.get(0) else null
             speed?.let { fr.p308.lanceur.drive.Speed.report(it.toFloat(), fromObd = true) }
             if (n % 10 == 1) {
-                val coolant = elm.pid("05")?.let { it[0] - 40 }
-                val boost = elm.pid("0B")?.let { (it[0] - baro) / 100f }
-                // Sur 308 1.6 HDi (EDC16C34), le PID 42 est souvent absent : ATRV lit directement le 12V du Vgate !
-                val volts = elm.pid("42")?.let { (it[0] * 256 + it[1]) / 1000f } ?: elm.readBatteryVolts()
+                val coolant = elm.pid("05", minBytes = 1)?.let { it[0] - 40 }
+                val boost = elm.pid("0B", minBytes = 1)?.let { (it[0] - baro) / 100f }
+                // Sur 308 1.6 HDi (EDC16C34), le PID 42 est absent : ATRV lit directement le 12V du Vgate !
+                val volts = elm.pid("42", minBytes = 2)?.let { (it[0] * 256 + it[1]) / 1000f } ?: elm.readBatteryVolts()
                 if (Vehicle.state.value.outsideTempC == null) {
-                    elm.pid("46")?.firstOrNull()?.let { raw ->
+                    elm.pid("46", minBytes = 1)?.firstOrNull()?.let { raw ->
                         val extC = raw - 40
                         if (extC in -35..60) {
                             Vehicle.update { s -> if (s.outsideTempC == null) s.copy(outsideTempC = extC.toFloat()) else s }
@@ -334,16 +418,65 @@ object Engine {
         }
     }
 
+    /** Lecture (et effacement si demandé) des codes défaut normalisés, puis du kilométrage moteur. */
+    private fun runDiag(elm: ElmTransport, req: DiagRequest) {
+        try {
+            var clearMsg = ""
+            if (req == DiagRequest.CLEAR) {
+                val ok = elm.cmd("04", 5000).uppercase().filter { it.isLetterOrDigit() }.contains("44")
+                clearMsg = if (ok) "Codes effacés. " else "Effacement refusé par le calculateur (coupe le moteur, contact mis). "
+            }
+            val stored = parseDtcs(elm.cmd("03", 4000), 0x43)
+            val pending = parseDtcs(elm.cmd("07", 4000), 0x47)
+            val permanent = parseDtcs(elm.cmd("0A", 4000), 0x4A)
+            val km = runCatching { readEcuKm(elm) }.getOrNull()
+            km?.let(::applyEcuKm)
+            val total = (stored + pending + permanent).distinct().size
+            _diag.value = DiagState(
+                busy = false,
+                status = clearMsg + if (total == 0) "Aucun code défaut" else "$total code(s) défaut",
+                readAtMs = System.currentTimeMillis(),
+                stored = stored, pending = pending, permanent = permanent,
+                ecuKm = km ?: _diag.value.ecuKm,
+            )
+        } catch (e: IOException) {
+            _diag.update { it.copy(busy = false, status = "Lecture interrompue (${e.message ?: "OBD"}) : réessaie") }
+            throw e
+        }
+    }
+
+    /**
+     * Kilométrage du calculateur moteur PSA EDC16C34 : requête KWP 21 10 vers 6A8, réponse 688
+     * « 61 10 00 02 25 B1 » = 140 721 km. Lecture seule ; l'adressage OBD normal est toujours rétabli.
+     */
+    private fun readEcuKm(elm: ElmTransport): Int? {
+        try {
+            listOf("ATSH6A8", "ATCRA688", "ATFCSH6A8", "ATFCSD300000", "ATFCSM1").forEach { elm.cmd(it, 1500) }
+            val hex = elm.cmd("2110", 2500).uppercase().filter { it.isLetterOrDigit() }
+            val i = hex.indexOf("6110")
+            if (i < 0 || hex.length < i + 12) return null
+            return hex.substring(i + 4, i + 12).toLongOrNull(16)?.toInt()?.takeIf { it in 1..1_999_999 }
+        } finally {
+            listOf("ATFCSM0", "ATCRA", "ATSH7DF").forEach { runCatching { elm.cmd(it, 1500) } }
+        }
+    }
+
+    /** Le kilométrage du calculateur remplace le kilométrage d'entretien saisi à la main (le GPS complète ensuite). */
+    private fun applyEcuKm(km: Int) {
+        if (Vehicle.state.value.odometerKm != km) Vehicle.setOdometer(km)
+    }
+
     /** Interface commune ELM327 (Bluetooth classique SPP ou Bluetooth Low Energy GATT). */
     private abstract class ElmTransport(val name: String) : Closeable {
         abstract fun cmd(command: String, timeoutMs: Long = 1500): String
 
-        fun pid(pid: String, timeoutMs: Long = 1500): IntArray? {
+        /** Octets de données d'un PID du mode 01, ou null si absent ou plus court que `minBytes`. */
+        fun pid(pid: String, timeoutMs: Long = 1500, minBytes: Int = 1): IntArray? {
             val hex = cmd("01$pid", timeoutMs).uppercase().filter { it.isLetterOrDigit() }
             val i = hex.indexOf("41$pid")
             if (i < 0) return null
             val data = hex.substring(i + 4).chunked(2).takeWhile { it.length == 2 }.mapNotNull { it.toIntOrNull(16) }
-            return data.toIntArray().takeIf { it.isNotEmpty() }
+            return data.toIntArray().takeIf { it.size >= minBytes }
         }
 
         fun readBatteryVolts(): Float? {

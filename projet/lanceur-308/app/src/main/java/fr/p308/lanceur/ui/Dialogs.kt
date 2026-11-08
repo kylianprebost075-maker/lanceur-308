@@ -283,6 +283,17 @@ fun SettingsDialog(onDismiss: () -> Unit) {
                         }.onFailure { Toast.makeText(ctx, "Écran absent sur cet autoradio : autorisation à donner via ADB", Toast.LENGTH_LONG).show() }
                     }) { Text("Ouvrir") }
                 }
+                SettingRow(
+                    "Performances à côté de CarPlay",
+                    "Panneau : puissance, couple, rapport conseillé, eau, turbo (bouton CarPlay du dock ; fenêtre flottante requise)",
+                ) {
+                    Switch(UiPrefs.perfOnCarPlay, UiPrefs::updatePerfOnCarPlay)
+                }
+                if (UiPrefs.perfOnCarPlay) {
+                    SettingRow("Côté du panneau", null) {
+                        Segmented(listOf(false to "Gauche", true to "Droite"), UiPrefs.perfOnRight) { UiPrefs.updatePerfOnRight(it) }
+                    }
+                }
                 SettingRow("Paramètres Android", "Réglages d'origine, souvent cachés par l'autoradio") {
                     TextButton(onClick = { openSettings(ctx, Intent(Settings.ACTION_SETTINGS)) }) { Text("Ouvrir") }
                 }

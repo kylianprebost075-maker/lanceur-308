@@ -19,6 +19,8 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import fr.p308.lanceur.AppVisibility
 import fr.p308.lanceur.MainActivity
+import fr.p308.lanceur.PerfPanel
+import fr.p308.lanceur.UiPrefs
 import fr.p308.lanceur.R
 import fr.p308.lanceur.maintenance.DueLevel
 import fr.p308.lanceur.maintenance.Maintenance
@@ -48,6 +50,7 @@ class VehicleWatchService : Service(), LocationListener {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private lateinit var overlay: DoorOverlay
     private lateinit var banner: AlertBanner
+    private lateinit var perf: PerfOverlay
     private var lastBatteryLevel = BatteryLevel.UNKNOWN
     private val gnss = object : GnssStatus.Callback() {
         override fun onSatelliteStatusChanged(status: GnssStatus) = GpsMonitor.onGnss(status)
@@ -70,6 +73,17 @@ class VehicleWatchService : Service(), LocationListener {
 
         overlay = DoorOverlay(this)
         banner = AlertBanner(this)
+        perf = PerfOverlay(this) { PerfPanel.armed.value = false }
+        scope.launch {
+            var wasForeground = AppVisibility.foreground.value
+            combine(Engine.state, AppVisibility.foreground, PerfPanel.armed) { e, fg, armed -> Triple(e, fg, armed) }
+                .collect { (e, fg, armed) ->
+                    // Retour dans le Lanceur : le panneau ne revient qu'au prochain lancement de CarPlay.
+                    if (fg && !wasForeground) PerfPanel.armed.value = false
+                    wasForeground = fg
+                    if (armed && !fg && UiPrefs.perfOnCarPlay) perf.show(e, UiPrefs.perfOnRight) else perf.hide()
+                }
+        }
         scope.launch {
             while (isActive) {
                 GpsMonitor.tick()
@@ -102,6 +116,7 @@ class VehicleWatchService : Service(), LocationListener {
         }
         overlay.hide()
         banner.hide()
+        perf.hide()
         CanBusSource.stop(this)
         scope.cancel()
         super.onDestroy()

@@ -36,6 +36,14 @@ object AppVisibility {
     val foreground = MutableStateFlow(false)
 }
 
+/**
+ * Panneau « performances » affiché par-dessus CarPlay : armé quand CarPlay est lancé depuis le dock avec l'option
+ * activée, désarmé au retour dans le Lanceur ou par un appui long sur le panneau.
+ */
+object PerfPanel {
+    val armed = MutableStateFlow(false)
+}
+
 object UiPrefs {
     private lateinit var prefs: SharedPreferences
 
@@ -48,6 +56,12 @@ object UiPrefs {
         private set
     var dimAtNight by mutableStateOf(true)
         private set
+    /** v0.9 : panneau performances à côté de CarPlay. */
+    var perfOnCarPlay by mutableStateOf(true)
+        private set
+    /** Côté du panneau performances : droite (par défaut) ou gauche. */
+    var perfOnRight by mutableStateOf(true)
+        private set
 
     val carColor get() = CAR_COLORS[colorIndex.coerceIn(CAR_COLORS.indices)]
 
@@ -57,6 +71,8 @@ object UiPrefs {
         fiveDoors = prefs.getBoolean("fiveDoors", true)
         nightMode = runCatching { NightMode.valueOf(prefs.getString("nightMode", "AUTO")!!) }.getOrDefault(NightMode.AUTO)
         dimAtNight = prefs.getBoolean("dimAtNight", true)
+        perfOnCarPlay = prefs.getBoolean("perfOnCarPlay", true)
+        perfOnRight = prefs.getBoolean("perfOnRight", true)
         Slot.entries.forEach { s -> prefs.getString("slot_${s.name}", null)?.let { slots[s] = it } }
     }
 
@@ -80,6 +96,16 @@ object UiPrefs {
         prefs.edit().putBoolean("dimAtNight", v).apply()
     }
 
+    fun updatePerfOnCarPlay(v: Boolean) {
+        perfOnCarPlay = v
+        prefs.edit().putBoolean("perfOnCarPlay", v).apply()
+    }
+
+    fun updatePerfOnRight(v: Boolean) {
+        perfOnRight = v
+        prefs.edit().putBoolean("perfOnRight", v).apply()
+    }
+
     fun setSlot(slot: Slot, pkg: String) {
         slots[slot] = pkg
         prefs.edit().putString("slot_${slot.name}", pkg).apply()
@@ -96,7 +122,9 @@ fun launchPackage(ctx: Context, pkg: String): Boolean {
 /** Lance l'appli assignée à l'emplacement, ou devine-la d'après le nom du paquet. */
 fun launchSlot(ctx: Context, slot: Slot): Boolean {
     val pkg = UiPrefs.slots[slot] ?: guessPackage(ctx, slot)?.also { UiPrefs.setSlot(slot, it) }
+    PerfPanel.armed.value = slot == Slot.CARPLAY && UiPrefs.perfOnCarPlay
     if (pkg != null && launchPackage(ctx, pkg)) return true
+    PerfPanel.armed.value = false
     Toast.makeText(ctx, "Appui long sur une appli dans « Applis » pour l'assigner à ${slot.label}", Toast.LENGTH_LONG).show()
     return false
 }
