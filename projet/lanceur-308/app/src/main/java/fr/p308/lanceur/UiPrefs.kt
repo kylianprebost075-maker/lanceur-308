@@ -62,6 +62,9 @@ object UiPrefs {
     /** Côté du panneau performances : droite (par défaut) ou gauche. */
     var perfOnRight by mutableStateOf(true)
         private set
+    /** v0.12.3 : panneau CarPlay réduit (pastille en haut) au lieu de la colonne complète. */
+    var perfCompact by mutableStateOf(false)
+        private set
     /** v0.12 : style « Verre » (panneaux translucides sur fond dégradé) ou style classique opaque. */
     var glass by mutableStateOf(true)
         private set
@@ -76,6 +79,7 @@ object UiPrefs {
         dimAtNight = prefs.getBoolean("dimAtNight", true)
         perfOnCarPlay = prefs.getBoolean("perfOnCarPlay", true)
         perfOnRight = prefs.getBoolean("perfOnRight", true)
+        perfCompact = prefs.getBoolean("perfCompact", false)
         glass = prefs.getBoolean("glass", true)
         Slot.entries.forEach { s -> prefs.getString("slot_${s.name}", null)?.let { slots[s] = it } }
     }
@@ -103,6 +107,11 @@ object UiPrefs {
     fun updatePerfOnCarPlay(v: Boolean) {
         perfOnCarPlay = v
         prefs.edit().putBoolean("perfOnCarPlay", v).apply()
+    }
+
+    fun updatePerfCompact(v: Boolean) {
+        perfCompact = v
+        prefs.edit().putBoolean("perfCompact", v).apply()
     }
 
     fun updatePerfOnRight(v: Boolean) {

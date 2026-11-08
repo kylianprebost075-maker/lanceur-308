@@ -307,6 +307,9 @@ fun SettingsDialog(onDismiss: () -> Unit) {
                     SettingRow("Côté du panneau", null) {
                         Segmented(listOf(false to "Gauche", true to "Droite"), UiPrefs.perfOnRight) { UiPrefs.updatePerfOnRight(it) }
                     }
+                    SettingRow("Taille du panneau", "Réduit : pastille en haut (rapport, ch, eau, chauffe). Toucher le panneau change aussi") {
+                        Segmented(listOf(false to "Complet", true to "Réduit"), UiPrefs.perfCompact) { UiPrefs.updatePerfCompact(it) }
+                    }
                 }
                 SettingRow("Paramètres Android", "Réglages d'origine, souvent cachés par l'autoradio") {
                     TextButton(onClick = { openSettings(ctx, Intent(Settings.ACTION_SETTINGS)) }) { Text("Ouvrir") }

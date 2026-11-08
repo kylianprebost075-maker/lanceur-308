@@ -34,9 +34,19 @@ class PerfOverlay(private val ctx: Context, private val onClose: () -> Unit) {
     private val density = ctx.resources.displayMetrics.density
     private var root: LinearLayout? = null
     private var full: LinearLayout? = null
-    private var mini: TextView? = null
+    private var mini: LinearLayout? = null
     private var rightSide = true
-    private var collapsed = false
+    private val collapsed get() = fr.p308.lanceur.UiPrefs.perfCompact
+
+    // Pastille (version réduite) : point de température, rapport, conseil, puissance, eau, chauffe restante.
+    private lateinit var miniDot: GradientDrawable
+    private lateinit var miniGear: TextView
+    private lateinit var miniAdvice: TextView
+    private lateinit var miniPower: TextView
+    private lateinit var miniWater: TextView
+    private lateinit var miniWarm: TextView
+    private lateinit var columnBg: GradientDrawable
+    private lateinit var pillBg: GradientDrawable
 
     private lateinit var gear: TextView
     private lateinit var advice: TextView
@@ -58,6 +68,11 @@ class PerfOverlay(private val ctx: Context, private val onClose: () -> Unit) {
         if (root != null && onRight != rightSide) hide()
         rightSide = onRight
         if (root == null) build()
+        else if (shownCompact != collapsed) {
+            // Taille changée dans les Réglages pendant que le panneau est affiché.
+            applyCollapsed()
+            root?.let { runCatching { wm.updateViewLayout(it, params()) } }
+        }
         render(e)
     }
 
@@ -182,16 +197,39 @@ class PerfOverlay(private val ctx: Context, private val onClose: () -> Unit) {
             addView(View(ctx), LinearLayout.LayoutParams(1, 0, 1f))
             addView(status)
         }
-        val m = label("", 20f, bold = true).apply { setPadding(dp(16), dp(10), dp(16), dp(10)) }
+        miniDot = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(SUB) }
+        miniGear = label("—", 30f, bold = true)
+        miniAdvice = label("", 19f, bold = true)
+        miniPower = label("", 21f, bold = true)
+        miniWater = label("", 19f, SUB)
+        miniWarm = label("", 19f, BLUE, bold = true)
+        val m = LinearLayout(ctx).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(18), dp(10), dp(22), dp(10))
+            fun gap() = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { leftMargin = dp(14) }
+            addView(View(ctx).apply { background = miniDot }, LinearLayout.LayoutParams(dp(13), dp(13)))
+            addView(miniGear, gap())
+            addView(miniAdvice, gap().apply { leftMargin = dp(8) })
+            addView(miniPower, gap())
+            addView(miniWater, gap())
+            addView(miniWarm, gap())
+        }
+        // Verre sombre : assez opaque pour rester lisible par-dessus la carte de CarPlay.
+        columnBg = GradientDrawable(
+            GradientDrawable.Orientation.TL_BR, intArrayOf(0xFC172242.toInt(), 0xFC0A0F1E.toInt()),
+        ).apply {
+            cornerRadius = dp(22).toFloat()
+            setStroke(dp(1), 0x40FFFFFF)
+        }
+        pillBg = GradientDrawable(
+            GradientDrawable.Orientation.TL_BR, intArrayOf(0xF5172242.toInt(), 0xF50A0F1E.toInt()),
+        ).apply {
+            cornerRadius = dp(40).toFloat()
+            setStroke(dp(1), 0x40FFFFFF)
+        }
         val r = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
-            // Verre sombre : assez opaque pour rester lisible par-dessus la carte de CarPlay.
-            background = GradientDrawable(
-                GradientDrawable.Orientation.TL_BR, intArrayOf(0xFC172242.toInt(), 0xFC0A0F1E.toInt()),
-            ).apply {
-                cornerRadius = dp(22).toFloat()
-                setStroke(dp(1), 0x40FFFFFF)
-            }
             addView(f, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT))
             addView(m)
             setOnClickListener { toggle() }
@@ -204,15 +242,20 @@ class PerfOverlay(private val ctx: Context, private val onClose: () -> Unit) {
         wm.addView(r, params())
     }
 
+    /** Toucher : passe de la colonne complète à la pastille et inversement (choix gardé, comme dans les Réglages). */
     private fun toggle() {
-        collapsed = !collapsed
+        fr.p308.lanceur.UiPrefs.updatePerfCompact(!collapsed)
         applyCollapsed()
         root?.let { runCatching { wm.updateViewLayout(it, params()) } }
     }
 
+    private var shownCompact: Boolean? = null
+
     private fun applyCollapsed() {
+        shownCompact = collapsed
         full?.visibility = if (collapsed) View.GONE else View.VISIBLE
         mini?.visibility = if (collapsed) View.VISIBLE else View.GONE
+        root?.background = if (collapsed) pillBg else columnBg
     }
 
     private fun params() = WindowManager.LayoutParams(
@@ -302,13 +345,29 @@ class PerfOverlay(private val ctx: Context, private val onClose: () -> Unit) {
         status.text = (e.voltage?.let { "Batterie %.1f V  ·  ".format(Locale.FRANCE, it) } ?: "") +
             if (e.connected) "appui long : fermer" else e.status
 
-        val warm = if (w.active) left?.let { "  ❄ ${ceil(it).toInt()} min" } ?: "" else ""
-        mini?.text = when (a.kind) {
-            ShiftAdvice.Kind.UP -> "▲ ${ShiftAdvice.ordinal(a.target)}  ${e.powerCh ?: "—"} ch$warm"
-            ShiftAdvice.Kind.DOWN -> "▼ ${ShiftAdvice.ordinal(a.target)}  ${e.powerCh ?: "—"} ch$warm"
-            else -> "${e.powerCh ?: "—"} ch  ${c?.let { "$it °C" } ?: ""}$warm"
+        // Pastille : le point prend la couleur de l'eau (ou de l'huile si elle est plus froide).
+        val coldest = listOfNotNull(c?.toFloat(), o).minOrNull()
+        miniDot.setColor(
+            when {
+                c != null && c >= 105 -> RED
+                coldest == null -> SUB
+                else -> tempColor(coldest, 999f)
+            }
+        )
+        miniGear.text = a.gear?.let { ShiftAdvice.ordinal(it) } ?: "—"
+        miniAdvice.text = when (a.kind) {
+            ShiftAdvice.Kind.UP -> "▲ ${ShiftAdvice.ordinal(a.target)}"
+            ShiftAdvice.Kind.DOWN -> "▼ ${ShiftAdvice.ordinal(a.target)}"
+            else -> ""
         }
-        mini?.setTextColor(if (a.kind == ShiftAdvice.Kind.NONE) TEXT else adviceColor)
+        miniAdvice.setTextColor(adviceColor)
+        miniAdvice.visibility = if (miniAdvice.text.isEmpty()) View.GONE else View.VISIBLE
+        miniPower.text = "${e.powerCh ?: "—"} ch"
+        miniWater.text = c?.let { "$it °C" } ?: ""
+        miniWater.visibility = if (c == null) View.GONE else View.VISIBLE
+        val warmMin = if (w.active) left ?: oilLeft else null
+        miniWarm.text = warmMin?.let { "❄ ${ceil(it).toInt().coerceAtLeast(1)} min" } ?: ""
+        miniWarm.visibility = if (warmMin == null) View.GONE else View.VISIBLE
     }
 
     private companion object {
