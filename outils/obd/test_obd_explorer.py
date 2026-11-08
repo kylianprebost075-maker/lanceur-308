@@ -115,6 +115,36 @@ class SeancesSimulees(unittest.TestCase):
             self.assertNotIn("REFUS", journal)
             self.assertTrue(json.loads(next(Path(d).glob("*-psa/resultats.json")).read_text(encoding="utf-8")))
 
+    def test_balayage_22_puis_relecture_moteur_tournant(self):
+        with tempfile.TemporaryDirectory() as d:
+            r = self.lancer(d, "balayer", "--calculateur", "moteur", "--service", "22",
+                            "--plages", "00F0-010F", "--nom", "arret")
+            self.assertEqual(set(r["identifiants"]), {"220100", "220101"})
+            self.assertEqual(r["refus"], {"31": 30})
+            ancien = o.TransportSimulation.__init__
+
+            def moteur_tournant(self):
+                ancien(self)
+                self.moteur = True
+
+            o.TransportSimulation.__init__ = moteur_tournant
+            try:
+                r = self.lancer(d, "balayer", "--calculateur", "moteur", "--service", "22",
+                                "--relire", "arret", "--nom", "tournant")
+            finally:
+                o.TransportSimulation.__init__ = ancien
+            self.assertEqual(len(r["identifiants"]), 2)
+            diffs = self.lancer(d, "comparer", "arret", "tournant")
+            self.assertEqual([(x["identifiant"], x["octet"], x["apres"]) for x in diffs], [("220100", 1, "2A")])
+
+    def test_balayage_arrete_si_service_inconnu(self):
+        with tempfile.TemporaryDirectory() as d:
+            r = self.lancer(d, "balayer", "--calculateur", "bsi", "--service", "22",
+                            "--plages", "0000-00FF", "--nom", "bsi")
+            self.assertEqual(r["identifiants"], {})
+            self.assertEqual(r["refus"], {"11": 3})
+            self.assertNotIn("REFUS", next(Path(d).glob("*-balayer/journal.txt")).read_text(encoding="utf-8"))
+
 
 if __name__ == "__main__":
     unittest.main()

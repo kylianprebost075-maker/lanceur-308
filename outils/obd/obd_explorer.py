@@ -19,6 +19,9 @@ Commandes (lancer avec `python -I obd_explorer.py <commande>`) :
   comparer NOM1 NOM2        octets qui ont changé entre deux instantanés (ex. phares éteints / allumés)
   chercher-km KM            cherche le kilométrage du compteur dans les instantanés
   direct --minutes N        relève en continu les valeurs OBD normalisées (moteur tournant)
+  balayer --calculateur X --service 21|22 --nom NOM [--plages 0000-00FF,...] [--relire NOM0]
+                            lit des plages d'identifiants (21xx ou 22xxxx) d'un calculateur et les enregistre comme
+                            un instantané (comparable avec `comparer`) ; --relire ne relit que ceux d'un instantané
 Option commune : --simulation (fausse voiture, pour essayer sans le boîtier), --mac AA:BB:..., --dossier.
 """
 from __future__ import annotations
@@ -127,6 +130,7 @@ class TransportSimulation:
     def __init__(self):
         self.entete = 0x7DF
         self.phares = False  # basculé par les tests pour vérifier `comparer`
+        self.moteur = False  # moteur tournant : change la valeur 22 0100 du calculateur moteur
 
     def _reponse(self, entete_rep: int, charge: bytes) -> list[str]:
         """Découpe une réponse en trames ISO-TP comme le boîtier les affiche (en-têtes visibles)."""
@@ -177,6 +181,13 @@ class TransportSimulation:
             if self.entete == 0x6A8 and lid in (0xA0, 0xA1):
                 return "\r".join(self._reponse(rep, bytes([0x61, lid]) + bytes(range(1, 15))))
             return "\r".join(self._reponse(rep, bytes([0x7F, 0x21, 0x12])))
+        if s == 0x22 and self.entete == 0x6A8 and len(req) == 3:
+            ident = int.from_bytes(req[1:3], "big")
+            if ident == 0x0100:  # fausse pression différentielle du FAP
+                return "\r".join(self._reponse(rep, bytes([0x62, 0x01, 0x00, 0x00, 0x2A if self.moteur else 0x00])))
+            if ident == 0x0101:  # fausse donnée fixe
+                return "\r".join(self._reponse(rep, bytes([0x62, 0x01, 0x01, 0x12, 0x34])))
+            return "\r".join(self._reponse(rep, bytes([0x7F, 0x22, 0x31])))
         return "\r".join(self._reponse(rep, bytes([0x7F, s, 0x11])))
 
     def _obd(self, req: bytes) -> list[str]:
@@ -552,7 +563,7 @@ def comparer_instantanes(a: dict, b: dict) -> list[dict]:
 
 
 def cmd_comparer(args):
-    """Affiche les octets qui ont changé entre deux instantanés."""
+    """Affiche les octets qui ont changé entre deux instantanés, et les identifiants lus d'un seul côté."""
     d = Path(args.dossier) / "instantanes"
     a = json.loads((d / f"{args.nom1}.json").read_text(encoding="utf-8"))
     b = json.loads((d / f"{args.nom2}.json").read_text(encoding="utf-8"))
@@ -561,7 +572,99 @@ def cmd_comparer(args):
         print(f"{x['calculateur']} {x['identifiant']} octet {x['octet']} : {x['avant']} → {x['apres']}")
     if not diffs:
         print("Aucune différence.")
+    for calc in sorted(set(a) | set(b)):
+        seuls_a = sorted(set(a.get(calc, {})) - set(b.get(calc, {})))
+        seuls_b = sorted(set(b.get(calc, {})) - set(a.get(calc, {})))
+        if seuls_a:
+            print(f"{calc} : lus seulement dans {args.nom1} : {' '.join(seuls_a)}")
+        if seuls_b:
+            print(f"{calc} : lus seulement dans {args.nom2} : {' '.join(seuls_b)}")
     return diffs
+
+
+PLAGES_22 = "0000-03FF,1000-13FF,2000-23FF,3000-33FF,D000-D4FF,E000-E3FF,F100-F1FF,F400-F4FF"
+
+
+def lire_plages(texte: str) -> list[tuple[int, int]]:
+    """« 0000-00FF,F190 » → [(0x0000, 0x00FF), (0xF190, 0xF190)]."""
+    plages = []
+    for morceau in texte.replace(" ", "").split(","):
+        if morceau:
+            debut, _, fin = morceau.partition("-")
+            plages.append((int(debut, 16), int(fin or debut, 16)))
+    return plages
+
+
+def trouver_calculateur(texte: str) -> tuple[str, int, int]:
+    """Calculateur PSA dont le nom contient le texte donné (ex. « moteur », « abs »)."""
+    for nom, req, rep in CALCULATEURS_PSA:
+        if texte.lower() in nom.lower():
+            return nom, req, rep
+    sys.exit(f"Calculateur inconnu : {texte}. Choix : " + ", ".join(n for n, _, _ in CALCULATEURS_PSA))
+
+
+def ouvrir_session(elm: Elm, reponse: int) -> str | None:
+    """Ouvre la session de diagnostic étendue PSA (C0), sinon UDS (03) ; renvoie celle acceptée."""
+    for session in ("10C0", "1003"):
+        c = elm.demander(session, 1.0).get(reponse)
+        if c and c[0] == 0x50:
+            return session
+    return None
+
+
+def balayer_identifiants(elm: Elm, reponse: int, service: int, identifiants: list[int],
+                         afficher=print) -> tuple[dict[str, str], dict[str, int]]:
+    """Lit chaque identifiant (21xx ou 22xxxx) ; renvoie ceux qui répondent et le compte des refus par code.
+
+    S'arrête tôt si le calculateur dit ne pas connaître le service (refus 11 trois fois de suite)."""
+    largeur = 2 if service == 0x21 else 4
+    trouves, refus = {}, {}
+    dernier_maintien, refus_11_suite = time.monotonic(), 0
+    for n, ident in enumerate(identifiants, 1):
+        if time.monotonic() - dernier_maintien > 2:
+            elm.demander("3E00", 0.5)
+            dernier_maintien = time.monotonic()
+        hexa = f"{service:02X}{ident:0{largeur}X}"
+        c = elm.demander(hexa, 1.0).get(reponse)
+        if c and c[0] == service + 0x40 and c[1:1 + largeur // 2] == ident.to_bytes(largeur // 2, "big"):
+            trouves[hexa] = c[1 + largeur // 2:].hex(" ").upper()
+            afficher(f"  {hexa} : {trouves[hexa]}")
+            refus_11_suite = 0
+        elif c and len(c) >= 3 and c[0] == 0x7F:
+            code = f"{c[2]:02X}"
+            refus[code] = refus.get(code, 0) + 1
+            refus_11_suite = refus_11_suite + 1 if c[2] == 0x11 else 0
+            if refus_11_suite >= 3:
+                afficher(f"  le calculateur ne connaît pas le service {service:02X} (refus 11)")
+                break
+        else:
+            refus["sans réponse"] = refus.get("sans réponse", 0) + 1
+        if n % 256 == 0:
+            afficher(f"  … {n}/{len(identifiants)} lus, {len(trouves)} trouvés")
+    return trouves, refus
+
+
+def cmd_balayer(s: Seance, args):
+    """Lit des plages d'identifiants d'un calculateur et les enregistre comme un instantané."""
+    nom, req, rep = trouver_calculateur(args.calculateur)
+    service = int(args.service, 16)
+    dossier = s.racine / "instantanes"
+    if args.relire:
+        photo = json.loads((dossier / f"{args.relire}.json").read_text(encoding="utf-8")).get(nom, {})
+        identifiants = [int(k[2:], 16) for k in photo if int(k[:2], 16) == service]
+    else:
+        plages = lire_plages(args.plages or ("00-FF" if service == 0x21 else PLAGES_22))
+        identifiants = [i for debut, fin in plages for i in range(debut, fin + 1)]
+    s.resultats["boitier"] = s.elm.initialiser()
+    s.elm.viser(req, rep)
+    session = ouvrir_session(s.elm, rep)
+    print(f"{nom} : session {session or 'non ouverte'} ; {len(identifiants)} identifiants {service:02X} à lire…")
+    trouves, refus = balayer_identifiants(s.elm, rep, service, identifiants)
+    print(f"{len(trouves)} identifiants répondent ; refus : {refus}")
+    dossier.mkdir(exist_ok=True)
+    (dossier / f"{args.nom}.json").write_text(json.dumps({nom: trouves}, ensure_ascii=False, indent=2), encoding="utf-8")
+    s.resultats.update({"calculateur": nom, "service": f"{service:02X}", "session": session,
+                        "identifiants": trouves, "refus": refus, "instantane": args.nom})
 
 
 def chercher_valeur(instantanes: dict[str, dict], km: int) -> list[dict]:
@@ -637,6 +740,12 @@ def main(argv=None):
     k.add_argument("km", type=int)
     d = sp.add_parser("direct")
     d.add_argument("--minutes", type=float, default=3)
+    b = sp.add_parser("balayer")
+    b.add_argument("--calculateur", required=True, help="ex. moteur, abs")
+    b.add_argument("--service", choices=("21", "22"), default="22")
+    b.add_argument("--plages", help="ex. 0000-00FF,F190 (par défaut : 00-FF pour 21, plages courantes pour 22)")
+    b.add_argument("--relire", help="ne relire que les identifiants de cet instantané")
+    b.add_argument("--nom", required=True, help="nom de l'instantané enregistré")
     args = p.parse_args(argv)
 
     if args.commande == "comparer":
@@ -646,7 +755,7 @@ def main(argv=None):
     s = Seance(args, args.commande)
     try:
         {"connexion": cmd_connexion, "standard": cmd_standard, "psa": cmd_psa,
-         "instantane": cmd_instantane, "direct": cmd_direct}[args.commande](s, args)
+         "instantane": cmd_instantane, "direct": cmd_direct, "balayer": cmd_balayer}[args.commande](s, args)
     finally:
         s.enregistrer()
         s.fermer()
