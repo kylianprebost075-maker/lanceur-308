@@ -18,7 +18,7 @@ import java.io.File
  */
 object Backup {
     private const val FILE = "sauvegarde-308.json"
-    private val PREFS = listOf("maintenance", "vehicle", "ui", "fuel", "chrono", "trips", "battery")
+    private val PREFS = listOf("maintenance", "vehicle", "ui", "fuel", "chrono", "trips", "battery", "gears")
 
     private fun volumes(ctx: Context): List<Pair<File, Boolean>> =
         ctx.getExternalFilesDirs(null).filterNotNull().map { it to runCatching { Environment.isExternalStorageRemovable(it) }.getOrDefault(false) }
@@ -83,6 +83,7 @@ object Backup {
         Vehicle.init(ctx)
         fr.p308.lanceur.drive.TripLog.init(ctx)
         fr.p308.lanceur.vehicle.CrankWatch.init(ctx)
+        fr.p308.lanceur.vehicle.GearCalib.init(ctx)
         return "Restauré depuis ${if (file.absolutePath.contains("emulated")) "la mémoire interne" else "la clé USB"} (sauvegarde du ${json.optString("date").take(10)})"
     }
 }

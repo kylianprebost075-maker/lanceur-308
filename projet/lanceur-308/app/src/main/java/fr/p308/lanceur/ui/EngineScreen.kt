@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import fr.p308.lanceur.maintenance.fmtKm
 import fr.p308.lanceur.vehicle.Engine
+import fr.p308.lanceur.vehicle.GearCalib
 import fr.p308.lanceur.vehicle.ShiftAdvice
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import java.util.Locale
@@ -111,7 +112,15 @@ private fun PowerPanel() {
                 )
                 TextButton(onClick = Engine::resetPeak) { Text("Remettre à zéro") }
             }
-            Text("Vgate vLinker MC+ : branche-le et mets le contact, la connexion BLE (vLinker MC-IOS) est automatique sans appairage.", fontSize = 11.sp, color = C.Sub)
+            if (e.connected) {
+                // Le texte se met à jour à chaque relevé OBD (cette page se redessine déjà à ce rythme).
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(GearCalib.status(), fontSize = 11.sp, color = C.Sub, modifier = Modifier.weight(1f), maxLines = 1)
+                    if (GearCalib.samples > 0) TextButton(onClick = GearCalib::reset) { Text("Réapprendre", fontSize = 11.sp) }
+                }
+            } else {
+                Text("Vgate vLinker MC+ : branche-le et mets le contact, la connexion BLE (vLinker MC-IOS) est automatique sans appairage.", fontSize = 11.sp, color = C.Sub)
+            }
         }
         Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             BarTile("Régime", e.rpm?.let { "${fmtKm(it)} tr/min" }, (e.rpm ?: 0) / MAX_RPM, Modifier.weight(1f))

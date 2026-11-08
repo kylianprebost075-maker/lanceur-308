@@ -270,7 +270,7 @@ fun HomeAndMaintenanceScreen(vs: VehicleState, items: List<MaintenanceItem>, int
                     ClockTile(Modifier.weight(1f).fillMaxWidth())
                     Tile(Modifier.weight(1f).fillMaxWidth()) {
                         Row(Modifier.weight(1f)) {
-                            Metric("Extérieur", vs.outsideTempC?.let { "%.1f °C".format(Locale.FRANCE, it) } ?: "—", Modifier.weight(1f))
+                            Metric("Extérieur", vs.outsideTempC?.let { if (vs.outsideTempEstimated) "≈ %.0f °C".format(Locale.FRANCE, it) else "%.1f °C".format(Locale.FRANCE, it) } ?: "—", Modifier.weight(1f))
                             BatteryMetric(Modifier.weight(1f))
                         }
                         Row(Modifier.weight(1f)) {

@@ -14,6 +14,8 @@ data class VehicleState(
     val odometerKm: Int? = null,
     val odometerFromCan: Boolean = false,
     val outsideTempC: Float? = null,
+    /** Vrai si la température extérieure est estimée par l'air d'admission (OBD), pas lue sur le CAN. */
+    val outsideTempEstimated: Boolean = false,
     val batteryV: Float? = null,
     val fuelRangeKm: Int? = null,
     val reverse: Boolean = false,

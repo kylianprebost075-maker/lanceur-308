@@ -36,6 +36,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.PI
+import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.roundToInt
 
@@ -176,7 +177,11 @@ object Engine {
         "OBD", "ELM", "LELINK", "KONNWEI", "VEEPEAK", "OBDLINK", "CARISTA",
     )
 
+    @Volatile
+    private var appCtx: Context? = null
+
     fun start(ctx: Context) {
+        appCtx = ctx.applicationContext
         if (job?.isActive == true) return
         job = scope.launch { connectLoop(ctx.applicationContext) }
     }
@@ -380,11 +385,11 @@ object Engine {
             if (elm.pid("00", 8000) == null) throw IOException("calculateur muet (mets le contact)")
         }
         status("Connecté à ${elm.name}", connected = true)
+        estimateOutsideTemp(elm)
         // Kilométrage du calculateur moteur (relevé le 08/11/2026 : identique au compteur) → kilométrage d'entretien.
-        runCatching { readEcuKm(elm) }.getOrNull()?.let { km ->
-            applyEcuKm(km)
-            _diag.update { it.copy(ecuKm = km) }
-        }
+        // Moteur tournant, le calculateur répond souvent trop tard : nouvel essai plus tard s'il a échoué.
+        var kmRead = tryEcuKm(elm)
+        var kmTriedAt = System.currentTimeMillis()
         val baro = elm.pid("33", minBytes = 1)?.firstOrNull() ?: 101
         CrankWatch.resetSession()
         var n = 0
@@ -393,6 +398,14 @@ object Engine {
             diagRequest?.let { req ->
                 diagRequest = null
                 runDiag(elm, req)
+                if (_diag.value.ecuKm != null) kmRead = true
+            }
+            if (!kmRead) {
+                val wait = if (engineOff) 60_000L else 5 * 60_000L
+                if (System.currentTimeMillis() - kmTriedAt > wait) {
+                    kmRead = tryEcuKm(elm)
+                    kmTriedAt = System.currentTimeMillis()
+                }
             }
             // minBytes : une réponse tronquée (bruit Bluetooth) est ignorée au lieu de couper la connexion.
             val rpm = elm.pid("0C", minBytes = 2)?.let { (it[0] * 256 + it[1]) / 4 }
@@ -411,19 +424,13 @@ object Engine {
             val load = elm.pid("04", minBytes = 1)?.let { it[0] * 100 / 255 }
             val speed = if (n % 2 == 0) elm.pid("0D", minBytes = 1)?.get(0) else null
             speed?.let { fr.p308.lanceur.drive.Speed.report(it.toFloat(), fromObd = true) }
+            // Régime et vitesse du même tour : sert à apprendre l'étagement réel de la boîte.
+            if (rpm != null && speed != null) GearCalib.feed(rpm, speed)
             if (n % 10 == 1) {
                 val coolant = elm.pid("05", minBytes = 1)?.let { it[0] - 40 }
                 val boost = elm.pid("0B", minBytes = 1)?.let { (it[0] - baro) / 100f }
-                // Sur 308 1.6 HDi (EDC16C34), le PID 42 est absent : ATRV lit directement le 12V du Vgate !
-                val volts = elm.pid("42", minBytes = 2)?.let { (it[0] * 256 + it[1]) / 1000f } ?: elm.readBatteryVolts()
-                if (Vehicle.state.value.outsideTempC == null) {
-                    elm.pid("46", minBytes = 1)?.firstOrNull()?.let { raw ->
-                        val extC = raw - 40
-                        if (extC in -35..60) {
-                            Vehicle.update { s -> if (s.outsideTempC == null) s.copy(outsideTempC = extC.toFloat()) else s }
-                        }
-                    }
-                }
+                // Le PID 42 (tension) est absent sur l'EDC16C34 (séance du 08/11) : ATRV lit le 12 V du vLinker.
+                val volts = elm.readBatteryVolts()
                 publish(rpm, load, speed, coolant, boost, volts)
             } else {
                 publish(rpm, load, speed)
@@ -465,13 +472,56 @@ object Engine {
      */
     private fun readEcuKm(elm: ElmTransport): Int? {
         try {
-            listOf("ATSH6A8", "ATCRA688", "ATFCSH6A8", "ATFCSD300000", "ATFCSM1").forEach { elm.cmd(it, 1500) }
-            val hex = elm.cmd("2110", 2500).uppercase().filter { it.isLetterOrDigit() }
-            val i = hex.indexOf("6110")
-            if (i < 0 || hex.length < i + 12) return null
-            return hex.substring(i + 4, i + 12).toLongOrNull(16)?.toInt()?.takeIf { it in 1..1_999_999 }
+            // Séance du 08/11 : moteur tournant, 2110 restait souvent sans réponse avec 400 ms d'attente (ATST64).
+            // On attend ici jusqu'à 1 s (ATSTFF, délai fixe), après un « testeur présent » (3E00), 3 essais.
+            listOf("ATAT0", "ATSTFF", "ATSH6A8", "ATCRA688", "ATFCSH6A8", "ATFCSD300000", "ATFCSM1").forEach { elm.cmd(it, 1500) }
+            elm.cmd("3E00", 2500)
+            repeat(3) {
+                val hex = elm.cmd("2110", 3000).uppercase().filter { it.isLetterOrDigit() }
+                val i = hex.indexOf("6110")
+                if (i >= 0 && hex.length >= i + 12) {
+                    hex.substring(i + 4, i + 12).toLongOrNull(16)?.toInt()?.takeIf { it in 1..1_999_999 }?.let { return it }
+                }
+            }
+            return null
         } finally {
-            listOf("ATFCSM0", "ATCRA", "ATSH7DF").forEach { runCatching { elm.cmd(it, 1500) } }
+            listOf("ATFCSM0", "ATCRA", "ATSH7DF", "ATST64", "ATAT1").forEach { runCatching { elm.cmd(it, 1500) } }
+        }
+    }
+
+    /** Lit le kilométrage moteur ; vrai s'il a été obtenu. Une coupure Bluetooth remonte (IOException). */
+    private fun tryEcuKm(elm: ElmTransport): Boolean {
+        val km = try {
+            readEcuKm(elm)
+        } catch (e: IOException) {
+            throw e
+        } catch (_: Exception) {
+            null
+        } ?: return false
+        applyEcuKm(km)
+        _diag.update { it.copy(ecuKm = km) }
+        return true
+    }
+
+    /**
+     * Température extérieure : la 308 ne la donne pas sur la prise OBD (PID 46 absent, séance du 08/11 ; c'est le
+     * BSI qui la connaît). Estimation : après un arrêt assez long, l'air d'admission (PID 0F) et l'eau sont à la
+     * température ambiante. Si l'eau est à moins de 6 °C de l'air et sous 45 °C, l'air d'admission = l'extérieur.
+     * Sinon (moteur encore chaud), la dernière estimation de moins de 3 h est reprise.
+     */
+    private fun estimateOutsideTemp(elm: ElmTransport) {
+        val iat = elm.pid("0F", minBytes = 1)?.let { it[0] - 40 }
+        val coolant = elm.pid("05", minBytes = 1)?.let { it[0] - 40 }
+        val p = appCtx?.let(::prefs)
+        val now = System.currentTimeMillis()
+        val value: Float? = if (iat != null && coolant != null && iat in -35..50 && coolant < 45 && abs(coolant - iat) <= 6) {
+            p?.edit()?.putFloat("outsideC", iat.toFloat())?.putLong("outsideAt", now)?.apply()
+            iat.toFloat()
+        } else {
+            p?.takeIf { now - it.getLong("outsideAt", 0L) < 3 * 3_600_000L }?.getFloat("outsideC", Float.NaN)?.takeIf { !it.isNaN() }
+        }
+        if (value != null) {
+            Vehicle.update { s -> if (s.outsideTempC == null || s.outsideTempEstimated) s.copy(outsideTempC = value, outsideTempEstimated = true) else s }
         }
     }
 

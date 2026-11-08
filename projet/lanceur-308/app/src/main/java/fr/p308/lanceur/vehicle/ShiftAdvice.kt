@@ -29,16 +29,20 @@ object ShiftAdvice {
         else -> "${g}e"
     }
 
+    /** Étagement utilisé : celui appris sur la route (GearCalib) dès qu'il existe, sinon les valeurs approchées. */
+    private fun table(): FloatArray = GearCalib.learned ?: KMH_PER_1000
+
     /** Rapport le plus proche du rapport vitesse / régime, ou null (arrêt, embrayage, point mort). */
     fun gear(rpm: Int?, speedKmh: Int?): Int? {
         if (rpm == null || speedKmh == null || rpm < 600 || speedKmh < 4) return null
+        val t = table()
         val ratio = speedKmh * 1000f / rpm
-        val i = KMH_PER_1000.indices.minByOrNull { abs(KMH_PER_1000[it] - ratio) } ?: return null
-        return if (abs(KMH_PER_1000[i] - ratio) / KMH_PER_1000[i] <= 0.12f) i + 1 else null
+        val i = t.indices.minByOrNull { abs(t[it] - ratio) } ?: return null
+        return if (abs(t[i] - ratio) / t[i] <= 0.12f) i + 1 else null
     }
 
     /** Régime qu'on aurait sur le rapport `g` à cette vitesse. */
-    fun rpmOn(g: Int, speedKmh: Int): Int = (speedKmh * 1000f / KMH_PER_1000[g - 1]).toInt()
+    fun rpmOn(g: Int, speedKmh: Int): Int = (speedKmh * 1000f / table()[g - 1]).toInt()
 
     /**
      * Conseil « éco » d'un diesel : monter tôt (≈ 2 300 tr/min à charge modérée) sans descendre sous 1 300 tr/min

@@ -85,7 +85,7 @@ object Vehicle {
             Trip.reset()
             _state.update {
                 it.copy(open = emptySet(), reverse = false, fogLights = false, headlights = null, rearRadarCm = emptyList(),
-                    outsideTempC = null, batteryV = null, fuelRangeKm = null, source = "Aucune")
+                    outsideTempC = null, outsideTempEstimated = false, batteryV = null, fuelRangeKm = null, source = "Aucune")
             }
             if (::appContext.isInitialized) CanBusSource.restart(appContext)
             return

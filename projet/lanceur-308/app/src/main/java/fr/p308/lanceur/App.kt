@@ -21,5 +21,6 @@ class App : Application() {
         // Après Vehicle.init : le mode démo est déjà connu, le trajet en cours peut être repris.
         TripLog.init(this)
         CrankWatch.init(this)
+        fr.p308.lanceur.vehicle.GearCalib.init(this)
     }
 }
