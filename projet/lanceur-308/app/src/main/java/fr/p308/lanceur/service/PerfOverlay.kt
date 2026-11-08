@@ -112,10 +112,16 @@ class PerfOverlay(private val ctx: Context, private val onClose: () -> Unit) {
         val c = e.coolantC
         val running = (e.rpm ?: 0) > 400
         val v = e.voltage
+        val turbo = fr.p308.lanceur.vehicle.TurboCool.state.value
+        val range = fr.p308.lanceur.drive.FuelRange.state.value
         return when {
             c != null && c >= 105 -> Alert("Surchauffe : eau $c °C", RED, true)
             running && v != null && v < 12.8f -> Alert("Batterie ne charge pas (%.1f V)".format(Locale.FRANCE, v), ORANGE, true)
             running && v != null && v > 15.2f -> Alert("Surtension (%.1f V)".format(Locale.FRANCE, v), ORANGE, true)
+            // À l'arrêt après un effort : laisser tourner avant de couper (huile qui refroidit le turbo).
+            turbo.stopped && turbo.waitS >= 5 -> Alert("Turbo chaud : attends ${turbo.waitS} s avant de couper", ORANGE, false)
+            turbo.justCooled && turbo.stopped -> Alert("Turbo refroidi ✓ tu peux couper", GREEN, false)
+            range != null && range.km < 60 -> Alert("Réserve bientôt : ≈ ${range.km} km", ORANGE, false)
             fr.p308.lanceur.drive.FapAdvice.current?.level == 2 -> Alert("FAP : 20 min de voie rapide", ORANGE, false)
             else -> null
         }
@@ -395,8 +401,12 @@ class PerfOverlay(private val ctx: Context, private val onClose: () -> Unit) {
             else -> ACCENT
         })
 
-        status.text = (e.voltage?.let { "Batterie %.1f V  ·  ".format(Locale.FRANCE, it) } ?: "") +
-            if (e.connected) "appui long : fermer" else e.status
+        val range = fr.p308.lanceur.drive.FuelRange.state.value
+        status.text = when {
+            range != null -> "Autonomie ≈ ${range.km} km" + (e.voltage?.let { "  ·  %.1f V".format(Locale.FRANCE, it) } ?: "")
+            else -> (e.voltage?.let { "Batterie %.1f V  ·  ".format(Locale.FRANCE, it) } ?: "") +
+                if (e.connected) "appui long : fermer" else e.status
+        }
 
         // Pastille : le point prend la couleur de l'eau (ou de l'huile si elle est plus froide).
         val coldest = listOfNotNull(c?.toFloat(), o).minOrNull()
@@ -451,7 +461,7 @@ class PerfOverlay(private val ctx: Context, private val onClose: () -> Unit) {
             miniWarm.setTextColor(alert.color)
             miniWarm.visibility = View.VISIBLE
         }
-        val blink = alert != null && (System.currentTimeMillis() / 600) % 2 == 0L
+        val blink = alert != null && alert.color != GREEN && (System.currentTimeMillis() / 600) % 2 == 0L
         root?.alpha = if (blink && collapsed) 0.6f else 1f
     }
 

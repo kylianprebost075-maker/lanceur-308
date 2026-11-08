@@ -50,6 +50,49 @@ object FuelModel {
     }
 }
 
+/** Autonomie estimée : km avant l'allumage du témoin de réserve, litres restants, base du calcul. */
+data class RangeInfo(val km: Int, val liters: Double, val l100: Double, val basis: String)
+
+/**
+ * Autonomie ESTIMÉE (la 308 ne la donne pas sur la prise OBD) : réservoir de 60 L plein au dernier plein complet,
+ * moins les km parcourus depuis × la consommation, plus les pleins partiels faits depuis. Consommation : celle
+ * mesurée entre les pleins s'il y en a, sinon la moyenne estimée des derniers trajets, sinon 6 L/100.
+ * Résultat donné jusqu'au témoin de réserve (≈ 6 L restants).
+ */
+object FuelRange {
+    const val TANK_L = 60.0
+    const val RESERVE_L = 6.0
+
+    private val _state = kotlinx.coroutines.flow.MutableStateFlow<RangeInfo?>(null)
+    val state: kotlinx.coroutines.flow.StateFlow<RangeInfo?> = _state
+
+    fun compute(fills: List<FuelEntry>, trips: List<TripRecord>, odometerKm: Int?): RangeInfo? {
+        val lastFull = fills.withIndex().lastOrNull { it.value.full } ?: return null
+        val odo = odometerKm ?: return null
+        val since = (odo - lastFull.value.km).coerceAtLeast(0)
+        if (since > 2_000) return null // plein trop ancien (ou kilométrage faux) : rien de fiable
+        val measured = fr.p308.lanceur.maintenance.Fuel.stats(fills).avgL100?.toDouble()
+        val recent = trips.filter { it.l100 != null }.take(10)
+        val estimated = if (recent.sumOf { it.distanceKm } >= 30) {
+            recent.sumOf { it.fuelL ?: 0.0 } / recent.sumOf { it.distanceKm } * 100
+        } else null
+        val l100 = (measured ?: estimated ?: 6.0).coerceIn(3.5, 12.0)
+        val basis = when {
+            measured != null -> "conso mesurée entre tes pleins"
+            estimated != null -> "conso estimée des derniers trajets"
+            else -> "conso moyenne par défaut, pas encore de mesure"
+        }
+        val partial = fills.drop(lastFull.index + 1).sumOf { it.liters.toDouble() }
+        val liters = (TANK_L - since * l100 / 100 + partial).coerceIn(0.0, TANK_L)
+        val km = ((liters - RESERVE_L).coerceAtLeast(0.0) / l100 * 100).toInt()
+        return RangeInfo(km, liters, l100, basis)
+    }
+
+    fun update(fills: List<FuelEntry>, trips: List<TripRecord>, odometerKm: Int?) {
+        _state.value = compute(fills, trips, odometerKm)
+    }
+}
+
 /** État du filtre à particules déduit des trajets (le FAP lui-même n'est pas lisible sur la prise OBD). */
 data class FapStatus(
     /** 0 = rien à faire, 1 = conseil, 2 = à faire vite. */

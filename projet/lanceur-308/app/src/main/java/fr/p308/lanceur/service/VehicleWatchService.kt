@@ -99,7 +99,15 @@ class VehicleWatchService : Service(), LocationListener {
                     Vehicle.state.value.outsideTempC)
                 AutoBackup.tick(this@VehicleWatchService)
                 checkBattery()
+                fr.p308.lanceur.vehicle.TurboCool.tick(Engine.state.value, fr.p308.lanceur.drive.Trip.state.value.currentKmh)
                 if (++ticks % 2 == 0) CarPlayWatch.tick(this@VehicleWatchService)
+                // Autonomie : recalculée toutes les 30 s (le kilométrage avance en roulant).
+                if (ticks % 30 == 1) {
+                    fr.p308.lanceur.drive.FuelRange.update(
+                        fr.p308.lanceur.maintenance.Fuel.entries.value, TripLog.history.value, Vehicle.state.value.odometerKm,
+                    )
+                    checkRange()
+                }
                 fr.p308.lanceur.backup.Import.check(this@VehicleWatchService)?.let(::notifyImport)
                 delay(1000)
             }
@@ -125,6 +133,7 @@ class VehicleWatchService : Service(), LocationListener {
             // Consommation corrigée par les pleins, puis conseil FAP (au plus une alerte tous les 3 jours).
             combine(fr.p308.lanceur.maintenance.Fuel.entries, TripLog.history) { f, t -> f to t }.collect { (fills, trips) ->
                 fr.p308.lanceur.drive.FuelModel.recompute(fills, trips)
+                fr.p308.lanceur.drive.FuelRange.update(fills, trips, Vehicle.state.value.odometerKm)
                 val fap = if (Vehicle.demo) null else fr.p308.lanceur.drive.FapAdvice.evaluate(trips)
                 fr.p308.lanceur.drive.FapAdvice.current = fap
                 fap?.let(::alertFap)
@@ -160,6 +169,18 @@ class VehicleWatchService : Service(), LocationListener {
             .setAutoCancel(true)
             .build())
         if (!AppVisibility.foreground.value) banner.show("🛣  ${s.text}", 0xE6C77700.toInt(), 15_000)
+    }
+
+    private var rangeAlerted = false
+
+    /** Réserve proche (autonomie estimée sous 50 km) : un bandeau une fois, réarmé après un plein. */
+    private fun checkRange() {
+        val r = fr.p308.lanceur.drive.FuelRange.state.value ?: return
+        if (r.km > 80) rangeAlerted = false
+        if (r.km >= 50 || rangeAlerted || Vehicle.demo) return
+        rangeAlerted = true
+        val msg = "Réserve bientôt : ≈ ${r.km} km d'autonomie (estimée depuis ton dernier plein)"
+        if (!AppVisibility.foreground.value) banner.show("⛽  $msg", 0xE6C77700.toInt(), 12_000)
     }
 
     /** Factures importées depuis la clé : notification + bandeau (Entretien → Historique pour les voir). */

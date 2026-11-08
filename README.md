@@ -44,6 +44,16 @@ de dessus en 2D, celle que l'appli affiche quand la 3D n'est pas disponible. Sur
 | **Réglages** | **Panneau performances à côté de CarPlay** |
 | ![Réglages : mode démo, panneau CarPlay, côté](docs/captures/onglets/11-reglages.png) | ![Panneau : puissance, rapport conseillé, régime, eau, turbo, batterie](docs/captures/onglets/12-panneau-performances.png) |
 
+**Nouveau en v0.13.1** :
+- **Autonomie estimée** (`drive/Insights.kt`, `FuelRange`) : réservoir de 60 L au dernier plein complet, moins les
+  km parcourus × la conso (mesurée entre les pleins, sinon estimée, sinon 6 L/100), plus les pleins partiels ;
+  donnée jusqu'au témoin de réserve (≈ 6 L). Affichée sur l'accueil, dans Pleins et dans le panneau CarPlay ;
+  bandeau sous 50 km.
+- **Refroidissement du turbo** (`vehicle/TurboCool.kt`) : secondes de ralenti conseillées avant de couper, qui
+  montent pendant l'effort (jusqu'à 60 s, ≈ 5 min de voie rapide) et descendent en roulant doucement ou au ralenti.
+  À l'arrêt : « Turbo chaud : attends N s » puis « Turbo refroidi ✓ » (accueil et panneau CarPlay) ; coupure
+  moteur turbo chaud notée dans le journal OBD.
+
 **Nouveau en v0.13** :
 - **Journal OBD** (`vehicle/ObdLog.kt`) : connexions, chaque essai de lecture du kilométrage avec la réponse brute,
   démarrages (chute saisie ou non), tensions ; 14 jours gardés, copiés sur la clé (dossier `journal/`).

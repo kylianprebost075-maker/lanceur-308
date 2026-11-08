@@ -56,12 +56,26 @@ fun FuelPanel(currentKm: Int?) {
     val stats = remember(entries) { Fuel.stats(entries) }
     var editing by remember { mutableStateOf<FuelEntry?>(null) }
     var adding by remember { mutableStateOf(false) }
+    val range by fr.p308.lanceur.drive.FuelRange.state.collectAsStateWithLifecycle()
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             StatTile("Conso moyenne", stats.avgL100?.let { "%.1f L/100".format(Locale.FRANCE, it) }, Modifier.weight(1f))
             StatTile("Dernier plein", stats.lastL100?.let { "%.1f L/100".format(Locale.FRANCE, it) }, Modifier.weight(1f))
             StatTile("Coût au km", stats.costPerKm?.let { "%.3f €".format(Locale.FRANCE, it) }, Modifier.weight(1f))
             StatTile("Ce mois-ci", eur(stats.monthSpend), Modifier.weight(1f))
+        }
+        // Autonomie estimée depuis le dernier plein complet, jusqu'au témoin de réserve.
+        Column(Modifier.padding(horizontal = 4.dp)) {
+            Text(
+                range?.let { "Autonomie ≈ ${it.km} km" } ?: "Autonomie : —",
+                fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
+                color = range?.let { if (it.km < 60) C.Orange else C.Text } ?: C.Sub,
+            )
+            Text(
+                range?.let { "Jusqu'au témoin de réserve. ≈ %.0f L dans le réservoir, %s (%.1f L/100).".format(Locale.FRANCE, it.liters, it.basis, it.l100) }
+                    ?: "Saisis un plein complet (avec le kilométrage) pour qu'elle soit estimée.",
+                fontSize = 11.sp, color = C.Sub,
+            )
         }
         Tile(Modifier.weight(1f).fillMaxWidth()) {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {

@@ -276,11 +276,24 @@ fun HomeAndMaintenanceScreen(vs: VehicleState, items: List<MaintenanceItem>, int
                             BatteryMetric(Modifier.weight(1f))
                         }
                         Row(Modifier.weight(1f)) {
-                            Metric("Autonomie", vs.fuelRangeKm?.let { "$it km" } ?: "—", Modifier.weight(1f))
+                            val range by fr.p308.lanceur.drive.FuelRange.state.collectAsStateWithLifecycle()
+                            Metric(
+                                "Autonomie",
+                                vs.fuelRangeKm?.let { "$it km" } ?: range?.let { "≈ ${it.km} km" } ?: "—",
+                                Modifier.weight(1f),
+                            )
                             Metric("Kilométrage", vs.odometerText() ?: "—", Modifier.weight(1f))
                         }
                         EngineMetrics(Modifier.weight(1f).clickable { onTab(Tab.ENGINE) })
-                        Text("Données : ${vs.source}", fontSize = 11.sp, color = C.Sub)
+                        // Conseil turbo à l'arrêt après un effort, sinon la source des données.
+                        val turbo by fr.p308.lanceur.vehicle.TurboCool.state.collectAsStateWithLifecycle()
+                        when {
+                            turbo.stopped && turbo.waitS >= 5 -> Text("Turbo chaud : laisse tourner ${turbo.waitS} s avant de couper",
+                                fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = C.Orange)
+                            turbo.stopped && turbo.justCooled -> Text("Turbo refroidi ✓ tu peux couper le moteur",
+                                fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = C.Green)
+                            else -> Text("Données : ${vs.source}", fontSize = 11.sp, color = C.Sub)
+                        }
                     }
                 }
             }
