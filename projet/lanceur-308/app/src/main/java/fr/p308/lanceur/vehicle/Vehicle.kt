@@ -47,12 +47,59 @@ object Vehicle {
 
     /** Kilométrage saisi à la main ; le GPS ajoute ensuite la distance parcourue. */
     fun setOdometer(km: Int) {
+        // Une saisie à la main corrige tout, y compris un relevé moteur faux : la limite « ne recule pas » repart d'ici.
+        prefs.edit().remove("ecuKm").apply()
+        setBase(km, fromEcu = false)
+    }
+
+    /**
+     * Kilométrage lu dans le calculateur moteur : il devient le nouveau point de départ et le GPS repart de zéro.
+     * Si la lecture échoue au démarrage suivant, rien n'est perdu : le dernier relevé + les km du GPS restent affichés.
+     * Une valeur plus petite que le dernier relevé moteur (le compteur ne recule jamais) est une lecture faussée :
+     * refusée. Renvoie vrai si la valeur est acceptée.
+     */
+    fun setOdometerFromEcu(km: Int): Boolean {
+        val lastEcu = prefs.getInt("ecuKm", -1)
+        if (lastEcu > 0 && km < lastEcu - 1) return false
+        prefs.edit().putInt("ecuKm", km).apply()
+        setBase(km, fromEcu = true)
+        return true
+    }
+
+    private fun setBase(km: Int, fromEcu: Boolean) {
         pendingMeters = 0f
-        prefs.edit().putInt("baseKm", km).putLong("gpsMeters", 0L).apply()
+        prefs.edit().putInt("baseKm", km).putLong("gpsMeters", 0L)
+            .putLong("baseAt", System.currentTimeMillis()).putBoolean("baseEcu", fromEcu).apply()
         publishGpsOdometer()
     }
 
+    /** À appeler après une restauration de sauvegarde. */
+    fun reloadOdometer() = publishGpsOdometer()
+
+    private var lastGpsMeterMs = 0L
+    private var lastObdNanos = 0L
+
     fun addGpsMeters(m: Float) {
+        lastGpsMeterMs = System.currentTimeMillis()
+        addMeters(m)
+    }
+
+    /**
+     * Secours quand le GPS ne compte plus (tunnel, parking couvert, pas de signal) : la vitesse lue sur l'OBD est
+     * intégrée, mais seulement si le GPS n'a rien ajouté depuis 5 s (jamais les deux en même temps).
+     */
+    @Synchronized
+    fun addObdSpeed(kmh: Int, nanos: Long = System.nanoTime()) {
+        val prev = lastObdNanos
+        lastObdNanos = nanos
+        if (prev == 0L || kmh < 3 || demo) return
+        val dt = ((nanos - prev) / 1e9).coerceIn(0.0, 3.0)
+        if (System.currentTimeMillis() - lastGpsMeterMs < 5_000L) return
+        addMeters((kmh / 3.6 * dt).toFloat())
+    }
+
+    @Synchronized
+    private fun addMeters(m: Float) {
         if (_state.value.odometerFromCan) return
         pendingMeters += m
         if (pendingMeters < 50f) return
@@ -65,8 +112,15 @@ object Vehicle {
     private fun publishGpsOdometer() {
         if (_state.value.odometerFromCan) return
         val base = prefs.getInt("baseKm", -1)
-        val km = if (base < 0) null else base + (prefs.getLong("gpsMeters", 0L) / 1000L).toInt()
-        _state.update { it.copy(odometerKm = km) }
+        val gpsKm = (prefs.getLong("gpsMeters", 0L) / 1000L).toInt()
+        val km = if (base < 0) null else base + gpsKm
+        _state.update {
+            it.copy(
+                odometerKm = km, odometerGpsKm = if (base < 0) 0 else gpsKm, odometerBaseKm = base.takeIf { b -> b >= 0 },
+                odometerReadAtMs = prefs.getLong("baseAt", 0L).takeIf { t -> t > 0 && base >= 0 },
+                odometerFromEcu = prefs.getBoolean("baseEcu", false),
+            )
+        }
     }
 
     /** Mode démo : simule roulage (roues + route animée), ouvrants, phares et radars pour tout tester à l'arrêt. */

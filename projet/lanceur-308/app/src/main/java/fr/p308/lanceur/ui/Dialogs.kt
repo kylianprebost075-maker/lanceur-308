@@ -77,6 +77,8 @@ import fr.p308.lanceur.maintenance.Maintenance
 import fr.p308.lanceur.maintenance.MaintenanceItem
 import fr.p308.lanceur.maintenance.fmtKm
 import fr.p308.lanceur.vehicle.Vehicle
+import fr.p308.lanceur.vehicle.odometerOrigin
+import fr.p308.lanceur.vehicle.odometerText
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -254,7 +256,10 @@ fun SettingsDialog(onDismiss: () -> Unit) {
                 SettingRow("5 portes", "Décoche pour une 308 3 portes") {
                     Switch(UiPrefs.fiveDoors, UiPrefs::updateFiveDoors)
                 }
-                SettingRow("Kilométrage", vs.odometerKm?.let { "${fmtKm(it)} km" } ?: "Non saisi") {
+                SettingRow(
+                    "Kilométrage",
+                    vs.odometerText()?.let { t -> t + (vs.odometerOrigin()?.let { " · $it" } ?: "") } ?: "Non saisi",
+                ) {
                     TextButton(onClick = { editingKm = true }) { Text("Modifier") }
                 }
                 SettingRow("Thème", if (Night.active) "Nuit en ce moment" else "Jour en ce moment") {

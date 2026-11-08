@@ -63,6 +63,8 @@ import fr.p308.lanceur.vehicle.Vehicle
 import fr.p308.lanceur.vehicle.VehicleState
 import fr.p308.lanceur.vehicle.describeOpen
 import fr.p308.lanceur.vehicle.openingsFor
+import fr.p308.lanceur.vehicle.odometerShortOrigin
+import fr.p308.lanceur.vehicle.odometerText
 import kotlinx.coroutines.delay
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -275,7 +277,7 @@ fun HomeAndMaintenanceScreen(vs: VehicleState, items: List<MaintenanceItem>, int
                         }
                         Row(Modifier.weight(1f)) {
                             Metric("Autonomie", vs.fuelRangeKm?.let { "$it km" } ?: "—", Modifier.weight(1f))
-                            Metric("Kilométrage", vs.odometerKm?.let { "${fmtKm(it)} km" } ?: "—", Modifier.weight(1f))
+                            Metric("Kilométrage", vs.odometerText() ?: "—", Modifier.weight(1f))
                         }
                         EngineMetrics(Modifier.weight(1f).clickable { onTab(Tab.ENGINE) })
                         Text("Données : ${vs.source}", fontSize = 11.sp, color = C.Sub)
@@ -431,7 +433,8 @@ private fun MaintenancePanel(vs: VehicleState, items: List<MaintenanceItem>) {
             }
             Column(Modifier.clip(RoundedCornerShape(12.dp)).clickable { editingKm = true }.padding(8.dp), horizontalAlignment = Alignment.End) {
                 Text("Kilométrage", fontSize = 12.sp, color = C.Sub)
-                Text(vs.odometerKm?.let { "${fmtKm(it)} km" } ?: "Toucher pour saisir", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                Text(vs.odometerText() ?: "Toucher pour saisir", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                vs.odometerShortOrigin()?.let { Text(it, fontSize = 10.sp, color = C.Sub, maxLines = 1) }
             }
         }
         Spacer(Modifier.height(8.dp))

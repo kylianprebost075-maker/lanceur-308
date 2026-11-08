@@ -38,6 +38,8 @@ import fr.p308.lanceur.vehicle.Engine
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import fr.p308.lanceur.vehicle.odometerOrigin
+import fr.p308.lanceur.vehicle.odometerText
 
 /** Onglet Moteur → Diagnostic : codes défaut normalisés (lecture, effacement confirmé) et kilométrage moteur. */
 @Composable
@@ -61,9 +63,19 @@ fun DiagPanel() {
                 Text("Lu à " + SimpleDateFormat("HH:mm", Locale.FRANCE).format(Date(it)), fontSize = 12.sp, color = C.Sub)
             }
             Spacer(Modifier.padding(4.dp))
-            Text("Kilométrage (calculateur moteur)", fontSize = 12.sp, color = C.Sub)
-            Text(d.ecuKm?.let { "${fmtKm(it)} km" } ?: "—", fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
-            Text("Recopié dans l'entretien à chaque connexion.", fontSize = 11.sp, color = C.Sub)
+            val vs by fr.p308.lanceur.vehicle.Vehicle.state.collectAsStateWithLifecycle()
+            Text("Kilométrage", fontSize = 12.sp, color = C.Sub)
+            if (d.ecuKm != null) {
+                Text("${fmtKm(d.ecuKm!!)} km", fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
+                Text("Lu dans le calculateur moteur à cette connexion.", fontSize = 11.sp, color = C.Green)
+            } else {
+                Text(vs.odometerText() ?: "—", fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
+                Text(
+                    (if (e.connected) "Pas encore relu (nouvel essai chaque minute moteur coupé). " else "") +
+                        (vs.odometerOrigin() ?: "Aucun relevé : touche le kilométrage dans Entretien pour le saisir."),
+                    fontSize = 11.sp, color = C.Sub,
+                )
+            }
             Spacer(Modifier.weight(1f))
             Button(onClick = { Engine.requestDiag() }, enabled = !d.busy, modifier = Modifier.fillMaxWidth()) {
                 Text(if (d.busy) "Lecture…" else "Lire les codes défaut")

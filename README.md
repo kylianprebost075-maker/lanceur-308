@@ -44,6 +44,12 @@ de dessus en 2D, celle que l'appli affiche quand la 3D n'est pas disponible. Sur
 | **Réglages** | **Panneau performances à côté de CarPlay** |
 | ![Réglages : mode démo, panneau CarPlay, côté](docs/captures/onglets/11-reglages.png) | ![Panneau : puissance, rapport conseillé, régime, eau, turbo, batterie](docs/captures/onglets/12-panneau-performances.png) |
 
+**Nouveau en v0.12.1** : kilométrage jamais perdu (`vehicle/Vehicle.kt`). Si le calculateur ne répond pas au
+démarrage, le dernier relevé (moteur ou saisi) reste la base et le GPS ajoute les km parcourus, affichés « ≈ » avec
+leur origine (« +44 km GPS depuis le 8 nov. »). Sans GPS (tunnel, parking couvert), la vitesse OBD prend le relais
+(jamais les deux à la fois). Un relevé moteur plus petit que le précédent est refusé (lecture faussée) ; une saisie
+à la main remet tout à zéro. Onglet Diagnostic : le kilométrage estimé s'affiche au lieu de « — ».
+
 **Nouveau en v0.12** :
 - **Style Verre** (`ui/Theme.kt`, réglage « Style Verre ») : panneaux translucides à liseré lumineux sur fond dégradé
   coloré. Sans flou en temps réel (trop coûteux sur l'autoradio) : dégradés calculés une fois par taille.

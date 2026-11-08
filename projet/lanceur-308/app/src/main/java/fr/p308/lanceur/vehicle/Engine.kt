@@ -428,7 +428,10 @@ object Engine {
             CrankWatch.onSample(null, rpm, _state.value.coolantC)
             val load = elm.pid("04", minBytes = 1)?.let { it[0] * 100 / 255 }
             val speed = if (n % 2 == 0) elm.pid("0D", minBytes = 1)?.get(0) else null
-            speed?.let { fr.p308.lanceur.drive.Speed.report(it.toFloat(), fromObd = true) }
+            speed?.let {
+                fr.p308.lanceur.drive.Speed.report(it.toFloat(), fromObd = true)
+                Vehicle.addObdSpeed(it)
+            }
             // Régime et vitesse du même tour : sert à apprendre l'étagement réel de la boîte.
             if (rpm != null && speed != null) GearCalib.feed(rpm, speed)
             if (n % 10 == 1) {
@@ -456,8 +459,7 @@ object Engine {
             val stored = parseDtcs(elm.cmd("03", 4000), 0x43)
             val pending = parseDtcs(elm.cmd("07", 4000), 0x47)
             val permanent = parseDtcs(elm.cmd("0A", 4000), 0x4A)
-            val km = runCatching { readEcuKm(elm) }.getOrNull()
-            km?.let(::applyEcuKm)
+            val km = runCatching { readEcuKm(elm) }.getOrNull()?.takeIf(::applyEcuKm)
             val total = (stored + pending + permanent).distinct().size
             _diag.value = DiagState(
                 busy = false,
@@ -504,7 +506,7 @@ object Engine {
         } catch (_: Exception) {
             null
         } ?: return false
-        applyEcuKm(km)
+        if (!applyEcuKm(km)) return false
         _diag.update { it.copy(ecuKm = km) }
         return true
     }
@@ -531,10 +533,11 @@ object Engine {
         }
     }
 
-    /** Le kilométrage du calculateur remplace le kilométrage d'entretien saisi à la main (le GPS complète ensuite). */
-    private fun applyEcuKm(km: Int) {
-        if (Vehicle.state.value.odometerKm != km) Vehicle.setOdometer(km)
-    }
+    /**
+     * Le kilométrage du calculateur devient le nouveau point de départ (le GPS complète ensuite). Faux si la valeur
+     * est refusée (plus petite que le dernier relevé moteur : lecture faussée).
+     */
+    private fun applyEcuKm(km: Int): Boolean = Vehicle.setOdometerFromEcu(km)
 
     /** Interface commune ELM327 (Bluetooth classique SPP ou Bluetooth Low Energy GATT). */
     private abstract class ElmTransport(val name: String) : Closeable {

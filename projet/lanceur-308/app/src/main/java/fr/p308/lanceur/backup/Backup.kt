@@ -99,6 +99,7 @@ object Backup {
         fr.p308.lanceur.vehicle.CrankWatch.init(ctx)
         fr.p308.lanceur.vehicle.GearCalib.init(ctx)
         fr.p308.lanceur.vehicle.Warmup.init(ctx)
+        fr.p308.lanceur.vehicle.Vehicle.reloadOdometer()
         return "Restauré depuis ${if (file.absolutePath.contains("emulated")) "la mémoire interne" else "la clé USB"} (sauvegarde du ${json.optString("date").take(10)})"
     }
 }
