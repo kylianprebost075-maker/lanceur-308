@@ -239,7 +239,8 @@ object Engine {
                 voltage = voltage ?: s.voltage,
                 torqueNm = torque ?: s.torqueNm, powerCh = power ?: s.powerCh,
                 peakCh = max(s.peakCh, power ?: 0),
-                advice = ShiftAdvice.advise(r, v, l, c),
+                // « Moteur froid » : la plus basse de l'eau et de l'huile estimée (l'huile chauffe moins vite).
+                advice = ShiftAdvice.advise(r, v, l, Warmup.coldTemp(c)),
             )
         }
     }
@@ -412,11 +413,15 @@ object Engine {
             // Pendant le démarreur, le calculateur ne répond souvent plus : on reste en mode « moteur coupé ».
             if (rpm != null) engineOff = rpm <= 400
             if (engineOff) {
-                // Moteur coupé : seulement régime + tension, plusieurs fois par seconde, pour saisir la chute au démarreur.
+                // Moteur coupé : régime + tension, plusieurs fois par seconde, pour saisir la chute au démarreur.
+                // Deux lectures de tension par tour : le calculateur répond lentement (jusqu'à 400 ms) au démarreur,
+                // ATRV (lu par le vLinker lui-même) reste rapide.
                 val volts = elm.readBatteryVolts()
-                val coolant = if (n % 20 == 0) elm.pid("05", minBytes = 1)?.let { it[0] - 40 } else null
-                publish(rpm, null, coolant = coolant, voltage = volts)
                 CrankWatch.onSample(volts, rpm, _state.value.coolantC)
+                val coolant = if (n % 20 == 0) elm.pid("05", minBytes = 1)?.let { it[0] - 40 } else null
+                val volts2 = elm.readBatteryVolts()
+                CrankWatch.onSample(volts2, null, _state.value.coolantC)
+                publish(rpm, null, coolant = coolant, voltage = volts2 ?: volts)
                 n++
                 continue
             }
@@ -431,6 +436,7 @@ object Engine {
                 val boost = elm.pid("0B", minBytes = 1)?.let { (it[0] - baro) / 100f }
                 // Le PID 42 (tension) est absent sur l'EDC16C34 (séance du 08/11) : ATRV lit le 12 V du vLinker.
                 val volts = elm.readBatteryVolts()
+                CrankWatch.onRunningVolts(volts)
                 publish(rpm, load, speed, coolant, boost, volts)
             } else {
                 publish(rpm, load, speed)

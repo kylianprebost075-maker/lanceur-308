@@ -145,12 +145,13 @@ class PerfOverlay(private val ctx: Context, private val onClose: () -> Unit) {
         advice.text = a.text
         advice.setTextColor(adviceColor)
         rpm.text = "Régime  ${e.rpm ?: "—"} tr/min"
-        coolant.text = "Eau  ${e.coolantC?.let { "$it °C" } ?: "—"}"
+        val oil = fr.p308.lanceur.vehicle.Warmup.state.value.oilC
+        coolant.text = "Eau  ${e.coolantC?.let { "$it °C" } ?: "—"}" + (oil?.let { "  ·  huile ≈ ${it.toInt()}" } ?: "")
         coolant.setTextColor(
             when {
                 e.coolantC == null -> Color.WHITE
                 e.coolantC >= 105 -> 0xFFFF4D4D.toInt()
-                e.coolantC < 60 -> 0xFF64B5F6.toInt()
+                e.coolantC < 60 || (oil != null && oil < 60f) -> 0xFF64B5F6.toInt()
                 else -> Color.WHITE
             }
         )

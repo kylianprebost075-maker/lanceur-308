@@ -65,16 +65,32 @@ fun BatteryPanel() {
             Text((b.volts ?: e.voltage)?.let(::volts) ?: "—", fontSize = 30.sp, fontWeight = FontWeight.SemiBold)
             b.message?.let { Text(it, fontSize = 13.sp, color = C.Orange) }
             Spacer(Modifier.height(10.dp))
+            // Moteur coupé et boîtier prêt : on le dit, pour que l'utilisateur sache qu'il peut démarrer.
+            if (!demo && e.connected && (e.rpm ?: 0) <= 400) {
+                val ready = CrankWatch.ready()
+                Text(
+                    if (ready) "✓ Prêt : démarre, la mesure se fait toute seule" else "Mesure en préparation…",
+                    fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = if (ready) C.Green else C.Orange,
+                )
+                Spacer(Modifier.height(6.dp))
+            }
             Text("Dernier démarrage", fontSize = 12.sp, color = C.Sub)
             if (last == null) {
                 Text("Pas encore mesuré", fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
             } else {
                 Text(last.verdict.label, fontSize = 26.sp, fontWeight = FontWeight.Bold, color = verdictColor(last.verdict))
-                Text("Repos ${volts(last.restV)} → mini ${volts(last.minV)} au démarreur", fontSize = 15.sp)
-                Text(when (last.verdict) {
-                    CrankVerdict.GOOD -> "La batterie tient bien la charge du démarreur."
-                    CrankVerdict.FAIR -> "Elle faiblit : surveille, surtout quand il fait froid."
-                    CrankVerdict.WEAK -> "Fais-la tester (contrôle gratuit chez la plupart des centres auto)."
+                Text(
+                    last.minV?.let { "Repos ${volts(last.restV)} → mini ${volts(it)} au démarreur" }
+                        ?: "Repos ${volts(last.restV)} · chute au démarreur non saisie",
+                    fontSize = 15.sp,
+                )
+                last.chargeV?.let { Text("Charge ${volts(it)} : ${CrankWatch.chargeText(it)}", fontSize = 15.sp) }
+                Text(when {
+                    last.minV == null && last.verdict == CrankVerdict.GOOD ->
+                        "Bonne tension au repos. La connexion a coupé pendant le démarreur : la chute n'a pas pu être lue."
+                    last.verdict == CrankVerdict.GOOD -> "La batterie tient bien la charge du démarreur."
+                    last.verdict == CrankVerdict.FAIR -> "Elle faiblit : surveille, surtout quand il fait froid."
+                    else -> "Fais-la tester (contrôle gratuit chez la plupart des centres auto)."
                 }, fontSize = 13.sp, color = C.Sub)
             }
             trend?.let {
@@ -88,8 +104,8 @@ fun BatteryPanel() {
             }
             Spacer(Modifier.weight(1f))
             Text(
-                "Mesuré à chaque démarrage si le boîtier OBD est connecté AVANT de tourner la clé : " +
-                    "mets le contact, attends « Boîtier OBD connecté », puis démarre.",
+                "Mesuré à chaque démarrage : mets le contact, attends « ✓ Prêt », puis démarre. Si la connexion " +
+                    "coupe pendant le démarreur, la tension au repos et la charge sont quand même notées.",
                 fontSize = 11.sp, color = C.Sub,
             )
         }
@@ -126,6 +142,6 @@ private fun CrankRow(r: CrankRecord) {
             Text(SimpleDateFormat("EEE d MMM · HH:mm", Locale.FRANCE).format(Date(r.atMs)), fontSize = 14.sp)
             r.coolantC?.let { Text(if (it < 30) "moteur froid ($it °C)" else "moteur chaud ($it °C)", fontSize = 11.sp, color = C.Sub) }
         }
-        Text("${volts(r.restV)} · ${volts(r.minV)}", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+        Text("${volts(r.restV)} · ${r.minV?.let(::volts) ?: "—"}", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
     }
 }

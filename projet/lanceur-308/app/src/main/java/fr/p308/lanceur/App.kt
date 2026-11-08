@@ -22,5 +22,6 @@ class App : Application() {
         TripLog.init(this)
         CrankWatch.init(this)
         fr.p308.lanceur.vehicle.GearCalib.init(this)
+        fr.p308.lanceur.vehicle.Warmup.init(this)
     }
 }

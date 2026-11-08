@@ -263,7 +263,8 @@ fun SettingsDialog(onDismiss: () -> Unit) {
                 SettingRow("Baisser la luminosité la nuit", "Écran moins éblouissant en thème nuit") {
                     Switch(UiPrefs.dimAtNight, UiPrefs::updateDimAtNight)
                 }
-                SettingRow("Sauvegarde", backupMessage ?: "Entretien, pleins, kilométrage, records et réglages") {
+                SettingRow("Sauvegarde", backupMessage ?: ("Tout (entretien, trajets, batterie, chauffes, réglages). " +
+                    fr.p308.lanceur.backup.AutoBackup.lastText(ctx))) {
                     Row {
                         TextButton(onClick = { backupMessage = Backup.save(ctx) }) { Text("Sauvegarder") }
                         TextButton(onClick = { backupMessage = Backup.restore(ctx) }) { Text("Restaurer") }

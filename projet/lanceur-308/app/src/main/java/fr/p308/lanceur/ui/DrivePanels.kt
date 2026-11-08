@@ -181,21 +181,37 @@ private fun ScoreDetail(t: TripRecord) {
         Text("$s", fontSize = 40.sp, fontWeight = FontWeight.Bold, color = scoreColor(s))
         Text(" / 100  conduite souple", fontSize = 15.sp, color = C.Sub)
     }
+    val p = TripLog.penalties(t)
+    Text("Retiré : −${p.harsh} à-coups (sur 40) · −${p.shifting} passages (sur 30) · −${p.cold} moteur froid (sur 20)",
+        fontSize = 12.sp, color = C.Sub)
     val brusque = t.harshAccel + t.harshBrake
     Text(
         if (brusque == 0) "Aucune accélération ni freinage brusque"
         else "$brusque à-coup(s) : ${t.harshAccel} accélération(s), ${t.harshBrake} freinage(s) — anticipe davantage",
         fontSize = 13.sp, color = if (brusque == 0) C.Sub else C.Orange,
     )
-    if (t.obdS >= 60) {
+    if (t.shifts > 0) {
         Text(
-            if (t.overRevPct <= 10) "Rapports bien passés (${t.overRevPct} % du temps au-dessus du conseil)"
-            else "${t.overRevPct} % du temps en régime trop haut : passe la vitesse quand ▲ s'affiche",
-            fontSize = 13.sp, color = if (t.overRevPct <= 10) C.Sub else C.Orange,
+            "${t.shifts} montée(s) de rapport, ${t.goodShiftPct} % bien placées" +
+                (t.avgShiftRpm?.let { " (en moyenne à ${fr.p308.lanceur.maintenance.fmtKm(it)} tr/min)" } ?: ""),
+            fontSize = 13.sp, color = if (t.goodShiftPct >= 80) C.Sub else C.Orange,
         )
+        if (t.lateShifts > 0) Text("${t.lateShifts} trop tard : monte vers 2 000–2 500 tr/min quand tu accélères doucement",
+            fontSize = 13.sp, color = C.Orange)
+        if (t.earlyShifts > 0) Text("${t.earlyShifts} trop tôt : le moteur tombait sous 1 150 tr/min, il peine et encrasse",
+            fontSize = 13.sp, color = C.Orange)
+    } else if (t.shifts == 0 && t.obdS >= 60) {
+        Text("Aucune montée de rapport repérée (rapports en cours d'apprentissage ?)", fontSize = 13.sp, color = C.Sub)
+    }
+    if (t.obdS >= 60) {
+        if (t.overRevPct > 3) Text("${t.overRevPct} % du temps en régime trop haut malgré ▲ : passe la vitesse quand il s'affiche",
+            fontSize = 13.sp, color = C.Orange)
+        if (t.lugPct > 2) Text("${t.lugPct} % du temps moteur qui peine : rétrograde quand ▼ s'affiche",
+            fontSize = 13.sp, color = C.Orange)
+        if (t.shifts < 0 && t.overRevPct <= 3) Text("Rapports bien passés", fontSize = 13.sp, color = C.Sub)
     }
     if (t.coldRevS > 0) {
-        Text("Moteur froid poussé ${t.coldRevS} s au-dessus de 2 800 tr/min — attends que l'eau dépasse 60 °C",
+        Text("Moteur froid poussé ${t.coldRevS} s au-dessus de 2 800 tr/min — attends l'eau et l'huile à 60 °C",
             fontSize = 13.sp, color = C.Orange)
     }
 }

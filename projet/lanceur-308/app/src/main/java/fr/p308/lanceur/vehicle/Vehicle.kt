@@ -78,6 +78,7 @@ object Vehicle {
             fr.p308.lanceur.drive.TripLog.demo = on
             fr.p308.lanceur.drive.TripLog.discard()
         }
+        Warmup.demo = on
         demoJob?.cancel()
         if (on) Engine.startDemo() else if (::appContext.isInitialized) Engine.stopDemo(appContext)
         if (!on) {

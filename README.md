@@ -44,6 +44,20 @@ de dessus en 2D, celle que l'appli affiche quand la 3D n'est pas disponible. Sur
 | **Réglages** | **Panneau performances à côté de CarPlay** |
 | ![Réglages : mode démo, panneau CarPlay, côté](docs/captures/onglets/11-reglages.png) | ![Panneau : puissance, rapport conseillé, régime, eau, turbo, batterie](docs/captures/onglets/12-panneau-performances.png) |
 
+**Nouveau en v0.11** :
+- **Moteur → Chauffe** (`vehicle/Warmup.kt`) : température d'huile ESTIMÉE (la 308 ne la donne pas sur l'OBD) :
+  l'huile suit l'eau avec 8 min de retard et chauffe plus fort qu'elle sous la charge ; moteur coupé, elle refroidit
+  vers l'extérieur (90 min). Temps de chauffe prévu (eau à 80 °C, puis huile) d'après les chauffes passées à
+  température de départ comparable, et comparaison des façons de chauffer (rouler tout de suite / ralenti d'abord).
+  Le conseil « moteur froid » tient compte de l'huile estimée.
+- **Score des passages de vitesse** : chaque montée de rapport est repérée et jugée (trop tard, trop tôt, bien placée,
+  régime moyen) ; le conseil ▲ ne compte qu'après 3 s, le moteur qui peine (▼) compte aussi ; détail des points retirés.
+- **Batterie au démarrage** : le démarreur coupait souvent la connexion Bluetooth et la mesure était perdue. Les relevés
+  sont gardés d'une connexion à l'autre, la tension est lue deux fois plus souvent, « ✓ Prêt » dit quand démarrer ;
+  si la chute n'est pas saisie, le repos et la tension de charge (alternateur) sont quand même notés.
+- **Sauvegarde automatique** (`backup/AutoBackup.kt`) de tout, en mémoire interne et sur la clé USB : fin de trajet,
+  nouveau démarrage ou chauffe, clé branchée, et au moins toutes les 6 h ; 10 copies datées dans `sauvegardes/`.
+
 **Corrigé en v0.10.1** (premiers essais sur la voiture) :
 - **Rapport engagé** (`vehicle/GearCalib.kt`) : l'étagement de départ est approché ; l'appli apprend maintenant les
   vrais rapports en roulant (rapport km/h pour 1 000 tr/min compté quand il reste stable, pics = rapports). État et

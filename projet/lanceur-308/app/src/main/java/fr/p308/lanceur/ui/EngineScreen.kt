@@ -56,7 +56,7 @@ private const val MAX_CH = 120f
 private const val MAX_RPM = 5000f
 
 private enum class EngineTab(val label: String) {
-    POWER("Puissance"), DIAG("Diagnostic"), BATTERY("Batterie"), TRIP("Trajets"), CHRONO("Chrono"),
+    POWER("Puissance"), WARMUP("Chauffe"), DIAG("Diagnostic"), BATTERY("Batterie"), TRIP("Trajets"), CHRONO("Chrono"),
 }
 
 @Composable
@@ -67,6 +67,7 @@ fun EngineScreen() {
         Box(Modifier.weight(1f)) {
             when (tab) {
                 EngineTab.POWER -> PowerPanel()
+                EngineTab.WARMUP -> WarmupPanel()
                 EngineTab.DIAG -> DiagPanel()
                 EngineTab.BATTERY -> BatteryPanel()
                 EngineTab.CHRONO -> ChronoPanel()

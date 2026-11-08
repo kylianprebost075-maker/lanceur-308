@@ -18,7 +18,10 @@ import java.io.File
  */
 object Backup {
     private const val FILE = "sauvegarde-308.json"
-    private val PREFS = listOf("maintenance", "vehicle", "ui", "fuel", "chrono", "trips", "battery", "gears")
+    private val PREFS = listOf("maintenance", "vehicle", "ui", "fuel", "chrono", "trips", "battery", "gears", "warmup")
+
+    /** Nombre de clés USB / cartes SD branchées (pour sauvegarder dès qu'une clé arrive). */
+    fun usbCount(ctx: Context): Int = volumes(ctx).count { it.second }
 
     private fun volumes(ctx: Context): List<Pair<File, Boolean>> =
         ctx.getExternalFilesDirs(null).filterNotNull().map { it to runCatching { Environment.isExternalStorageRemovable(it) }.getOrDefault(false) }
@@ -40,7 +43,18 @@ object Backup {
             json.put(name, obj)
         }
         val vols = volumes(ctx)
-        vols.forEach { (dir, _) -> runCatching { File(dir, FILE).writeText(json.toString(2)) } }
+        val text = json.toString(2)
+        val stamp = java.text.SimpleDateFormat("yyyyMMdd-HHmm", java.util.Locale.FRANCE).format(java.util.Date())
+        vols.forEach { (dir, _) ->
+            runCatching { File(dir, FILE).writeText(text) }
+            // Copies datées (les 10 dernières) : une mauvaise manip ne fait pas perdre l'historique.
+            runCatching {
+                val d = File(dir, "sauvegardes").apply { mkdirs() }
+                File(d, "sauvegarde-308-$stamp.json").writeText(text)
+                d.listFiles()?.filter { it.name.startsWith("sauvegarde-308-") }?.sortedByDescending { it.name }?.drop(10)
+                    ?.forEach { it.delete() }
+            }
+        }
         val usb = vols.filter { it.second }
         copyGpsLogs(ctx)
         return if (usb.isEmpty()) "Sauvegardé dans la mémoire interne (aucune clé USB détectée)"
@@ -84,6 +98,7 @@ object Backup {
         fr.p308.lanceur.drive.TripLog.init(ctx)
         fr.p308.lanceur.vehicle.CrankWatch.init(ctx)
         fr.p308.lanceur.vehicle.GearCalib.init(ctx)
+        fr.p308.lanceur.vehicle.Warmup.init(ctx)
         return "Restauré depuis ${if (file.absolutePath.contains("emulated")) "la mémoire interne" else "la clé USB"} (sauvegarde du ${json.optString("date").take(10)})"
     }
 }

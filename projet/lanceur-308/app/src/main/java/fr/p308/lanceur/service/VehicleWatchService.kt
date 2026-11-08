@@ -22,6 +22,7 @@ import fr.p308.lanceur.MainActivity
 import fr.p308.lanceur.PerfPanel
 import fr.p308.lanceur.UiPrefs
 import fr.p308.lanceur.R
+import fr.p308.lanceur.backup.AutoBackup
 import fr.p308.lanceur.maintenance.DueLevel
 import fr.p308.lanceur.maintenance.Maintenance
 import fr.p308.lanceur.maintenance.MaintenanceItem
@@ -93,6 +94,9 @@ class VehicleWatchService : Service(), LocationListener {
                 GpsMonitor.tick()
                 if (!Vehicle.demo) Speed.decayIfStale()
                 TripLog.tick(Engine.state.value)
+                fr.p308.lanceur.vehicle.Warmup.tick(Engine.state.value, fr.p308.lanceur.drive.Trip.state.value.currentKmh,
+                    Vehicle.state.value.outsideTempC)
+                AutoBackup.tick(this@VehicleWatchService)
                 checkBattery()
                 delay(1000)
             }
@@ -119,8 +123,9 @@ class VehicleWatchService : Service(), LocationListener {
 
     /** Démarrage avec une chute de tension anormale : notification + bandeau par-dessus CarPlay. */
     private fun alertWeakStart(r: CrankRecord) {
-        val msg = "Batterie faible au démarrage : %.1f V au repos, %.1f V au démarreur. Fais-la tester."
-            .format(java.util.Locale.FRANCE, r.restV, r.minV)
+        val msg = (r.minV?.let { "Batterie faible au démarrage : %.1f V au repos, %.1f V au démarreur. Fais-la tester."
+            .format(java.util.Locale.FRANCE, r.restV, it) }
+            ?: "Batterie faible : %.1f V au repos avant le démarrage. Fais-la tester.".format(java.util.Locale.FRANCE, r.restV))
         getSystemService(NotificationManager::class.java).notify(CRANK_NOTIF, NotificationCompat.Builder(this, CH_ALERT)
             .setSmallIcon(R.drawable.ic_car)
             .setContentTitle("Batterie")

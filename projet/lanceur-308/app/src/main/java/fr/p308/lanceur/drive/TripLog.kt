@@ -27,13 +27,29 @@ data class TripRecord(
     /** Secondes de roulage avec l'OBD connecté, dont avec le conseil « passe la vitesse » affiché. */
     val obdS: Int,
     val overRevS: Int,
-    /** Secondes à plus de 2 800 tr/min moteur froid (eau sous 60 °C). */
+    /** Secondes à plus de 2 800 tr/min moteur froid (eau ou huile estimée sous 60 °C). */
     val coldRevS: Int,
+    /** Montées de rapport repérées (-1 = trajet d'avant la v0.11, sans ce détail). */
+    val shifts: Int = -1,
+    /** Montées trop tard (au-delà de 2 900 tr/min sans accélérer fort, ou de 4 000 tr/min). */
+    val lateShifts: Int = 0,
+    /** Montées trop tôt (moteur sous 1 150 tr/min juste après). */
+    val earlyShifts: Int = 0,
+    val shiftRpmSum: Long = 0,
+    /** Secondes où le moteur peine (conseil ▼ affiché plus de 2 s). */
+    val lugS: Int = 0,
 ) {
     val avgKmh: Double get() = if (movingS > 1) distanceKm * 3600 / movingS else 0.0
     val overRevPct: Int get() = if (obdS > 0) (overRevS * 100f / obdS).roundToInt() else 0
+    val lugPct: Int get() = if (obdS > 0) (lugS * 100f / obdS).roundToInt() else 0
+    val goodShifts: Int get() = (shifts - lateShifts - earlyShifts).coerceAtLeast(0)
+    val goodShiftPct: Int get() = if (shifts > 0) goodShifts * 100 / shifts else 0
+    val avgShiftRpm: Int? get() = if (shifts > 0) (shiftRpmSum / shifts).toInt() else null
     val score: Int get() = TripLog.score(this)
 }
+
+/** Points retirés au score, par famille. */
+data class ScorePenalties(val harsh: Int, val shifting: Int, val cold: Int)
 
 /**
  * Historique des trajets. Un trajet commence dès 5 km/h et se termine après 5 minutes à l'arrêt (ou quand
@@ -81,15 +97,28 @@ object TripLog {
         }
     }
 
-    /** Score sur 100 : brusqueries (40 pts), régime trop haut quand l'appli conseille de monter (30), moteur froid poussé (20). */
+    /** Score sur 100 : brusqueries (40 pts), passages de vitesse (30), moteur froid poussé (20). */
     fun score(t: TripRecord): Int {
+        val p = penalties(t)
+        return (100 - p.harsh - p.shifting - p.cold).coerceIn(0, 100)
+    }
+
+    fun penalties(t: TripRecord): ScorePenalties {
         // Au moins 5 km pour la moyenne : un seul freinage sur un trajet très court ne doit pas tout faire chuter.
         val km = max(t.distanceKm, 5.0)
         val harshPer10 = (t.harshAccel + t.harshBrake) * 10 / km
         val penHarsh = minOf(40.0, harshPer10 * 5)
-        val penRev = if (t.obdS >= 60) minOf(30.0, t.overRevS * 100.0 / t.obdS * 0.6) else 0.0
+        val penShift = when {
+            t.obdS < 60 -> 0.0
+            t.shifts < 0 -> minOf(30.0, t.overRevS * 100.0 / t.obdS * 0.6) // ancien calcul (trajets d'avant v0.11)
+            else -> {
+                // Montées mal placées (comptées dès 5 montées), régime trop haut malgré ▲, moteur qui peine (▼).
+                val badPct = if (t.shifts >= 5) (t.lateShifts + t.earlyShifts) * 100.0 / t.shifts else 0.0
+                minOf(30.0, 0.25 * badPct + 0.4 * t.overRevPct + 0.5 * t.lugPct)
+            }
+        }
         val penCold = minOf(20.0, t.coldRevS / 3.0)
-        return (100 - penHarsh - penRev - penCold).roundToInt().coerceIn(0, 100)
+        return ScorePenalties(penHarsh.roundToInt(), penShift.roundToInt(), penCold.roundToInt())
     }
 
     /** Vitesse (OBD ou GPS), appelée par [Speed.report]. */
@@ -102,7 +131,7 @@ object TripLog {
                 lastKmh = kmh
                 return
             }
-            t = TripRecord(nowMs, nowMs, 0.0, 0.0, 0f, 0, 0, 0, 0, 0, 0)
+            t = TripRecord(nowMs, nowMs, 0.0, 0.0, 0f, 0, 0, 0, 0, 0, 0, shifts = 0)
             refNanos = 0L
             inAccel = false
             inBrake = false
@@ -148,14 +177,64 @@ object TripLog {
         }
         val moving = lastKmh > 5f
         _current.value = if (moving && e.connected && e.rpm != null) {
+            val kind = e.advice.kind
+            // Le conseil ne compte qu'après un délai : le temps de débrayer et de passer la vitesse.
+            if (kind == ShiftAdvice.Kind.UP) { if (upSinceMs == 0L) upSinceMs = nowMs } else upSinceMs = 0L
+            if (kind == ShiftAdvice.Kind.DOWN) { if (downSinceMs == 0L) downSinceMs = nowMs } else downSinceMs = 0L
+            val shift = detectShift(e, nowMs)
+            val cold = fr.p308.lanceur.vehicle.Warmup.coldTemp(e.coolantC) ?: 90
             t.copy(
                 obdS = t.obdS + 1,
-                overRevS = t.overRevS + if (e.advice.kind == ShiftAdvice.Kind.UP) 1 else 0,
-                coldRevS = t.coldRevS + if ((e.coolantC ?: 90) < 60 && e.rpm > 2800) 1 else 0,
+                overRevS = t.overRevS + if (upSinceMs != 0L && nowMs - upSinceMs >= 3_000L) 1 else 0,
+                lugS = t.lugS + if (downSinceMs != 0L && nowMs - downSinceMs >= 2_000L) 1 else 0,
+                coldRevS = t.coldRevS + if (cold < 60 && e.rpm > 2800) 1 else 0,
                 peakCh = max(t.peakCh, e.powerCh ?: 0),
+                shifts = t.shifts.coerceAtLeast(0) + if (shift != null) 1 else 0,
+                lateShifts = t.lateShifts + if (shift == ShiftKind.LATE) 1 else 0,
+                earlyShifts = t.earlyShifts + if (shift == ShiftKind.EARLY) 1 else 0,
+                shiftRpmSum = t.shiftRpmSum + if (shift != null) lastShiftRpm.toLong() else 0L,
             )
-        } else t
+        } else {
+            upSinceMs = 0L
+            downSinceMs = 0L
+            t
+        }
         if (++ticks % 30 == 0) saveCurrent()
+    }
+
+    private enum class ShiftKind { GOOD, LATE, EARLY }
+
+    private var upSinceMs = 0L
+    private var downSinceMs = 0L
+    private var gearSeen: Int? = null
+    private var gearRpm = 0
+    private var gearLoad = 0
+    private var gearMs = 0L
+    private var lastShiftRpm = 0
+
+    /**
+     * Montée de rapport : le rapport reconnu passe de g à g+1 (ou plus) en moins de 4 s (embrayage). Le régime
+     * du passage est le dernier relevé sur l'ancien rapport. Bien placée : 1 500 à 2 900 tr/min en conduite normale,
+     * jusqu'à 4 000 tr/min en accélération franche (charge ≥ 70 %), et moteur au-dessus de 1 150 tr/min après.
+     */
+    private fun detectShift(e: EngineState, nowMs: Long): ShiftKind? {
+        val g = e.advice.gear ?: return null
+        val rpm = e.rpm ?: return null
+        val prev = gearSeen
+        var kind: ShiftKind? = null
+        if (prev != null && g > prev && nowMs - gearMs <= 4_000L) {
+            lastShiftRpm = gearRpm
+            kind = when {
+                rpm < 1150 -> ShiftKind.EARLY
+                gearRpm > 4000 || (gearRpm > 2900 && gearLoad < 70) -> ShiftKind.LATE
+                else -> ShiftKind.GOOD
+            }
+        }
+        gearSeen = g
+        gearRpm = rpm
+        gearLoad = e.loadPct ?: 50
+        gearMs = nowMs
+        return kind
     }
 
     /** Bouton « Terminer le trajet ». */
@@ -197,7 +276,10 @@ object TripLog {
         val h = 3_600_000L
         fun trip(ago: Long, km: Double, min: Int, maxK: Float, ch: Int, acc: Int, brk: Int, revPct: Int, cold: Int): TripRecord {
             val obd = min * 60
-            return TripRecord(now - ago, now - ago + min * 60_000L, km, min * 60.0 * 0.85, maxK, ch, acc, brk, obd, obd * revPct / 100, cold)
+            val shifts = (km * 2.2).toInt() + 4
+            val late = shifts * revPct / 40
+            return TripRecord(now - ago, now - ago + min * 60_000L, km, min * 60.0 * 0.85, maxK, ch, acc, brk, obd, obd * revPct / 300, cold,
+                shifts, late, if (revPct > 10) 2 else 0, shifts * (2200L + revPct * 25L), obd * (revPct / 4) / 100)
         }
         return listOf(
             trip(2 * h, 18.4, 24, 112f, 88, 1, 0, 6, 0),
@@ -212,10 +294,13 @@ object TripLog {
         .put("s", t.startMs).put("e", t.endMs).put("km", t.distanceKm).put("mv", t.movingS)
         .put("max", t.maxKmh.toDouble()).put("ch", t.peakCh).put("acc", t.harshAccel).put("frein", t.harshBrake)
         .put("obd", t.obdS).put("haut", t.overRevS).put("froid", t.coldRevS)
+        .put("passages", t.shifts).put("tard", t.lateShifts).put("tot", t.earlyShifts).put("rpmPassages", t.shiftRpmSum)
+        .put("peine", t.lugS)
 
     private fun decode(o: JSONObject) = TripRecord(
         o.getLong("s"), o.getLong("e"), o.getDouble("km"), o.getDouble("mv"), o.getDouble("max").toFloat(),
         o.optInt("ch"), o.optInt("acc"), o.optInt("frein"), o.optInt("obd"), o.optInt("haut"), o.optInt("froid"),
+        o.optInt("passages", -1), o.optInt("tard"), o.optInt("tot"), o.optLong("rpmPassages"), o.optInt("peine"),
     )
 
     private fun encodeList(list: List<TripRecord>) = JSONArray(list.map(::encode)).toString()
