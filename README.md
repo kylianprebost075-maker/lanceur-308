@@ -12,7 +12,7 @@
 
 La 308 en 3D telle que l'appli l'affiche : accueil en 3/4 avant, ouvrants animés d'après le CAN, phares et feux
 pilotés par l'appli, plongée à la place du conducteur dans l'onglet Entretien.
-*Rendus du modèle `car.glb` de l'appli (three.js, plaque factice « AB-123-CD ») ; captures de l'interface complète à venir.*
+*Rendus du modèle `car.glb` de l'appli (three.js, plaque factice « AB-123-CD ») ; captures de chaque onglet ci-dessous.*
 
 | Accueil (3/4 avant, phares) | Ouvrants ouverts |
 |---|---|
@@ -21,6 +21,29 @@ pilotés par l'appli, plongée à la place du conducteur dans l'onglet Entretien
 | ![308 en 3/4 arrière, feux arrière allumés](docs/captures/3-4-arriere.png) | ![308 de profil](docs/captures/profil.png) |
 | **Vue conducteur (onglet Entretien)** | |
 | ![Habitacle vu du siège conducteur : volant et compteurs](docs/captures/interieur.png) | |
+
+### Les onglets de l'appli (v0.9)
+
+Captures prises le 8 novembre 2026 dans l'émulateur Android (écran 1024 × 600 comme l'autoradio), en **mode démo**
+(données simulées). L'émulateur ne sait pas afficher la 3D (Filament) : sur ces captures, la voiture est la vue
+de dessus en 2D, celle que l'appli affiche quand la 3D n'est pas disponible. Sur l'autoradio, c'est la 3D ci-dessus.
+
+| Accueil | Véhicule — État |
+|---|---|
+| ![Accueil : voiture, heure, température, batterie, puissance](docs/captures/onglets/01-accueil.png) | ![Véhicule : ouvrants, éclairage, radars](docs/captures/onglets/02-vehicule-etat.png) |
+| **Véhicule — GPS** | **Véhicule — Diagnostic CAN** |
+| ![GPS de l'autoradio et détection des gels](docs/captures/onglets/03-vehicule-gps.png) | ![Diagnostic CAN pas à pas](docs/captures/onglets/04-vehicule-diagnostic-can.png) |
+| **Moteur — Puissance** | **Moteur — Diagnostic** |
+| ![Puissance, couple, rapport engagé, régime, turbo, eau](docs/captures/onglets/05-moteur-puissance.png) | ![Codes défaut et kilométrage du calculateur](docs/captures/onglets/06-moteur-diagnostic.png) |
+| **Moteur — Chrono** | **Moteur — Trajet** |
+| ![Chrono 0-100 et 80-120 km/h](docs/captures/onglets/07-moteur-chrono.png) | ![Distance, temps, vitesses moyenne et maxi](docs/captures/onglets/08-moteur-trajet.png) |
+| **Entretien** | **Entretien — Pleins** |
+| ![Échéances d'entretien](docs/captures/onglets/09-entretien.png) | ![Consommation et coût des pleins](docs/captures/onglets/10-entretien-pleins.png) |
+| **Réglages** | **Panneau performances à côté de CarPlay** |
+| ![Réglages : mode démo, panneau CarPlay, côté](docs/captures/onglets/11-reglages.png) | ![Panneau : puissance, rapport conseillé, régime, eau, turbo, batterie](docs/captures/onglets/12-panneau-performances.png) |
+
+*Panneau performances : dans l'émulateur, il n'y a pas CarPlay ; l'horloge d'Android a été mise à sa place
+sur le bouton CarPlay pour montrer le panneau. Le bandeau rouge est une alerte d'ouvrant du mode démo.*
 
 ---
 
