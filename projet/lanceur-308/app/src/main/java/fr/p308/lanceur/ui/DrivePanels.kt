@@ -120,7 +120,7 @@ fun TripPanel() {
                 Spacer(Modifier.height(8.dp))
                 Row(Modifier.fillMaxWidth()) {
                     Value("Moyenne", "%.0f km/h".format(Locale.FRANCE, t.avgKmh), Modifier.weight(1f))
-                    Value("Maxi", "${t.maxKmh.toInt()} km/h", Modifier.weight(1f))
+                    Value("Conso (L/100 km)", t.l100?.let { "≈ %.1f".format(Locale.FRANCE, it) } ?: "—", Modifier.weight(1f))
                 }
                 Spacer(Modifier.weight(1f))
                 ScoreDetail(t)
@@ -161,6 +161,12 @@ fun TripPanel() {
                     Text("%.1f km en %s · moyenne %.0f km/h · maxi %d km/h".format(
                         Locale.FRANCE, t.distanceKm, duration(t.movingS), t.avgKmh, t.maxKmh.toInt()), fontSize = 15.sp)
                     if (t.peakCh > 0) Text("Puissance maxi utilisée : ${t.peakCh} ch", fontSize = 15.sp)
+                    t.fuelL?.let { l ->
+                        val price = fr.p308.lanceur.drive.MonthReport.lastPricePerL(fr.p308.lanceur.maintenance.Fuel.entries.value)
+                        Text("Gazole estimé : ≈ %.1f L".format(Locale.FRANCE, l) +
+                            (t.l100?.let { " (%.1f L/100)".format(Locale.FRANCE, it) } ?: "") +
+                            (price?.let { " · ≈ %.2f €".format(Locale.FRANCE, l * it) } ?: ""), fontSize = 15.sp)
+                    }
                     Spacer(Modifier.height(6.dp))
                     ScoreDetail(t)
                 }
@@ -225,7 +231,8 @@ private fun TripRow(t: TripRecord, onClick: () -> Unit) {
     ) {
         Column(Modifier.weight(1f)) {
             Text(SimpleDateFormat("EEE d MMM · HH:mm", Locale.FRANCE).format(Date(t.startMs)), fontSize = 14.sp)
-            Text("%.1f km · %s · %.0f km/h".format(Locale.FRANCE, t.distanceKm, duration(t.movingS), t.avgKmh),
+            Text("%.1f km · %s · %.0f km/h".format(Locale.FRANCE, t.distanceKm, duration(t.movingS), t.avgKmh) +
+                (t.l100?.let { " · ≈ %.1f L/100".format(Locale.FRANCE, it) } ?: ""),
                 fontSize = 12.sp, color = C.Sub)
         }
         Text("${t.score}", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = scoreColor(t.score))

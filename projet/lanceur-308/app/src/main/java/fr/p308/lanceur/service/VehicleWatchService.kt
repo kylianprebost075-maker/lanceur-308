@@ -110,6 +110,13 @@ class VehicleWatchService : Service(), LocationListener {
                 .collect { (km, items) -> checkMaintenance(km, items) }
         }
         scope.launch {
+            // Consommation corrigée par les pleins, puis conseil FAP (au plus une alerte tous les 3 jours).
+            combine(fr.p308.lanceur.maintenance.Fuel.entries, TripLog.history) { f, t -> f to t }.collect { (fills, trips) ->
+                fr.p308.lanceur.drive.FuelModel.recompute(fills, trips)
+                if (!Vehicle.demo) fr.p308.lanceur.drive.FapAdvice.evaluate(trips)?.let(::alertFap)
+            }
+        }
+        scope.launch {
             // Seuls les démarrages mesurés après le lancement du service déclenchent une alerte.
             var seen = CrankWatch.history.value.firstOrNull()?.atMs ?: 0L
             CrankWatch.history.collect { list ->
@@ -119,6 +126,26 @@ class VehicleWatchService : Service(), LocationListener {
                 if (last.verdict == CrankVerdict.WEAK) alertWeakStart(last)
             }
         }
+    }
+
+    /** Conseil voie rapide pour le FAP : notification + bandeau, au plus tous les 3 jours (ou si ça s'aggrave). */
+    private fun alertFap(s: fr.p308.lanceur.drive.FapStatus) {
+        val p = getSharedPreferences("alerts", Context.MODE_PRIVATE)
+        if (s.level == 0) {
+            p.edit().putInt("fapLevel", 0).apply()
+            return
+        }
+        val now = System.currentTimeMillis()
+        if (s.level <= p.getInt("fapLevel", 0) && now - p.getLong("fapAt", 0L) < 3 * 86_400_000L) return
+        p.edit().putInt("fapLevel", s.level).putLong("fapAt", now).apply()
+        getSystemService(NotificationManager::class.java).notify(FAP_NOTIF, NotificationCompat.Builder(this, CH_ALERT)
+            .setSmallIcon(R.drawable.ic_car)
+            .setContentTitle("Filtre à particules")
+            .setContentText(s.text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(s.text))
+            .setAutoCancel(true)
+            .build())
+        if (!AppVisibility.foreground.value) banner.show("🛣  ${s.text}", 0xE6C77700.toInt(), 15_000)
     }
 
     /** Démarrage avec une chute de tension anormale : notification + bandeau par-dessus CarPlay. */
@@ -169,6 +196,7 @@ class VehicleWatchService : Service(), LocationListener {
     /** Odomètre GPS : on ignore les points imprécis, l'arrêt (dérive) et les sauts impossibles. */
     override fun onLocationChanged(loc: Location) {
         GpsMonitor.onLocation(loc)
+        fr.p308.lanceur.vehicle.GpsClock.onLocation(loc)
         if (!Vehicle.demo) {
             val gpsKmh = if (loc.hasSpeed()) loc.speed * 3.6f else 0f
             Speed.report(if (gpsKmh < 1.8f) 0f else gpsKmh, fromObd = false)
@@ -218,8 +246,14 @@ class VehicleWatchService : Service(), LocationListener {
                 sent.edit().remove(item.id).apply()
                 return@forEach
             }
-            if (sent.getString(item.id, null) == due.level.name) return@forEach
-            val title = if (due.level == DueLevel.LATE) "Entretien dépassé : ${item.name}" else "Entretien à prévoir : ${item.name}"
+            // Échéances à date (contrôle technique, assurance…) : 2e rappel une semaine avant.
+            val tag = if (due.level == DueLevel.SOON && (due.daysLeft ?: 99L) <= 7L) "SOON7" else due.level.name
+            if (sent.getString(item.id, null) == tag) return@forEach
+            val title = when {
+                due.level == DueLevel.LATE -> "Entretien dépassé : ${item.name}"
+                tag == "SOON7" -> "Plus qu'une semaine : ${item.name}"
+                else -> "Entretien à prévoir : ${item.name}"
+            }
             nm.notify(item.id.hashCode(), NotificationCompat.Builder(this, CH_ALERT)
                 .setSmallIcon(R.drawable.ic_car)
                 .setContentTitle(title)
@@ -231,7 +265,7 @@ class VehicleWatchService : Service(), LocationListener {
             if (!AppVisibility.foreground.value) {
                 banner.show("🔧  $title (${due.label()})", if (due.level == DueLevel.LATE) 0xE6B71C1C.toInt() else 0xE6C77700.toInt())
             }
-            sent.edit().putString(item.id, due.level.name).apply()
+            sent.edit().putString(item.id, tag).apply()
         }
     }
 
@@ -240,6 +274,7 @@ class VehicleWatchService : Service(), LocationListener {
         private const val CH_ALERT = "alerts"
         private const val BATTERY_NOTIF = 4242
         private const val CRANK_NOTIF = 4243
+        private const val FAP_NOTIF = 4244
 
         fun start(ctx: Context) =
             ContextCompat.startForegroundService(ctx, Intent(ctx, VehicleWatchService::class.java))

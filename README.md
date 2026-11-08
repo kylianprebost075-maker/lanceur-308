@@ -44,6 +44,19 @@ de dessus en 2D, celle que l'appli affiche quand la 3D n'est pas disponible. Sur
 | **Réglages** | **Panneau performances à côté de CarPlay** |
 | ![Réglages : mode démo, panneau CarPlay, côté](docs/captures/onglets/11-reglages.png) | ![Panneau : puissance, rapport conseillé, régime, eau, turbo, batterie](docs/captures/onglets/12-panneau-performances.png) |
 
+**Nouveau en v0.12** :
+- **Style Verre** (`ui/Theme.kt`, réglage « Style Verre ») : panneaux translucides à liseré lumineux sur fond dégradé
+  coloré. Sans flou en temps réel (trop coûteux sur l'autoradio) : dégradés calculés une fois par taille.
+- **Consommation estimée** (`drive/Insights.kt`) : ≈ 0,3 L/h + 0,27 L par kWh fourni (puissance OBD), corrigée par
+  les pleins complets (médiane des 5 derniers écarts). Par trajet, par mois, en euros (prix du dernier plein).
+- **Conseil FAP** : compté depuis le dernier trajet avec 15 min à 70 km/h ou plus ; conseil à 10 petits trajets ou
+  300 km, urgent à 20 ou 600 km ; notification au plus tous les 3 jours.
+- **Moteur → Bilan** : mois en cours comparé au précédent (km, trajets, temps, gazole, coût, L/100, pleins, score,
+  chauffe).
+- **Heure remise à l'heure par le GPS** (`vehicle/GpsClock.kt`) pour l'horloge du Lanceur (une appli ne peut pas changer
+  l'heure d'Android) ; fuseau de Paris appliqué en France.
+- **Contrôle technique** : rappel 30 jours puis 7 jours avant, invitation à saisir la date du dernier contrôle.
+
 **Nouveau en v0.11** :
 - **Moteur → Chauffe** (`vehicle/Warmup.kt`) : température d'huile ESTIMÉE (la 308 ne la donne pas sur l'OBD) :
   l'huile suit l'eau avec 8 min de retard et chauffe plus fort qu'elle sous la charge ; moteur coupé, elle refroidit

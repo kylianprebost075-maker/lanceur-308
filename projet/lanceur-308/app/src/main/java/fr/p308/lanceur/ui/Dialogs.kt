@@ -260,6 +260,14 @@ fun SettingsDialog(onDismiss: () -> Unit) {
                 SettingRow("Thème", if (Night.active) "Nuit en ce moment" else "Jour en ce moment") {
                     Segmented(NightMode.entries.map { it to it.label }, UiPrefs.nightMode) { UiPrefs.updateNightMode(it) }
                 }
+                SettingRow("Heure", fr.p308.lanceur.vehicle.GpsClock.status()) {
+                    TextButton(onClick = {
+                        runCatching { ctx.startActivity(Intent(Settings.ACTION_DATE_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                    }) { Text("Android") }
+                }
+                SettingRow("Style Verre", "Panneaux translucides sur fond dégradé (décoche pour le style classique)") {
+                    Switch(UiPrefs.glass, UiPrefs::updateGlass)
+                }
                 SettingRow("Baisser la luminosité la nuit", "Écran moins éblouissant en thème nuit") {
                     Switch(UiPrefs.dimAtNight, UiPrefs::updateDimAtNight)
                 }

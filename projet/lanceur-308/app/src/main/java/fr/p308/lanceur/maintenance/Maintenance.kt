@@ -78,15 +78,20 @@ object Defaults308 {
             note = "À vérifier dans le carnet : la préconisation PSA du DV6 a changé selon les années."),
         MaintenanceItem(name = "Additif FAP (Eolys)", everyKm = 120_000,
             note = "Si la voiture a un FAP. À vérifier selon le carnet et le témoin d'additif."),
-        MaintenanceItem(name = "Contrôle technique", everyMonths = 24),
+        controleTechnique(),
         assurance(),
     )
+
+    const val CT_NOTE = "Mets la date du dernier contrôle : rappel 30 jours puis 7 jours avant. En cas de contre-visite, " +
+        "2 mois pour faire réparer."
+
+    fun controleTechnique() = MaintenanceItem(name = "Contrôle technique", everyMonths = 24, note = CT_NOTE)
 
     fun assurance() = MaintenanceItem(name = "Assurance (échéance)", everyMonths = 12,
         note = "Mets la date de la dernière échéance : rappel 30 jours avant, le temps de comparer les offres.")
 
     /** Version des éléments par défaut : les nouveaux sont ajoutés une seule fois aux listes existantes. */
-    const val VERSION = 2
+    const val VERSION = 3
 }
 
 object Maintenance {
@@ -102,8 +107,17 @@ object Maintenance {
             // v0.10 : rappel d'assurance ajouté (sauf si l'utilisateur en a déjà créé un).
             if (_items.value.none { it.name.contains("assurance", ignoreCase = true) }) save(_items.value + Defaults308.assurance())
         }
+        if (prefs.getInt("defaultsVersion", 1) < 3) {
+            // v0.12 : contrôle technique ajouté s'il manque, explication ajoutée s'il n'en a pas.
+            val ct = _items.value.firstOrNull { isCt(it) }
+            if (ct == null) save(_items.value + Defaults308.controleTechnique())
+            else if (ct.note.isBlank()) save(_items.value.map { if (it.id == ct.id) it.copy(note = Defaults308.CT_NOTE) else it })
+        }
         prefs.edit().putInt("defaultsVersion", Defaults308.VERSION).apply()
     }
+
+    fun isCt(item: MaintenanceItem) = item.name.contains("contrôle technique", ignoreCase = true) ||
+        item.name.contains("controle technique", ignoreCase = true)
 
     fun upsert(item: MaintenanceItem) {
         val list = _items.value

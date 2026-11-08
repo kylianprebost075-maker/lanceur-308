@@ -62,6 +62,9 @@ object UiPrefs {
     /** Côté du panneau performances : droite (par défaut) ou gauche. */
     var perfOnRight by mutableStateOf(true)
         private set
+    /** v0.12 : style « Verre » (panneaux translucides sur fond dégradé) ou style classique opaque. */
+    var glass by mutableStateOf(true)
+        private set
 
     val carColor get() = CAR_COLORS[colorIndex.coerceIn(CAR_COLORS.indices)]
 
@@ -73,6 +76,7 @@ object UiPrefs {
         dimAtNight = prefs.getBoolean("dimAtNight", true)
         perfOnCarPlay = prefs.getBoolean("perfOnCarPlay", true)
         perfOnRight = prefs.getBoolean("perfOnRight", true)
+        glass = prefs.getBoolean("glass", true)
         Slot.entries.forEach { s -> prefs.getString("slot_${s.name}", null)?.let { slots[s] = it } }
     }
 
@@ -104,6 +108,11 @@ object UiPrefs {
     fun updatePerfOnRight(v: Boolean) {
         perfOnRight = v
         prefs.edit().putBoolean("perfOnRight", v).apply()
+    }
+
+    fun updateGlass(v: Boolean) {
+        glass = v
+        prefs.edit().putBoolean("glass", v).apply()
     }
 
     fun setSlot(slot: Slot, pkg: String) {

@@ -79,9 +79,11 @@ fun LanceurApp() {
         }
     }
 
-    Row(Modifier.fillMaxSize().background(C.Bg).padding(8.dp)) {
+    Row(Modifier.fillMaxSize().appBackground().padding(8.dp)) {
         Column(
-            Modifier.width(76.dp).fillMaxHeight().clip(RoundedCornerShape(20.dp)).background(C.Card).padding(vertical = 6.dp),
+            Modifier.width(76.dp).fillMaxHeight()
+                .glassSurface(RoundedCornerShape(if (GlassStyle.on) 24.dp else 20.dp), androidx.compose.ui.graphics.SolidColor(C.Card))
+                .padding(vertical = 6.dp),
             verticalArrangement = Arrangement.SpaceEvenly,
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {

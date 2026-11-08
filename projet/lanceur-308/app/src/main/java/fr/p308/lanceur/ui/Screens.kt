@@ -312,9 +312,10 @@ private fun EngineMetrics(modifier: Modifier) {
 /** Horloge alignée sur le changement de minute (se réveille 1 fois/min au lieu de chaque seconde). */
 @Composable
 private fun ClockTile(modifier: Modifier) {
-    val now by produceState(LocalDateTime.now()) {
+    val now by produceState(fr.p308.lanceur.vehicle.GpsClock.localNow()) {
         while (true) {
-            val cur = LocalDateTime.now()
+            // Heure remise à l'heure par le GPS (voir GpsClock).
+            val cur = fr.p308.lanceur.vehicle.GpsClock.localNow()
             value = cur
             val waitMs = (60 - cur.second) * 1_000L - (cur.nano / 1_000_000L) + 50L
             delay(waitMs.coerceIn(500L, 60_050L))
@@ -434,6 +435,16 @@ private fun MaintenancePanel(vs: VehicleState, items: List<MaintenanceItem>) {
             }
         }
         Spacer(Modifier.height(8.dp))
+        // Contrôle technique sans date : sans elle, aucun rappel possible.
+        items.firstOrNull { fr.p308.lanceur.maintenance.Maintenance.isCt(it) && it.lastDate == null }?.let { ct ->
+            Text(
+                "📅  Touche ici pour mettre la date de ton dernier contrôle technique : rappel 30 jours puis 7 jours avant.",
+                fontSize = 14.sp, color = C.Orange,
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(C.Orange.copy(0.12f))
+                    .clickable { editing = ct }.padding(10.dp),
+            )
+            Spacer(Modifier.height(6.dp))
+        }
         LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             items(items, key = { it.id }) { item -> MaintenanceRow(item, vs.odometerKm) { editing = item } }
             item {

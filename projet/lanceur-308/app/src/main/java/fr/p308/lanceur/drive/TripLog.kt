@@ -38,7 +38,14 @@ data class TripRecord(
     val shiftRpmSum: Long = 0,
     /** Secondes où le moteur peine (conseil ▼ affiché plus de 2 s). */
     val lugS: Int = 0,
+    /** Gazole estimé AVANT correction par les pleins (litres, OBD seulement). */
+    val fuelRawL: Double = 0.0,
+    /** Secondes à 70 km/h ou plus (voie rapide : le FAP peut se régénérer). -1 = trajet d'avant la v0.12. */
+    val fastS: Int = -1,
 ) {
+    /** Litres estimés, corrigés par les pleins (null sans OBD sur la majeure partie du trajet). */
+    val fuelL: Double? get() = if (fuelRawL > 0.05 && obdS >= movingS * 0.6) fuelRawL * FuelModel.factor else null
+    val l100: Double? get() = fuelL?.takeIf { distanceKm >= 1.0 }?.let { it / distanceKm * 100 }
     val avgKmh: Double get() = if (movingS > 1) distanceKm * 3600 / movingS else 0.0
     val overRevPct: Int get() = if (obdS > 0) (overRevS * 100f / obdS).roundToInt() else 0
     val lugPct: Int get() = if (obdS > 0) (lugS * 100f / obdS).roundToInt() else 0
@@ -131,7 +138,7 @@ object TripLog {
                 lastKmh = kmh
                 return
             }
-            t = TripRecord(nowMs, nowMs, 0.0, 0.0, 0f, 0, 0, 0, 0, 0, 0, shifts = 0)
+            t = TripRecord(nowMs, nowMs, 0.0, 0.0, 0f, 0, 0, 0, 0, 0, 0, shifts = 0, fastS = 0)
             refNanos = 0L
             inAccel = false
             inBrake = false
@@ -176,7 +183,14 @@ object TripLog {
             return
         }
         val moving = lastKmh > 5f
+        // Gazole (moteur tournant, même à l'arrêt) et temps sur voie rapide, avant le détail OBD ci-dessous.
+        val engineOn = e.connected && (e.rpm ?: 0) > 400
+        val base = t.copy(
+            fuelRawL = t.fuelRawL + if (engineOn) FuelModel.litersPerHour(e.powerCh) / 3600.0 else 0.0,
+            fastS = t.fastS.coerceAtLeast(0) + if (lastKmh >= 70f) 1 else 0,
+        )
         _current.value = if (moving && e.connected && e.rpm != null) {
+            val t = base
             val kind = e.advice.kind
             // Le conseil ne compte qu'après un délai : le temps de débrayer et de passer la vitesse.
             if (kind == ShiftAdvice.Kind.UP) { if (upSinceMs == 0L) upSinceMs = nowMs } else upSinceMs = 0L
@@ -197,7 +211,7 @@ object TripLog {
         } else {
             upSinceMs = 0L
             downSinceMs = 0L
-            t
+            base
         }
         if (++ticks % 30 == 0) saveCurrent()
     }
@@ -279,7 +293,8 @@ object TripLog {
             val shifts = (km * 2.2).toInt() + 4
             val late = shifts * revPct / 40
             return TripRecord(now - ago, now - ago + min * 60_000L, km, min * 60.0 * 0.85, maxK, ch, acc, brk, obd, obd * revPct / 300, cold,
-                shifts, late, if (revPct > 10) 2 else 0, shifts * (2200L + revPct * 25L), obd * (revPct / 4) / 100)
+                shifts, late, if (revPct > 10) 2 else 0, shifts * (2200L + revPct * 25L), obd * (revPct / 4) / 100,
+                km * (0.052 + revPct / 2000.0), if (maxK > 100f) min * 60 / 3 else 0)
         }
         return listOf(
             trip(2 * h, 18.4, 24, 112f, 88, 1, 0, 6, 0),
@@ -295,12 +310,13 @@ object TripLog {
         .put("max", t.maxKmh.toDouble()).put("ch", t.peakCh).put("acc", t.harshAccel).put("frein", t.harshBrake)
         .put("obd", t.obdS).put("haut", t.overRevS).put("froid", t.coldRevS)
         .put("passages", t.shifts).put("tard", t.lateShifts).put("tot", t.earlyShifts).put("rpmPassages", t.shiftRpmSum)
-        .put("peine", t.lugS)
+        .put("peine", t.lugS).put("gazole", t.fuelRawL).put("rapide", t.fastS)
 
     private fun decode(o: JSONObject) = TripRecord(
         o.getLong("s"), o.getLong("e"), o.getDouble("km"), o.getDouble("mv"), o.getDouble("max").toFloat(),
         o.optInt("ch"), o.optInt("acc"), o.optInt("frein"), o.optInt("obd"), o.optInt("haut"), o.optInt("froid"),
         o.optInt("passages", -1), o.optInt("tard"), o.optInt("tot"), o.optLong("rpmPassages"), o.optInt("peine"),
+        o.optDouble("gazole", 0.0), o.optInt("rapide", -1),
     )
 
     private fun encodeList(list: List<TripRecord>) = JSONArray(list.map(::encode)).toString()
