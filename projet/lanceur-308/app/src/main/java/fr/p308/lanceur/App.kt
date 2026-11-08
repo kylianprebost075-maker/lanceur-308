@@ -23,5 +23,7 @@ class App : Application() {
         CrankWatch.init(this)
         fr.p308.lanceur.vehicle.GearCalib.init(this)
         fr.p308.lanceur.vehicle.Warmup.init(this)
+        fr.p308.lanceur.vehicle.ObdLog.init(this)
+        fr.p308.lanceur.maintenance.History.init(this)
     }
 }

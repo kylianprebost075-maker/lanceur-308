@@ -68,6 +68,10 @@ data class FapStatus(
  * à 90 km/h). On compte ce qui s'est passé depuis le dernier bon trajet.
  */
 object FapAdvice {
+    /** Dernier état calculé par le service (sert à l'alerte du panneau CarPlay). */
+    @Volatile
+    var current: FapStatus? = null
+
     private fun good(t: TripRecord) = if (t.fastS >= 0) t.fastS >= 900 else t.distanceKm >= 25 && t.maxKmh >= 90f
 
     fun evaluate(trips: List<TripRecord>, nowMs: Long = System.currentTimeMillis()): FapStatus? {

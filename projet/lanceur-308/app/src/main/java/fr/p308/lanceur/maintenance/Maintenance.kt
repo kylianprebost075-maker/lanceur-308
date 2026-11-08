@@ -30,7 +30,11 @@ const val SOON_KM = 1_000
 const val SOON_DAYS = 30L
 
 fun MaintenanceItem.due(currentKm: Int?, today: LocalDate = LocalDate.now()): Due {
-    val kmLeft = if (everyKm > 0 && lastKm != null && currentKm != null) lastKm + everyKm - currentKm else null
+    // Vidange : les km depuis la dernière comptent davantage si l'usage est sévère (petits trajets, voir OilWear).
+    val kmLeft = if (everyKm > 0 && lastKm != null && currentKm != null) {
+        val driven = currentKm - lastKm
+        everyKm - if (OilWear.isOil(this)) OilWear.effectiveKm(driven) else driven
+    } else null
     val dueDate = if (everyMonths > 0 && lastDate != null) lastDate.plusMonths(everyMonths.toLong()) else null
     val daysLeft = dueDate?.let { ChronoUnit.DAYS.between(today, it) }
     if (kmLeft == null && daysLeft == null) return Due(null, null, 0f, DueLevel.NOT_SET)

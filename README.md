@@ -44,6 +44,23 @@ de dessus en 2D, celle que l'appli affiche quand la 3D n'est pas disponible. Sur
 | **Réglages** | **Panneau performances à côté de CarPlay** |
 | ![Réglages : mode démo, panneau CarPlay, côté](docs/captures/onglets/11-reglages.png) | ![Panneau : puissance, rapport conseillé, régime, eau, turbo, batterie](docs/captures/onglets/12-panneau-performances.png) |
 
+**Nouveau en v0.13** :
+- **Journal OBD** (`vehicle/ObdLog.kt`) : connexions, chaque essai de lecture du kilométrage avec la réponse brute,
+  démarrages (chute saisie ou non), tensions ; 14 jours gardés, copiés sur la clé (dossier `journal/`).
+- **Panneau CarPlay** : taille Auto (complet pendant la chauffe ou en cas d'alerte, pastille une fois chaud),
+  alertes (surchauffe, charge batterie anormale, FAP à nettoyer vite ; la pastille clignote), consommation
+  instantanée. Ouverture automatique quand CarPlay passe au premier plan (`service/CarPlayWatch.kt`, autorisation
+  « Accès aux données d'utilisation » donnée à la main).
+- **Tracé de chaque trajet** (`ui/TripTrace.kt`) d'après les journaux GPS, coloré selon la vitesse, sans fond de carte.
+- **Vidange adaptée à l'usage** (`maintenance/Wear.kt`) : les petits trajets avancent l'échéance (jusqu'à × 1,6).
+- **Santé de la batterie dans le temps** : démarrages comparés (froid pris en compte), estimation des semaines
+  restantes, alerte quand elle se dégrade.
+- **Export pour Excel** (`backup/Export.kt`) : trajets, pleins, démarrages, chauffes, historique en CSV sur la clé.
+- **Historique des interventions + import des factures** (`maintenance/History.kt`, `backup/Import.kt`) : un fichier
+  `import-entretien.json` posé sur la clé (Android/data/fr.p308.lanceur/files/) est fusionné une fois (historique,
+  dates et km des entretiens, kilométrage vers le haut seulement), puis renommé `.importé`. Les données
+  personnelles (factures) ne sont jamais dans ce dépôt.
+
 **Nouveau en v0.12.3** : panneau CarPlay réduit en pastille en haut (point coloré selon l'eau / l'huile, rapport,
 conseil ▲▼, ch, eau, minutes de chauffe restantes). Toucher passe de la colonne à la pastille ; le choix est gardé
 (Réglages → « Taille du panneau » : Complet / Réduit).

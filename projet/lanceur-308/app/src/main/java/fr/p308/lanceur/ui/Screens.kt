@@ -412,10 +412,16 @@ private fun VehicleStatePanel(vs: VehicleState) {
 
 @Composable
 fun MaintenanceScreen(vs: VehicleState, items: List<MaintenanceItem>) {
-    var fuel by rememberSaveable { mutableStateOf(false) }
+    var page by rememberSaveable { mutableStateOf(0) }
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Segmented(listOf(false to "Entretien", true to "Pleins"), fuel) { fuel = it }
-        Box(Modifier.weight(1f)) { if (fuel) FuelPanel(vs.odometerKm) else MaintenancePanel(vs, items) }
+        Segmented(listOf(0 to "Entretien", 1 to "Pleins", 2 to "Historique"), page) { page = it }
+        Box(Modifier.weight(1f)) {
+            when (page) {
+                1 -> FuelPanel(vs.odometerKm)
+                2 -> HistoryPanel()
+                else -> MaintenancePanel(vs, items)
+            }
+        }
     }
 }
 
@@ -487,6 +493,17 @@ private fun MaintenanceRow(item: MaintenanceItem, km: Int?, onClick: () -> Unit)
                 Text("$done · ${item.intervalLabel()}", fontSize = 12.sp, color = C.Sub, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Text(due.label(), color = color, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+        }
+        // Vidange : avancée selon l'usage (petits trajets), avec l'explication.
+        val wear = fr.p308.lanceur.maintenance.OilWear.info
+        if (fr.p308.lanceur.maintenance.OilWear.isOil(item) && wear != null && item.lastKm != null && km != null) {
+            val driven = (km - item.lastKm).coerceAtLeast(0)
+            val ahead = fr.p308.lanceur.maintenance.OilWear.effectiveKm(driven) - driven
+            Text(
+                if (wear.shortPct >= 20) "Usage sévère : ${wear.shortPct} % de petits trajets → vidange avancée d'environ ${fmtKm(ahead)} km"
+                else "Usage normal (${wear.shortPct} % de petits trajets) : intervalle habituel",
+                fontSize = 11.sp, color = if (wear.shortPct >= 20) C.Orange else C.Sub, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            )
         }
         if (due.level != DueLevel.NOT_SET) {
             Spacer(Modifier.height(6.dp))

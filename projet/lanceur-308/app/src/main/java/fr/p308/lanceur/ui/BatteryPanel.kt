@@ -93,7 +93,15 @@ fun BatteryPanel() {
                     else -> "Fais-la tester (contrôle gratuit chez la plupart des centres auto)."
                 }, fontSize = 13.sp, color = C.Sub)
             }
-            trend?.let {
+            // Santé dans le temps (tous les démarrages, froid pris en compte), sinon la simple tendance.
+            val health = fr.p308.lanceur.maintenance.BatteryHealthModel.evaluate(list)
+            if (health != null) {
+                Spacer(Modifier.height(8.dp))
+                Text("Santé dans le temps", fontSize = 12.sp, color = C.Sub)
+                Text(health.title, fontSize = 17.sp, fontWeight = FontWeight.Bold,
+                    color = when (health.level) { 0 -> C.Green; 1 -> C.Orange; else -> C.Red })
+                Text(health.text, fontSize = 13.sp, color = C.Sub)
+            } else trend?.let {
                 Spacer(Modifier.height(6.dp))
                 val txt = when {
                     it <= -0.3f -> "Tendance : en baisse (%.1f V sur les 10 derniers démarrages)".format(Locale.FRANCE, it)

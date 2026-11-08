@@ -18,7 +18,7 @@ import java.io.File
  */
 object Backup {
     private const val FILE = "sauvegarde-308.json"
-    private val PREFS = listOf("maintenance", "vehicle", "ui", "fuel", "chrono", "trips", "battery", "gears", "warmup")
+    private val PREFS = listOf("maintenance", "vehicle", "ui", "fuel", "chrono", "trips", "battery", "gears", "warmup", "history")
 
     /** Nombre de clés USB / cartes SD branchées (pour sauvegarder dès qu'une clé arrive). */
     fun usbCount(ctx: Context): Int = volumes(ctx).count { it.second }
@@ -57,8 +57,16 @@ object Backup {
         }
         val usb = vols.filter { it.second }
         copyGpsLogs(ctx)
+        // Journal OBD et tableaux pour Excel : sur la clé seulement (la mémoire interne les a déjà).
+        usb.forEach { (dir, _) ->
+            runCatching {
+                val j = File(dir, "journal").apply { mkdirs() }
+                fr.p308.lanceur.vehicle.ObdLog.dir?.listFiles()?.forEach { it.copyTo(File(j, it.name), overwrite = true) }
+            }
+            runCatching { Export.writeAll(File(dir, "export")) }
+        }
         return if (usb.isEmpty()) "Sauvegardé dans la mémoire interne (aucune clé USB détectée)"
-        else "Sauvegardé sur la clé : Android/data/fr.p308.lanceur/files/$FILE"
+        else "Sauvegardé sur la clé : Android/data/fr.p308.lanceur/files/ (sauvegarde, journal OBD, tableaux Excel dans « export »)"
     }
 
     /** Copie les journaux GPS sur la clé (dossier gps/ à côté de la sauvegarde). */
@@ -100,6 +108,7 @@ object Backup {
         fr.p308.lanceur.vehicle.GearCalib.init(ctx)
         fr.p308.lanceur.vehicle.Warmup.init(ctx)
         fr.p308.lanceur.vehicle.Vehicle.reloadOdometer()
+        fr.p308.lanceur.maintenance.History.init(ctx)
         return "Restauré depuis ${if (file.absolutePath.contains("emulated")) "la mémoire interne" else "la clé USB"} (sauvegarde du ${json.optString("date").take(10)})"
     }
 }

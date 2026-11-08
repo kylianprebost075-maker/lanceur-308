@@ -44,6 +44,9 @@ object PerfPanel {
     val armed = MutableStateFlow(false)
 }
 
+/** Taille du panneau CarPlay. */
+enum class PerfSize(val label: String) { FULL("Complet"), COMPACT("Réduit"), AUTO("Auto") }
+
 object UiPrefs {
     private lateinit var prefs: SharedPreferences
 
@@ -62,8 +65,14 @@ object UiPrefs {
     /** Côté du panneau performances : droite (par défaut) ou gauche. */
     var perfOnRight by mutableStateOf(true)
         private set
-    /** v0.12.3 : panneau CarPlay réduit (pastille en haut) au lieu de la colonne complète. */
-    var perfCompact by mutableStateOf(false)
+    /**
+     * Taille du panneau CarPlay : colonne complète, pastille en haut (v0.12.3), ou automatique (v0.13 : complète
+     * pendant la chauffe ou en cas d'alerte, pastille une fois le moteur chaud).
+     */
+    var perfSize by mutableStateOf(PerfSize.AUTO)
+        private set
+    /** v0.13 : le panneau s'affiche aussi quand CarPlay s'ouvre tout seul (accès aux données d'utilisation). */
+    var perfAutoCarPlay by mutableStateOf(true)
         private set
     /** v0.12 : style « Verre » (panneaux translucides sur fond dégradé) ou style classique opaque. */
     var glass by mutableStateOf(true)
@@ -79,7 +88,12 @@ object UiPrefs {
         dimAtNight = prefs.getBoolean("dimAtNight", true)
         perfOnCarPlay = prefs.getBoolean("perfOnCarPlay", true)
         perfOnRight = prefs.getBoolean("perfOnRight", true)
-        perfCompact = prefs.getBoolean("perfCompact", false)
+        perfSize = runCatching { PerfSize.valueOf(prefs.getString("perfSize", null)!!) }.getOrElse {
+            // Réglage de la v0.12.3 (réduit oui / non) repris s'il existe.
+            if (prefs.contains("perfCompact")) (if (prefs.getBoolean("perfCompact", false)) PerfSize.COMPACT else PerfSize.FULL)
+            else PerfSize.AUTO
+        }
+        perfAutoCarPlay = prefs.getBoolean("perfAutoCarPlay", true)
         glass = prefs.getBoolean("glass", true)
         Slot.entries.forEach { s -> prefs.getString("slot_${s.name}", null)?.let { slots[s] = it } }
     }
@@ -109,9 +123,14 @@ object UiPrefs {
         prefs.edit().putBoolean("perfOnCarPlay", v).apply()
     }
 
-    fun updatePerfCompact(v: Boolean) {
-        perfCompact = v
-        prefs.edit().putBoolean("perfCompact", v).apply()
+    fun updatePerfSize(v: PerfSize) {
+        perfSize = v
+        prefs.edit().putString("perfSize", v.name).apply()
+    }
+
+    fun updatePerfAutoCarPlay(v: Boolean) {
+        perfAutoCarPlay = v
+        prefs.edit().putBoolean("perfAutoCarPlay", v).apply()
     }
 
     fun updatePerfOnRight(v: Boolean) {
@@ -147,7 +166,7 @@ fun launchSlot(ctx: Context, slot: Slot): Boolean {
     return false
 }
 
-private fun guessPackage(ctx: Context, slot: Slot): String? {
+fun guessPackage(ctx: Context, slot: Slot): String? {
     val launchable = ctx.packageManager
         .queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0)
         .map { it.activityInfo.packageName }

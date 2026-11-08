@@ -245,8 +245,16 @@ object Engine {
         }
     }
 
-    private fun status(text: String, connected: Boolean = false) =
+    private var lastLoggedStatus = ""
+
+    private fun status(text: String, connected: Boolean = false) {
+        // Journal : chaque changement d'état de la connexion (pas les répétitions d'une même recherche).
+        if (text != lastLoggedStatus) {
+            lastLoggedStatus = text
+            ObdLog.log("CONNEXION", text)
+        }
         _state.update { it.copy(status = text, connected = connected) }
+    }
 
     private fun prefs(ctx: Context) = ctx.getSharedPreferences("vehicle", Context.MODE_PRIVATE)
 
@@ -386,6 +394,7 @@ object Engine {
             if (elm.pid("00", 8000) == null) throw IOException("calculateur muet (mets le contact)")
         }
         status("Connecté à ${elm.name}", connected = true)
+        ObdLog.log("CONNEXION", "tension ${elm.readBatteryVolts() ?: "?"} V à la connexion")
         estimateOutsideTemp(elm)
         // Kilométrage du calculateur moteur (relevé le 08/11/2026 : identique au compteur) → kilométrage d'entretien.
         // Moteur tournant, le calculateur répond souvent trop tard : nouvel essai plus tard s'il a échoué.
@@ -411,21 +420,26 @@ object Engine {
             // minBytes : une réponse tronquée (bruit Bluetooth) est ignorée au lieu de couper la connexion.
             val rpm = elm.pid("0C", minBytes = 2)?.let { (it[0] * 256 + it[1]) / 4 }
             // Pendant le démarreur, le calculateur ne répond souvent plus : on reste en mode « moteur coupé ».
+            if (rpm != null && (rpm <= 400) != engineOff) {
+                ObdLog.log("MOTEUR", if (rpm > 400) "démarré ($rpm tr/min, eau ${_state.value.coolantC ?: "?"} °C)" else "coupé")
+            }
             if (rpm != null) engineOff = rpm <= 400
             if (engineOff) {
                 // Moteur coupé : régime + tension, plusieurs fois par seconde, pour saisir la chute au démarreur.
                 // Deux lectures de tension par tour : le calculateur répond lentement (jusqu'à 400 ms) au démarreur,
                 // ATRV (lu par le vLinker lui-même) reste rapide.
                 val volts = elm.readBatteryVolts()
-                CrankWatch.onSample(volts, rpm, _state.value.coolantC)
+                CrankWatch.onSample(volts, rpm, _state.value.coolantC)?.let(::logCrank)
+                // Moteur coupé : une tension par minute suffit au journal (les relevés rapides restent en mémoire).
+                if (n % 120 == 0) ObdLog.log("TENSION", "moteur coupé : ${volts ?: "?"} V")
                 val coolant = if (n % 20 == 0) elm.pid("05", minBytes = 1)?.let { it[0] - 40 } else null
                 val volts2 = elm.readBatteryVolts()
-                CrankWatch.onSample(volts2, null, _state.value.coolantC)
+                CrankWatch.onSample(volts2, null, _state.value.coolantC)?.let(::logCrank)
                 publish(rpm, null, coolant = coolant, voltage = volts2 ?: volts)
                 n++
                 continue
             }
-            CrankWatch.onSample(null, rpm, _state.value.coolantC)
+            CrankWatch.onSample(null, rpm, _state.value.coolantC)?.let(::logCrank)
             val load = elm.pid("04", minBytes = 1)?.let { it[0] * 100 / 255 }
             val speed = if (n % 2 == 0) elm.pid("0D", minBytes = 1)?.get(0) else null
             speed?.let {
@@ -440,6 +454,7 @@ object Engine {
                 // Le PID 42 (tension) est absent sur l'EDC16C34 (séance du 08/11) : ATRV lit le 12 V du vLinker.
                 val volts = elm.readBatteryVolts()
                 CrankWatch.onRunningVolts(volts)
+                if (n % 600 == 1) ObdLog.log("TENSION", "moteur tournant : ${volts ?: "?"} V, eau ${coolant ?: "?"} °C, turbo ${boost ?: "?"} bar")
                 publish(rpm, load, speed, coolant, boost, volts)
             } else {
                 publish(rpm, load, speed)
@@ -483,18 +498,34 @@ object Engine {
             // Séance du 08/11 : moteur tournant, 2110 restait souvent sans réponse avec 400 ms d'attente (ATST64).
             // On attend ici jusqu'à 1 s (ATSTFF, délai fixe), après un « testeur présent » (3E00), 3 essais.
             listOf("ATAT0", "ATSTFF", "ATSH6A8", "ATCRA688", "ATFCSH6A8", "ATFCSD300000", "ATFCSM1").forEach { elm.cmd(it, 1500) }
-            elm.cmd("3E00", 2500)
-            repeat(3) {
-                val hex = elm.cmd("2110", 3000).uppercase().filter { it.isLetterOrDigit() }
+            val tp = elm.cmd("3E00", 2500)
+            val engine = if ((_state.value.rpm ?: 0) > 400) "moteur tournant" else "moteur coupé"
+            repeat(3) { k ->
+                val raw = elm.cmd("2110", 3000)
+                val hex = raw.uppercase().filter { it.isLetterOrDigit() }
                 val i = hex.indexOf("6110")
                 if (i >= 0 && hex.length >= i + 12) {
-                    hex.substring(i + 4, i + 12).toLongOrNull(16)?.toInt()?.takeIf { it in 1..1_999_999 }?.let { return it }
+                    hex.substring(i + 4, i + 12).toLongOrNull(16)?.toInt()?.takeIf { it in 1..1_999_999 }?.let {
+                        ObdLog.log("KM", "lu : $it km (essai ${k + 1}/3, $engine)")
+                        return it
+                    }
                 }
+                // Réponse brute gardée : c'est elle qui dit pourquoi ça échoue (NO DATA, 7F 21 xx, rien…).
+                ObdLog.log("KM", "essai ${k + 1}/3 raté ($engine) : réponse « ${raw.trim().ifEmpty { "(vide)" }} », 3E00 → « ${tp.trim()} »")
             }
             return null
         } finally {
             listOf("ATFCSM0", "ATCRA", "ATSH7DF", "ATST64", "ATAT1").forEach { runCatching { elm.cmd(it, 1500) } }
         }
+    }
+
+    /** Démarrage noté par CrankWatch → journal (avec ce qui a été saisi ou non). */
+    private fun logCrank(r: CrankRecord) {
+        ObdLog.log(
+            "DEMARRAGE",
+            "repos ${r.restV} V, " + (r.minV?.let { "mini $it V au démarreur" } ?: "chute au démarreur NON saisie") +
+                ", eau ${r.coolantC ?: "?"} °C, verdict ${r.verdict.label}",
+        )
     }
 
     /** Lit le kilométrage moteur ; vrai s'il a été obtenu. Une coupure Bluetooth remonte (IOException). */
@@ -503,10 +534,14 @@ object Engine {
             readEcuKm(elm)
         } catch (e: IOException) {
             throw e
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            ObdLog.log("KM", "erreur : ${e.message ?: e.javaClass.simpleName}")
             null
         } ?: return false
-        if (!applyEcuKm(km)) return false
+        if (!applyEcuKm(km)) {
+            ObdLog.log("KM", "$km km refusé : plus petit que le dernier relevé moteur (lecture faussée)")
+            return false
+        }
         _diag.update { it.copy(ecuKm = km) }
         return true
     }

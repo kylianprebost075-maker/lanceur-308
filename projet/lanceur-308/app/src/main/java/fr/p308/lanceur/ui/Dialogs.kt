@@ -307,8 +307,31 @@ fun SettingsDialog(onDismiss: () -> Unit) {
                     SettingRow("Côté du panneau", null) {
                         Segmented(listOf(false to "Gauche", true to "Droite"), UiPrefs.perfOnRight) { UiPrefs.updatePerfOnRight(it) }
                     }
-                    SettingRow("Taille du panneau", "Réduit : pastille en haut (rapport, ch, eau, chauffe). Toucher le panneau change aussi") {
-                        Segmented(listOf(false to "Complet", true to "Réduit"), UiPrefs.perfCompact) { UiPrefs.updatePerfCompact(it) }
+                    SettingRow(
+                        "Taille du panneau",
+                        "Réduit : pastille en haut. Auto : complet pendant la chauffe ou en cas d'alerte, pastille une fois chaud",
+                    ) {
+                        Segmented(fr.p308.lanceur.PerfSize.entries.map { it to it.label }, UiPrefs.perfSize) { UiPrefs.updatePerfSize(it) }
+                    }
+                    // Revérifié toutes les 2 s : l'autorisation se donne dans les réglages d'Android, puis on revient.
+                    val usage by produceState(fr.p308.lanceur.service.CarPlayWatch.hasAccess(ctx)) {
+                        while (true) {
+                            delay(2000)
+                            value = fr.p308.lanceur.service.CarPlayWatch.hasAccess(ctx)
+                        }
+                    }
+                    SettingRow(
+                        "Ouvrir avec CarPlay",
+                        if (!UiPrefs.perfAutoCarPlay) "Le panneau ne s'affiche qu'avec le bouton CarPlay du Lanceur"
+                        else if (usage) "Le panneau s'affiche aussi quand CarPlay s'ouvre tout seul (téléphone branché)"
+                        else "Autorise « Accès aux données d'utilisation » pour le Lanceur 308 (bouton Autoriser)",
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (UiPrefs.perfAutoCarPlay && !usage) {
+                                TextButton(onClick = { openSettings(ctx, Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) }) { Text("Autoriser") }
+                            }
+                            Switch(UiPrefs.perfAutoCarPlay, UiPrefs::updatePerfAutoCarPlay)
+                        }
                     }
                 }
                 SettingRow("Paramètres Android", "Réglages d'origine, souvent cachés par l'autoradio") {

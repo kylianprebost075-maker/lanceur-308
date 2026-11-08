@@ -62,6 +62,7 @@ class VehicleWatchService : Service(), LocationListener {
     }
     private var lastFix: Location? = null
     private var gpsOn = false
+    private var ticks = 0
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -98,6 +99,8 @@ class VehicleWatchService : Service(), LocationListener {
                     Vehicle.state.value.outsideTempC)
                 AutoBackup.tick(this@VehicleWatchService)
                 checkBattery()
+                if (++ticks % 2 == 0) CarPlayWatch.tick(this@VehicleWatchService)
+                fr.p308.lanceur.backup.Import.check(this@VehicleWatchService)?.let(::notifyImport)
                 delay(1000)
             }
         }
@@ -106,14 +109,25 @@ class VehicleWatchService : Service(), LocationListener {
                 .collect { (open, fg) -> if (open.isEmpty() || fg) overlay.hide() else overlay.show("⚠  " + describeOpen(open)) }
         }
         scope.launch {
-            combine(Vehicle.state.map { it.odometerKm }.distinctUntilChanged(), Maintenance.items) { km, items -> km to items }
-                .collect { (km, items) -> checkMaintenance(km, items) }
+            // Usure de l'huile recalculée quand les trajets ou l'entretien changent, avant de vérifier les échéances.
+            combine(Vehicle.state.map { it.odometerKm }.distinctUntilChanged(), Maintenance.items, TripLog.history) { km, items, trips ->
+                fr.p308.lanceur.maintenance.OilWear.recompute(items, trips)
+                km to items
+            }.collect { (km, items) -> checkMaintenance(km, items) }
+        }
+        scope.launch {
+            // Santé de la batterie dans le temps : alerte quand elle se dégrade (une fois par niveau).
+            CrankWatch.history.collect { list ->
+                if (!Vehicle.demo) fr.p308.lanceur.maintenance.BatteryHealthModel.evaluate(list)?.let(::alertBatteryHealth)
+            }
         }
         scope.launch {
             // Consommation corrigée par les pleins, puis conseil FAP (au plus une alerte tous les 3 jours).
             combine(fr.p308.lanceur.maintenance.Fuel.entries, TripLog.history) { f, t -> f to t }.collect { (fills, trips) ->
                 fr.p308.lanceur.drive.FuelModel.recompute(fills, trips)
-                if (!Vehicle.demo) fr.p308.lanceur.drive.FapAdvice.evaluate(trips)?.let(::alertFap)
+                val fap = if (Vehicle.demo) null else fr.p308.lanceur.drive.FapAdvice.evaluate(trips)
+                fr.p308.lanceur.drive.FapAdvice.current = fap
+                fap?.let(::alertFap)
             }
         }
         scope.launch {
@@ -146,6 +160,35 @@ class VehicleWatchService : Service(), LocationListener {
             .setAutoCancel(true)
             .build())
         if (!AppVisibility.foreground.value) banner.show("🛣  ${s.text}", 0xE6C77700.toInt(), 15_000)
+    }
+
+    /** Factures importées depuis la clé : notification + bandeau (Entretien → Historique pour les voir). */
+    private fun notifyImport(msg: String) {
+        getSystemService(NotificationManager::class.java).notify(IMPORT_NOTIF, NotificationCompat.Builder(this, CH_ALERT)
+            .setSmallIcon(R.drawable.ic_car)
+            .setContentTitle("Entretien")
+            .setContentText(msg)
+            .setStyle(NotificationCompat.BigTextStyle().bigText("$msg Détail : Entretien → Historique."))
+            .setAutoCancel(true)
+            .build())
+        banner.show("🧾  $msg", 0xE62E7D32.toInt(), 12_000)
+    }
+
+    /** Batterie qui se dégrade d'un démarrage à l'autre : prévient avant la panne (une fois par aggravation). */
+    private fun alertBatteryHealth(h: fr.p308.lanceur.maintenance.BatteryHealth) {
+        val p = getSharedPreferences("alerts", Context.MODE_PRIVATE)
+        val before = p.getInt("batHealth", 0)
+        p.edit().putInt("batHealth", h.level).apply()
+        if (h.level <= before) return
+        val msg = "${h.title} : ${h.text}"
+        getSystemService(NotificationManager::class.java).notify(HEALTH_NOTIF, NotificationCompat.Builder(this, CH_ALERT)
+            .setSmallIcon(R.drawable.ic_car)
+            .setContentTitle("Santé de la batterie")
+            .setContentText(msg)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(msg))
+            .setAutoCancel(true)
+            .build())
+        if (!AppVisibility.foreground.value) banner.show("🔋  $msg", 0xE6C77700.toInt(), 15_000)
     }
 
     /** Démarrage avec une chute de tension anormale : notification + bandeau par-dessus CarPlay. */
@@ -275,6 +318,8 @@ class VehicleWatchService : Service(), LocationListener {
         private const val BATTERY_NOTIF = 4242
         private const val CRANK_NOTIF = 4243
         private const val FAP_NOTIF = 4244
+        private const val HEALTH_NOTIF = 4245
+        private const val IMPORT_NOTIF = 4246
 
         fun start(ctx: Context) =
             ContextCompat.startForegroundService(ctx, Intent(ctx, VehicleWatchService::class.java))

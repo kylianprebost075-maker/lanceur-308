@@ -36,7 +36,25 @@ class PerfOverlay(private val ctx: Context, private val onClose: () -> Unit) {
     private var full: LinearLayout? = null
     private var mini: LinearLayout? = null
     private var rightSide = true
-    private val collapsed get() = fr.p308.lanceur.UiPrefs.perfCompact
+    /** Mode Auto : pastille une fois le moteur chaud et sans alerte (recalculé à chaque mesure). */
+    private var autoCompact = false
+    /** Mode Auto : un toucher impose l'autre taille jusqu'à la fermeture du panneau. */
+    private var tapOverride: Boolean? = null
+    private val collapsed: Boolean
+        get() = when (fr.p308.lanceur.UiPrefs.perfSize) {
+            fr.p308.lanceur.PerfSize.FULL -> false
+            fr.p308.lanceur.PerfSize.COMPACT -> true
+            fr.p308.lanceur.PerfSize.AUTO -> tapOverride ?: autoCompact
+        }
+
+    /** Alerte affichée en tête du panneau (et sur la pastille) : texte court, couleur, true = grave. */
+    private data class Alert(val text: String, val color: Int, val serious: Boolean)
+
+    private lateinit var alertView: TextView
+    private lateinit var alertBg: GradientDrawable
+    private lateinit var fuel: Gauge
+    /** Consommation instantanée lissée (L/100 km, ou L/h à l'arrêt). */
+    private var fuelSmooth: Double? = null
 
     // Pastille (version réduite) : point de température, rapport, conseil, puissance, eau, chauffe restante.
     private lateinit var miniDot: GradientDrawable
@@ -67,6 +85,9 @@ class PerfOverlay(private val ctx: Context, private val onClose: () -> Unit) {
         if (!Settings.canDrawOverlays(ctx)) return
         if (root != null && onRight != rightSide) hide()
         rightSide = onRight
+        val alert = alertFor(e)
+        val w = Warmup.state.value
+        autoCompact = alert?.serious != true && !w.active && (e.coolantC ?: 0) >= 75 && (w.oilC ?: 80f) >= 70f
         if (root == null) build()
         else if (shownCompact != collapsed) {
             // Taille changée dans les Réglages pendant que le panneau est affiché.
@@ -79,6 +100,25 @@ class PerfOverlay(private val ctx: Context, private val onClose: () -> Unit) {
     fun hide() {
         root?.let { runCatching { wm.removeView(it) } }
         root = null
+        tapOverride = null
+        fuelSmooth = null
+    }
+
+    /**
+     * Ce qui mérite d'être vu tout de suite : surchauffe (grave), charge de la batterie anormale moteur tournant,
+     * filtre à particules à nettoyer vite. null = rien.
+     */
+    private fun alertFor(e: EngineState): Alert? {
+        val c = e.coolantC
+        val running = (e.rpm ?: 0) > 400
+        val v = e.voltage
+        return when {
+            c != null && c >= 105 -> Alert("Surchauffe : eau $c °C", RED, true)
+            running && v != null && v < 12.8f -> Alert("Batterie ne charge pas (%.1f V)".format(Locale.FRANCE, v), ORANGE, true)
+            running && v != null && v > 15.2f -> Alert("Surtension (%.1f V)".format(Locale.FRANCE, v), ORANGE, true)
+            fr.p308.lanceur.drive.FapAdvice.current?.level == 2 -> Alert("FAP : 20 min de voie rapide", ORANGE, false)
+            else -> null
+        }
     }
 
     private fun label(text: String, size: Float, color: Int = TEXT, bold: Boolean = false) = TextView(ctx).apply {
@@ -162,7 +202,15 @@ class PerfOverlay(private val ctx: Context, private val onClose: () -> Unit) {
         oil = Gauge("Huile (estimée)")
         boost = Gauge("Turbo")
         rpm = Gauge("Régime")
+        fuel = Gauge("Conso")
         status = label("", 11f, SUB)
+        alertBg = GradientDrawable().apply { cornerRadius = dp(12).toFloat(); setColor(RED) }
+        alertView = label("", 15f, Color.WHITE, bold = true).apply {
+            background = alertBg
+            setPadding(dp(10), dp(7), dp(10), dp(7))
+            maxLines = 2
+            visibility = View.GONE
+        }
 
         val gearRow = LinearLayout(ctx).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -184,13 +232,14 @@ class PerfOverlay(private val ctx: Context, private val onClose: () -> Unit) {
         val f = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(12), dp(10), dp(12), dp(10))
+            addView(alertView, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = dp(6) })
             addView(card(label("Rapport", 11f, SUB), gearRow))
             addView(space(6))
             addView(card(label("Puissance · couple", 11f, SUB), powerRow))
             addView(space(6))
             addView(warmCard)
             // Les jauges se répartissent la hauteur restante (pas de grand vide en bas sur l'écran de 600 px).
-            listOf(coolant, oil, boost, rpm).forEach { g ->
+            listOf(coolant, oil, boost, rpm, fuel).forEach { g ->
                 addView(View(ctx), LinearLayout.LayoutParams(1, 0, 1f))
                 addView(g.view)
             }
@@ -244,7 +293,11 @@ class PerfOverlay(private val ctx: Context, private val onClose: () -> Unit) {
 
     /** Toucher : passe de la colonne complète à la pastille et inversement (choix gardé, comme dans les Réglages). */
     private fun toggle() {
-        fr.p308.lanceur.UiPrefs.updatePerfCompact(!collapsed)
+        when (fr.p308.lanceur.UiPrefs.perfSize) {
+            fr.p308.lanceur.PerfSize.AUTO -> tapOverride = !collapsed
+            fr.p308.lanceur.PerfSize.FULL -> fr.p308.lanceur.UiPrefs.updatePerfSize(fr.p308.lanceur.PerfSize.COMPACT)
+            fr.p308.lanceur.PerfSize.COMPACT -> fr.p308.lanceur.UiPrefs.updatePerfSize(fr.p308.lanceur.PerfSize.FULL)
+        }
         applyCollapsed()
         root?.let { runCatching { wm.updateViewLayout(it, params()) } }
     }
@@ -367,7 +420,39 @@ class PerfOverlay(private val ctx: Context, private val onClose: () -> Unit) {
         miniWater.visibility = if (c == null) View.GONE else View.VISIBLE
         val warmMin = if (w.active) left ?: oilLeft else null
         miniWarm.text = warmMin?.let { "❄ ${ceil(it).toInt().coerceAtLeast(1)} min" } ?: ""
+        miniWarm.setTextColor(BLUE)
         miniWarm.visibility = if (warmMin == null) View.GONE else View.VISIBLE
+
+        // Consommation instantanée : modèle de la puissance, corrigé par les pleins, lissé (≈ 3 s).
+        val kmh = e.speedKmh ?: fr.p308.lanceur.drive.Trip.state.value.currentKmh.toInt()
+        val lph = if (e.powerCh != null && (e.rpm ?: 0) > 400) {
+            fr.p308.lanceur.drive.FuelModel.litersPerHour(e.powerCh) * fr.p308.lanceur.drive.FuelModel.factor
+        } else null
+        val inst = lph?.let { if (kmh >= 8) it / kmh * 100 else it }
+        fuelSmooth = inst?.let { v -> fuelSmooth?.let { it + (v - it) * 0.15 } ?: v }
+        val fs = fuelSmooth
+        when {
+            fs == null -> fuel.set("—", 0f, ACCENT)
+            kmh < 8 -> fuel.set("%.1f L/h".format(Locale.FRANCE, fs), (fs / 3.0).toFloat(), SUB)
+            else -> fuel.set(
+                "%.1f L/100".format(Locale.FRANCE, fs), (fs / 15.0).toFloat(),
+                when { fs < 6 -> GREEN; fs < 10 -> ORANGE; else -> RED },
+            )
+        }
+
+        // Alerte : bandeau en tête de la colonne ; sur la pastille, texte à la place de la chauffe et clignotement.
+        val alert = alertFor(e)
+        alertView.text = alert?.let { "⚠  ${it.text}" } ?: ""
+        alertView.visibility = if (alert == null) View.GONE else View.VISIBLE
+        alert?.let { alertBg.setColor(it.color) }
+        pillBg.setStroke(dp(if (alert == null) 1 else 3), alert?.color ?: 0x40FFFFFF)
+        if (alert != null && collapsed) {
+            miniWarm.text = "⚠ ${alert.text}"
+            miniWarm.setTextColor(alert.color)
+            miniWarm.visibility = View.VISIBLE
+        }
+        val blink = alert != null && (System.currentTimeMillis() / 600) % 2 == 0L
+        root?.alpha = if (blink && collapsed) 0.6f else 1f
     }
 
     private companion object {

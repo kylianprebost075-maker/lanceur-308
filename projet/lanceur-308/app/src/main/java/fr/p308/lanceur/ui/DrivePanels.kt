@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
@@ -157,7 +159,7 @@ fun TripPanel() {
             containerColor = C.Card,
             title = { Text(SimpleDateFormat("EEEE d MMMM · HH:mm", Locale.FRANCE).format(Date(t.startMs))) },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("%.1f km en %s · moyenne %.0f km/h · maxi %d km/h".format(
                         Locale.FRANCE, t.distanceKm, duration(t.movingS), t.avgKmh, t.maxKmh.toInt()), fontSize = 15.sp)
                     if (t.peakCh > 0) Text("Puissance maxi utilisée : ${t.peakCh} ch", fontSize = 15.sp)
@@ -167,6 +169,8 @@ fun TripPanel() {
                             (t.l100?.let { " (%.1f L/100)".format(Locale.FRANCE, it) } ?: "") +
                             (price?.let { " · ≈ %.2f €".format(Locale.FRANCE, l * it) } ?: ""), fontSize = 15.sp)
                     }
+                    Spacer(Modifier.height(6.dp))
+                    TripTrace(t)
                     Spacer(Modifier.height(6.dp))
                     ScoreDetail(t)
                 }
