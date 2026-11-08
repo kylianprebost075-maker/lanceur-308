@@ -44,6 +44,11 @@ de dessus en 2D, celle que l'appli affiche quand la 3D n'est pas disponible. Sur
 | **Réglages** | **Panneau performances à côté de CarPlay** |
 | ![Réglages : mode démo, panneau CarPlay, côté](docs/captures/onglets/11-reglages.png) | ![Panneau : puissance, rapport conseillé, régime, eau, turbo, batterie](docs/captures/onglets/12-panneau-performances.png) |
 
+**Nouveau en v0.12.2** : panneau CarPlay refait en style verre (`service/PerfOverlay.kt`) : rapport et conseil,
+puissance et couple (Nm), temps de chauffe restant avec barre de progression (« Moteur chaud ✓ » ensuite), eau,
+huile estimée, turbo et régime avec une barre colorée chacun (bleu froid, orange tiède, vert chaud, rouge trop chaud),
+batterie. Réduit : rapport conseillé, puissance et minutes de chauffe restantes.
+
 **Nouveau en v0.12.1** : kilométrage jamais perdu (`vehicle/Vehicle.kt`). Si le calculateur ne répond pas au
 démarrage, le dernier relevé (moteur ou saisi) reste la base et le GPS ajoute les km parcourus, affichés « ≈ » avec
 leur origine (« +44 km GPS depuis le 8 nov. »). Sans GPS (tunnel, parking couvert), la vitesse OBD prend le relais
