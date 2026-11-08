@@ -44,6 +44,16 @@ de dessus en 2D, celle que l'appli affiche quand la 3D n'est pas disponible. Sur
 | **Réglages** | **Panneau performances à côté de CarPlay** |
 | ![Réglages : mode démo, panneau CarPlay, côté](docs/captures/onglets/11-reglages.png) | ![Panneau : puissance, rapport conseillé, régime, eau, turbo, batterie](docs/captures/onglets/12-panneau-performances.png) |
 
+**Corrigé en v0.10.1** (premiers essais sur la voiture) :
+- **Rapport engagé** (`vehicle/GearCalib.kt`) : l'étagement de départ est approché ; l'appli apprend maintenant les
+  vrais rapports en roulant (rapport km/h pour 1 000 tr/min compté quand il reste stable, pics = rapports). État et
+  bouton « Réapprendre » en bas de Moteur → Puissance.
+- **Kilométrage** : moteur tournant, le calculateur répondait trop tard à la demande 21 10. Attente portée à 1 s,
+  3 essais, et nouvel essai toutes les minutes moteur coupé (5 min moteur tournant) tant qu'il n'est pas lu.
+- **Température extérieure** : la 308 ne la donne pas sur la prise OBD (PID 46 absent). Elle est estimée par l'air
+  d'admission quand le moteur est froid (affichée « ≈ »), puis reprise pendant 3 h.
+- Les PID 46 et 42, absents, ne sont plus demandés : 400 ms gagnées à chaque fois.
+
 **Nouveau en v0.10** :
 - **Batterie** (`vehicle/CrankWatch.kt`) : moteur coupé, la boucle OBD lit la tension (ATRV) plusieurs fois par
   seconde ; au démarrage (régime > 400 tr/min), elle garde la tension au repos et la plus basse au démarreur.
