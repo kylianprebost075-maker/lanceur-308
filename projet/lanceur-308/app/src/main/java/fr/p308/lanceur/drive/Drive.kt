@@ -20,6 +20,7 @@ object Speed {
         else if (lastObdNanos != 0L && nanos - lastObdNanos < 3_000_000_000L) return
         lastReportNanos = nanos
         Trip.feed(clean, nanos)
+        TripLog.feed(clean, nanos)
         Chrono.feed(clean, nanos)
     }
 
@@ -29,6 +30,7 @@ object Speed {
         if (lastReportNanos != 0L && nanos - lastReportNanos > 3_500_000_000L && Trip.state.value.currentKmh > 0f) {
             lastReportNanos = nanos
             Trip.feed(0f, nanos)
+            TripLog.feed(0f, nanos)
             Chrono.feed(0f, nanos)
         }
     }

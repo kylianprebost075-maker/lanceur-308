@@ -79,7 +79,14 @@ object Defaults308 {
         MaintenanceItem(name = "Additif FAP (Eolys)", everyKm = 120_000,
             note = "Si la voiture a un FAP. À vérifier selon le carnet et le témoin d'additif."),
         MaintenanceItem(name = "Contrôle technique", everyMonths = 24),
+        assurance(),
     )
+
+    fun assurance() = MaintenanceItem(name = "Assurance (échéance)", everyMonths = 12,
+        note = "Mets la date de la dernière échéance : rappel 30 jours avant, le temps de comparer les offres.")
+
+    /** Version des éléments par défaut : les nouveaux sont ajoutés une seule fois aux listes existantes. */
+    const val VERSION = 2
 }
 
 object Maintenance {
@@ -91,6 +98,11 @@ object Maintenance {
         prefs = ctx.getSharedPreferences("maintenance", Context.MODE_PRIVATE)
         val stored = prefs.getString("items", null)
         _items.value = if (stored == null) Defaults308.items().also(::save) else decode(stored)
+        if (prefs.getInt("defaultsVersion", 1) < 2) {
+            // v0.10 : rappel d'assurance ajouté (sauf si l'utilisateur en a déjà créé un).
+            if (_items.value.none { it.name.contains("assurance", ignoreCase = true) }) save(_items.value + Defaults308.assurance())
+        }
+        prefs.edit().putInt("defaultsVersion", Defaults308.VERSION).apply()
     }
 
     fun upsert(item: MaintenanceItem) {

@@ -22,7 +22,7 @@ pilotés par l'appli, plongée à la place du conducteur dans l'onglet Entretien
 | **Vue conducteur (onglet Entretien)** | |
 | ![Habitacle vu du siège conducteur : volant et compteurs](docs/captures/interieur.png) | |
 
-### Les onglets de l'appli (v0.9)
+### Les onglets de l'appli (v0.9, Batterie et Trajets en v0.10)
 
 Captures prises le 8 novembre 2026 dans l'émulateur Android (écran 1024 × 600 comme l'autoradio), en **mode démo**
 (données simulées). L'émulateur ne sait pas afficher la 3D (Filament) : sur ces captures, la voiture est la vue
@@ -35,12 +35,26 @@ de dessus en 2D, celle que l'appli affiche quand la 3D n'est pas disponible. Sur
 | ![GPS de l'autoradio et détection des gels](docs/captures/onglets/03-vehicule-gps.png) | ![Diagnostic CAN pas à pas](docs/captures/onglets/04-vehicule-diagnostic-can.png) |
 | **Moteur — Puissance** | **Moteur — Diagnostic** |
 | ![Puissance, couple, rapport engagé, régime, turbo, eau](docs/captures/onglets/05-moteur-puissance.png) | ![Codes défaut et kilométrage du calculateur](docs/captures/onglets/06-moteur-diagnostic.png) |
-| **Moteur — Chrono** | **Moteur — Trajet** |
-| ![Chrono 0-100 et 80-120 km/h](docs/captures/onglets/07-moteur-chrono.png) | ![Distance, temps, vitesses moyenne et maxi](docs/captures/onglets/08-moteur-trajet.png) |
+| **Moteur — Batterie (v0.10)** | **Moteur — Trajets (v0.10)** |
+| ![Santé de la batterie mesurée à chaque démarrage](docs/captures/onglets/13-moteur-batterie.png) | ![Trajet en cours avec score de conduite souple, historique des trajets](docs/captures/onglets/08-moteur-trajets.png) |
+| **Moteur — Chrono** | |
+| ![Chrono 0-100 et 80-120 km/h](docs/captures/onglets/07-moteur-chrono.png) | |
 | **Entretien** | **Entretien — Pleins** |
 | ![Échéances d'entretien](docs/captures/onglets/09-entretien.png) | ![Consommation et coût des pleins](docs/captures/onglets/10-entretien-pleins.png) |
 | **Réglages** | **Panneau performances à côté de CarPlay** |
 | ![Réglages : mode démo, panneau CarPlay, côté](docs/captures/onglets/11-reglages.png) | ![Panneau : puissance, rapport conseillé, régime, eau, turbo, batterie](docs/captures/onglets/12-panneau-performances.png) |
+
+**Nouveau en v0.10** :
+- **Batterie** (`vehicle/CrankWatch.kt`) : moteur coupé, la boucle OBD lit la tension (ATRV) plusieurs fois par
+  seconde ; au démarrage (régime > 400 tr/min), elle garde la tension au repos et la plus basse au démarreur.
+  Repères : plus de 10,2 V = bonne, 9,6 à 10,2 V = à surveiller, moins de 9,6 V (ou repos sous 12,0 V) = faible,
+  avec alerte. Il faut que le boîtier soit connecté avant de lancer le moteur.
+- **Trajets** (`drive/TripLog.kt`) : un trajet commence à 5 km/h et se termine après 5 min à l'arrêt ; 100 gardés.
+  Score de conduite souple sur 100 : à-coups (plus de 11 km/h par seconde en accélération, 13 au freinage ; 40 pts),
+  temps en régime trop haut quand le conseil ▲ s'affiche (30 pts), moteur froid au-dessus de 2 800 tr/min (20 pts).
+  Les trajets du mode démo ne sont jamais enregistrés (les exemples affichés en démo sont fictifs).
+- **Entretien** : rappel d'assurance ajouté, rappels aussi en bandeau par-dessus CarPlay. Sauvegarde : trajets et
+  démarrages inclus.
 
 *Panneau performances : dans l'émulateur, il n'y a pas CarPlay ; l'horloge d'Android a été mise à sa place
 sur le bouton CarPlay pour montrer le panneau. Le bandeau rouge est une alerte d'ouvrant du mode démo.*

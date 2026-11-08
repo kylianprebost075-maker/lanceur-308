@@ -2,6 +2,8 @@ package fr.p308.lanceur
 
 import android.app.Application
 import fr.p308.lanceur.drive.Chrono
+import fr.p308.lanceur.drive.TripLog
+import fr.p308.lanceur.vehicle.CrankWatch
 import fr.p308.lanceur.maintenance.Fuel
 import fr.p308.lanceur.maintenance.Maintenance
 import fr.p308.lanceur.vehicle.GpsMonitor
@@ -16,5 +18,8 @@ class App : Application() {
         Fuel.init(this)
         Chrono.init(this)
         GpsMonitor.init(this)
+        // Après Vehicle.init : le mode démo est déjà connu, le trajet en cours peut être repris.
+        TripLog.init(this)
+        CrankWatch.init(this)
     }
 }

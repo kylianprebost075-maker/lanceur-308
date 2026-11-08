@@ -386,7 +386,9 @@ object Engine {
             _diag.update { it.copy(ecuKm = km) }
         }
         val baro = elm.pid("33", minBytes = 1)?.firstOrNull() ?: 101
+        CrankWatch.resetSession()
         var n = 0
+        var engineOff = true
         while (currentCoroutineContext().isActive) {
             diagRequest?.let { req ->
                 diagRequest = null
@@ -394,6 +396,18 @@ object Engine {
             }
             // minBytes : une réponse tronquée (bruit Bluetooth) est ignorée au lieu de couper la connexion.
             val rpm = elm.pid("0C", minBytes = 2)?.let { (it[0] * 256 + it[1]) / 4 }
+            // Pendant le démarreur, le calculateur ne répond souvent plus : on reste en mode « moteur coupé ».
+            if (rpm != null) engineOff = rpm <= 400
+            if (engineOff) {
+                // Moteur coupé : seulement régime + tension, plusieurs fois par seconde, pour saisir la chute au démarreur.
+                val volts = elm.readBatteryVolts()
+                val coolant = if (n % 20 == 0) elm.pid("05", minBytes = 1)?.let { it[0] - 40 } else null
+                publish(rpm, null, coolant = coolant, voltage = volts)
+                CrankWatch.onSample(volts, rpm, _state.value.coolantC)
+                n++
+                continue
+            }
+            CrankWatch.onSample(null, rpm, _state.value.coolantC)
             val load = elm.pid("04", minBytes = 1)?.let { it[0] * 100 / 255 }
             val speed = if (n % 2 == 0) elm.pid("0D", minBytes = 1)?.get(0) else null
             speed?.let { fr.p308.lanceur.drive.Speed.report(it.toFloat(), fromObd = true) }

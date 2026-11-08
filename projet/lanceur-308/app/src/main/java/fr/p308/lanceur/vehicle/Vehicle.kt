@@ -73,6 +73,11 @@ object Vehicle {
     fun updateDemo(on: Boolean) {
         demo = on
         prefs.edit().putBoolean("demo", on).apply()
+        // Les trajets de démo ne se mélangent jamais aux vrais : le trajet en cours est abandonné au changement.
+        if (fr.p308.lanceur.drive.TripLog.demo != on) {
+            fr.p308.lanceur.drive.TripLog.demo = on
+            fr.p308.lanceur.drive.TripLog.discard()
+        }
         demoJob?.cancel()
         if (on) Engine.startDemo() else if (::appContext.isInitialized) Engine.stopDemo(appContext)
         if (!on) {

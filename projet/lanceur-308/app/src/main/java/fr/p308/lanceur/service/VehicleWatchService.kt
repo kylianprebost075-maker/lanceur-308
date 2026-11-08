@@ -28,6 +28,10 @@ import fr.p308.lanceur.maintenance.MaintenanceItem
 import fr.p308.lanceur.maintenance.due
 import fr.p308.lanceur.maintenance.label
 import fr.p308.lanceur.drive.Speed
+import fr.p308.lanceur.drive.TripLog
+import fr.p308.lanceur.vehicle.CrankRecord
+import fr.p308.lanceur.vehicle.CrankVerdict
+import fr.p308.lanceur.vehicle.CrankWatch
 import fr.p308.lanceur.vehicle.BatteryLevel
 import fr.p308.lanceur.vehicle.CanBusSource
 import fr.p308.lanceur.vehicle.BatteryWatch
@@ -88,6 +92,7 @@ class VehicleWatchService : Service(), LocationListener {
             while (isActive) {
                 GpsMonitor.tick()
                 if (!Vehicle.demo) Speed.decayIfStale()
+                TripLog.tick(Engine.state.value)
                 checkBattery()
                 delay(1000)
             }
@@ -100,6 +105,30 @@ class VehicleWatchService : Service(), LocationListener {
             combine(Vehicle.state.map { it.odometerKm }.distinctUntilChanged(), Maintenance.items) { km, items -> km to items }
                 .collect { (km, items) -> checkMaintenance(km, items) }
         }
+        scope.launch {
+            // Seuls les démarrages mesurés après le lancement du service déclenchent une alerte.
+            var seen = CrankWatch.history.value.firstOrNull()?.atMs ?: 0L
+            CrankWatch.history.collect { list ->
+                val last = list.firstOrNull() ?: return@collect
+                if (last.atMs <= seen) return@collect
+                seen = last.atMs
+                if (last.verdict == CrankVerdict.WEAK) alertWeakStart(last)
+            }
+        }
+    }
+
+    /** Démarrage avec une chute de tension anormale : notification + bandeau par-dessus CarPlay. */
+    private fun alertWeakStart(r: CrankRecord) {
+        val msg = "Batterie faible au démarrage : %.1f V au repos, %.1f V au démarreur. Fais-la tester."
+            .format(java.util.Locale.FRANCE, r.restV, r.minV)
+        getSystemService(NotificationManager::class.java).notify(CRANK_NOTIF, NotificationCompat.Builder(this, CH_ALERT)
+            .setSmallIcon(R.drawable.ic_car)
+            .setContentTitle("Batterie")
+            .setContentText(msg)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(msg))
+            .setAutoCancel(true)
+            .build())
+        if (!AppVisibility.foreground.value) banner.show("🔋  $msg", 0xE6C77700.toInt(), 15_000)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -193,6 +222,10 @@ class VehicleWatchService : Service(), LocationListener {
                 .setContentIntent(open)
                 .setAutoCancel(true)
                 .build())
+            // Les notifications de l'autoradio passent souvent inaperçues : bandeau aussi par-dessus CarPlay.
+            if (!AppVisibility.foreground.value) {
+                banner.show("🔧  $title (${due.label()})", if (due.level == DueLevel.LATE) 0xE6B71C1C.toInt() else 0xE6C77700.toInt())
+            }
             sent.edit().putString(item.id, due.level.name).apply()
         }
     }
@@ -201,6 +234,7 @@ class VehicleWatchService : Service(), LocationListener {
         private const val CH_SERVICE = "service"
         private const val CH_ALERT = "alerts"
         private const val BATTERY_NOTIF = 4242
+        private const val CRANK_NOTIF = 4243
 
         fun start(ctx: Context) =
             ContextCompat.startForegroundService(ctx, Intent(ctx, VehicleWatchService::class.java))

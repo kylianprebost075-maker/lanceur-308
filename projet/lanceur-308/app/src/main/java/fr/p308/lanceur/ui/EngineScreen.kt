@@ -54,7 +54,9 @@ import kotlin.math.sin
 private const val MAX_CH = 120f
 private const val MAX_RPM = 5000f
 
-private enum class EngineTab(val label: String) { POWER("Puissance"), DIAG("Diagnostic"), CHRONO("Chrono"), TRIP("Trajet") }
+private enum class EngineTab(val label: String) {
+    POWER("Puissance"), DIAG("Diagnostic"), BATTERY("Batterie"), TRIP("Trajets"), CHRONO("Chrono"),
+}
 
 @Composable
 fun EngineScreen() {
@@ -65,6 +67,7 @@ fun EngineScreen() {
             when (tab) {
                 EngineTab.POWER -> PowerPanel()
                 EngineTab.DIAG -> DiagPanel()
+                EngineTab.BATTERY -> BatteryPanel()
                 EngineTab.CHRONO -> ChronoPanel()
                 EngineTab.TRIP -> TripPanel()
             }
