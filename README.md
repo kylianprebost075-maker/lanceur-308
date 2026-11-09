@@ -1,7 +1,9 @@
-# Lanceur 308 — dossier de reprise (version 0.8)
+# Lanceur 308 — dossier de reprise (version 0.16)
 
 > **À lire en entier avant de toucher à quoi que ce soit.**
-> Ce dossier permet à une IA (ou à un développeur) de reprendre le projet **exactement là où il en est** au 6 novembre 2026.
+> Ce dossier permet à une IA (ou à un développeur) de reprendre le projet. Dernière version : **0.16 du 9 novembre
+> 2026** (nouveautés de chaque version juste sous la galerie ; les sections techniques plus bas datent de la 0.8 et
+> sont complétées par ces notes de version).
 > L'ancien README (version 0.4) est conservé dans `diagnostic/README_ancien_v0.4.md` pour l'historique.
 >
 > **Non publiés dans ce dépôt** (voir `.gitignore`) : les modèles 3D `.glb` et l'APK compilée (ils contiennent
@@ -22,9 +24,9 @@ pilotés par l'appli, plongée à la place du conducteur dans l'onglet Entretien
 | **Vue conducteur (onglet Entretien)** | |
 | ![Habitacle vu du siège conducteur : volant et compteurs](docs/captures/interieur.png) | |
 
-### Les onglets de l'appli (v0.9, Batterie et Trajets en v0.10)
+### Les onglets de l'appli (mis à jour en v0.16)
 
-Captures prises le 8 novembre 2026 dans l'émulateur Android (écran 1024 × 600 comme l'autoradio), en **mode démo**
+Captures prises les 8 et 9 novembre 2026 dans l'émulateur Android (écran 1024 × 600 comme l'autoradio), en **mode démo**
 (données simulées). L'émulateur ne sait pas afficher la 3D (Filament) : sur ces captures, la voiture est la vue
 de dessus en 2D, celle que l'appli affiche quand la 3D n'est pas disponible. Sur l'autoradio, c'est la 3D ci-dessus.
 
@@ -37,11 +39,17 @@ de dessus en 2D, celle que l'appli affiche quand la 3D n'est pas disponible. Sur
 | ![Puissance, couple, rapport engagé, régime, turbo, eau](docs/captures/onglets/05-moteur-puissance.png) | ![Codes défaut et kilométrage du calculateur](docs/captures/onglets/06-moteur-diagnostic.png) |
 | **Moteur — Batterie (v0.10)** | **Moteur — Trajets (v0.10)** |
 | ![Santé de la batterie mesurée à chaque démarrage](docs/captures/onglets/13-moteur-batterie.png) | ![Trajet en cours avec score de conduite souple, historique des trajets](docs/captures/onglets/08-moteur-trajets.png) |
-| **Moteur — Chrono** | |
-| ![Chrono 0-100 et 80-120 km/h](docs/captures/onglets/07-moteur-chrono.png) | |
+| **Moteur — Chrono** | **Moteur — Bilan et FAP (v0.14)** |
+| ![Chrono 0-100 et 80-120 km/h](docs/captures/onglets/07-moteur-chrono.png) | ![Bilan du mois, régénération du FAP en cours repérée au débit d'air, conseil voie rapide](docs/captures/onglets/14-moteur-bilan-fap.png) |
+| **Son — Alignement (v0.15)** | **Son — Tests et polarité (v0.15)** |
+| ![Distances oreille / haut-parleurs et retards à recopier dans le DSP](docs/captures/onglets/15-son-alignement.png) | ![Sons de test par côté, balayage, test de polarité A / B en cours](docs/captures/onglets/16-son-tests.png) |
+| **Son — Mesure au micro du PC (v0.15)** | **Son — Options (v0.15)** |
+| ![Bruit rose, clics gauche / droite, montée en volume pour l'outil PC](docs/captures/onglets/17-son-mesure-pc.png) | ![Volume selon la vitesse, annonces vocales, applis son de l'autoradio](docs/captures/onglets/18-son-options.png) |
+| **Optimiser l'autoradio (v0.16)** | **Optimiser — réglages guidés (v0.16)** |
+| ![Mémoire libérée, mode CarPlay, nettoyage à l'ouverture de CarPlay](docs/captures/onglets/19-optimisation.png) | ![Animations, recherche Wi-Fi / Bluetooth, veille FYT, applis inutilisées](docs/captures/onglets/20-optimisation-reglages.png) |
 | **Entretien** | **Entretien — Pleins** |
 | ![Échéances d'entretien](docs/captures/onglets/09-entretien.png) | ![Consommation et coût des pleins](docs/captures/onglets/10-entretien-pleins.png) |
-| **Réglages** | **Panneau performances à côté de CarPlay** |
+| **Réglages** | **Panneau à côté de CarPlay (v0.13, alerte FAP v0.14)** |
 | ![Réglages : mode démo, panneau CarPlay, côté](docs/captures/onglets/11-reglages.png) | ![Panneau : puissance, rapport conseillé, régime, eau, turbo, batterie](docs/captures/onglets/12-panneau-performances.png) |
 
 **Nouveau en v0.16 : optimisation de l'autoradio** (Réglages → Optimiser l'autoradio ; `optim/Optim.kt`,
@@ -279,7 +287,7 @@ Puis copier l'APK vers `livrables\Lanceur308.apk`, `E:\Lanceur308.apk` et `E:\30
 - AGP 8.7.3, **Kotlin 2.0.21**, Compose BOM 2024.12.01
 - **SceneView 2.2.1** (Filament 1.52) — SceneView 2.3+ exige Kotlin 2.2.
 - minSdk 26, targetSdk 33, compileSdk 35. R8 activé (`proguard-rules.pro` garde `com.google.android.filament.**` et `io.github.sceneview.**`).
-- Version dans `app/build.gradle.kts` : **incrémenter `versionCode` à chaque livraison** (actuellement 8 / "0.8").
+- Version dans `app/build.gradle.kts` : **incrémenter `versionCode` à chaque livraison** (actuellement 22 / "0.16").
 
 ---
 
@@ -395,7 +403,10 @@ Simule ouvrants, phares, marche arrière, batterie faible, accélérations ; les
 2. Si la 3D rame encore en roulant : passer `lowResOptions()` à 0.65 ou limiter à 24 FPS dans `LightScene.kt`.
 3. **Gel GPS sous CarPlay** (problème de départ) : faire un trajet avec Véhicule → GPS, appuyer sur « Waze / Plans vient de se figer » à chaque gel, puis analyser avec `outils/analyser_gps.sh`.
 4. Antibrouillards sur le CAN : codes non identifiés (profil Raise PSA décompilé dans `fyt-extraits/`).
-5. Son / DSP (alignement temporel, Focal AV, Pioneer AR, ampli TDA7851) : jamais commencé.
+5. Son / DSP (alignement temporel, Focal AV, Pioneer AR, ampli TDA7851) : fait en v0.15 (onglet Son + outil PC
+   `outils/son`). Reste : piloter le DSP FYT directement, après étude des APK copiées sur la clé (`apk-fyt/`).
+8. FAP : seuil de détection des régénérations (débit d'air +25 %) à confirmer avec le journal OBD d'une vraie
+   régénération. CarPlay : mesurer l'effet du mode CarPlay (v0.16) sur le lag, boîtier OBD branché / débranché.
 6. Codes défaut OBD (mode 03 / effacement 04) : faciles à ajouter dans `Engine.kt` maintenant que le boîtier est là.
 7. **Onglet Diagnostic (v0.9)** : d'abord une séance d'exploration dans la voiture avec un PC et le vLinker
    (`outils/obd/obd_explorer.py`, lecture seule garantie, fiche `outils/obd/SEANCE_OBD.md`) pour savoir ce que
@@ -405,7 +416,7 @@ Simule ouvrants, phares, marche arrière, batterie faible, accélérations ; les
 
 ## 8. Prompt conseillé pour l'IA qui reprend
 
-> Lis `README.md` en entier. Tu reprends le projet « Lanceur 308 » (Android/Kotlin/Compose + SceneView 2.2.1, autoradio FYT Android 8 avec GPU Mali-T820, **sans ADB**, installation par APK sur clé USB). La dernière version livrée est la 0.8. Compile toujours avec la même clé `debug.keystore`, incrémente `versionCode` à chaque livraison et copie l'APK dans `livrables/` et sur la clé USB. Demande-moi d'abord comment s'est passé l'essai de la v0.8 (netteté de la 3D, connexion du Vgate vLinker MC+). Explique chaque étape en français simple.
+> Lis `README.md` en entier. Tu reprends le projet « Lanceur 308 » (Android/Kotlin/Compose + SceneView 2.2.1, autoradio FYT Android 8 avec GPU Mali-T820, **sans ADB**, installation par APK sur clé USB). La dernière version livrée est la 0.16 (nouveautés de chaque version en haut du README). Compile toujours avec la même clé `debug.keystore`, incrémente `versionCode` à chaque livraison et copie l'APK sur la clé USB. Ne publie jamais de données personnelles (factures, journaux OBD/GPS, VIN, plaque). Demande-moi d'abord comment s'est passé l'essai de la dernière version dans la voiture. Explique chaque étape en français simple.
 
 ---
 
