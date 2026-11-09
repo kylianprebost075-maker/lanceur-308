@@ -81,11 +81,19 @@ class PerfOverlay(private val ctx: Context, private val onClose: () -> Unit) {
 
     private fun dp(v: Int) = (v * density).toInt()
 
+    private var lastRenderMs = 0L
+    private var lastAlertText: String? = null
+
     fun show(e: EngineState, onRight: Boolean) {
         if (!Settings.canDrawOverlays(ctx)) return
         if (root != null && onRight != rightSide) hide()
         rightSide = onRight
         val alert = alertFor(e)
+        // Mode CarPlay : 2 dessins par seconde au plus (une alerte qui change passe tout de suite).
+        val now = System.currentTimeMillis()
+        if (root != null && fr.p308.lanceur.optim.Optim.carplayLight && now - lastRenderMs < 500 && alert?.text == lastAlertText) return
+        lastRenderMs = now
+        lastAlertText = alert?.text
         val w = Warmup.state.value
         autoCompact = alert?.serious != true && !w.active && (e.coolantC ?: 0) >= 75 && (w.oilC ?: 80f) >= 70f
         if (root == null) build()

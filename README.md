@@ -44,6 +44,18 @@ de dessus en 2D, celle que l'appli affiche quand la 3D n'est pas disponible. Sur
 | **Réglages** | **Panneau performances à côté de CarPlay** |
 | ![Réglages : mode démo, panneau CarPlay, côté](docs/captures/onglets/11-reglages.png) | ![Panneau : puissance, rapport conseillé, régime, eau, turbo, batterie](docs/captures/onglets/12-panneau-performances.png) |
 
+**Nouveau en v0.16 : optimisation de l'autoradio** (Réglages → Optimiser l'autoradio ; `optim/Optim.kt`,
+`ui/OptimDialog.kt`). Android 8 sans root ni ADB : seulement ce qu'une appli normale peut faire, le reste guidé.
+- **Mode CarPlay** : pendant CarPlay, boucle OBD ralentie (pause de 300 ms par tour moteur tournant ; jamais moteur
+  coupé, pour le démarreur) et panneau redessiné 2 fois/s au plus (une nouvelle alerte passe tout de suite). But :
+  laisser la puce Bluetooth / Wi-Fi 2,4 GHz et le processeur au CarPlay sans fil.
+- **Mémoire** : `killBackgroundProcesses` sur les applis en arrière-plan (jamais : com.syu / com.fyt, système vital,
+  CarPlay / musique / radio choisis, clavier, Lanceur ; Android épargne aussi ce qui est visible ou joue). Bouton +
+  automatique à l'ouverture de CarPlay (10 min mini entre deux).
+- **Réglages guidés** avec état relu : animations 0,5×, recherche Wi-Fi / Bluetooth permanente, mises à jour auto du
+  Play Store, veille / démarrage rapide FYT (réglages d'usine).
+- **Applis pas ouvertes depuis 30 jours** (accès aux données d'utilisation) → page Android pour les désactiver.
+
 **Nouveau en v0.15 : onglet Son** (dock → Son ; code dans `sound/` et `ui/SoundScreen.kt`) :
 - **Alignement temporel** : distances oreille → haut-parleur (tweeters sous le pare-brise, arrière) → retard de
   chaque voie ((d_max − d) / 34,3 cm/ms) et baisse de niveau (20·log10(d / d_max)), à recopier dans le DSP.

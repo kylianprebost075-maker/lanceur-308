@@ -470,6 +470,9 @@ object Engine {
                 publish(rpm, load, speed)
             }
             n++
+            // Mode CarPlay : ≈ 3 tours par seconde au lieu d'en continu, pour laisser la puce Bluetooth / Wi-Fi
+            // (partagée avec le CarPlay sans fil) et le processeur à CarPlay. Moteur coupé : pas de pause (démarreur).
+            if (fr.p308.lanceur.optim.Optim.lightNow()) delay(300)
         }
     }
 

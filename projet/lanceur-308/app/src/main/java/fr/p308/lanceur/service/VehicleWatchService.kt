@@ -83,8 +83,13 @@ class VehicleWatchService : Service(), LocationListener {
         perf = PerfOverlay(this) { PerfPanel.armed.value = false }
         scope.launch {
             var wasForeground = AppVisibility.foreground.value
+            var wasCarPlay = false
             combine(Engine.state, AppVisibility.foreground, PerfPanel.armed) { e, fg, armed -> Triple(e, fg, armed) }
                 .collect { (e, fg, armed) ->
+                    // CarPlay vient de s'ouvrir : on libère la mémoire (applis en arrière-plan seulement).
+                    val carPlay = armed && !fg
+                    if (carPlay && !wasCarPlay && !Vehicle.demo) fr.p308.lanceur.optim.Optim.cleanForCarPlay(this@VehicleWatchService)
+                    wasCarPlay = carPlay
                     // Retour dans le Lanceur : le panneau ne revient qu'au prochain lancement de CarPlay.
                     if (fg && !wasForeground) PerfPanel.armed.value = false
                     wasForeground = fg

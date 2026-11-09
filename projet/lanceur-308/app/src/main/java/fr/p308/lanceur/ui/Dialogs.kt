@@ -233,6 +233,7 @@ fun SettingsDialog(onDismiss: () -> Unit) {
     var isHome by remember { mutableStateOf(HomeAlias.isEnabled(ctx)) }
     var editingKm by remember { mutableStateOf(false) }
     var backupMessage by remember { mutableStateOf<String?>(null) }
+    var optim by remember { mutableStateOf(false) }
     val vs by Vehicle.state.collectAsStateValue()
 
     AlertDialog(
@@ -255,6 +256,9 @@ fun SettingsDialog(onDismiss: () -> Unit) {
                 }
                 SettingRow("5 portes", "Décoche pour une 308 3 portes") {
                     Switch(UiPrefs.fiveDoors, UiPrefs::updateFiveDoors)
+                }
+                SettingRow("Optimiser l'autoradio", "Mémoire, applis inutiles, mode CarPlay, réglages qui accélèrent Android") {
+                    Button(onClick = { optim = true }) { Text("Ouvrir") }
                 }
                 SettingRow(
                     "Kilométrage",
@@ -338,16 +342,8 @@ fun SettingsDialog(onDismiss: () -> Unit) {
                     TextButton(onClick = { openSettings(ctx, Intent(Settings.ACTION_SETTINGS)) }) { Text("Ouvrir") }
                 }
                 SettingRow("Options pour les développeurs", "Pour activer le débogage USB / ADB") {
-                    TextButton(onClick = {
-                        openSettings(
-                            ctx,
-                            // L'écran direct d'abord : l'action générique tombe sur « non disponible » si Android hésite.
-                            Intent().setClassName("com.android.settings", "com.android.settings.Settings\$DevelopmentSettingsDashboardActivity"),
-                            Intent().setClassName("com.android.settings", "com.android.settings.Settings\$DevelopmentSettingsActivity"), // Android 8
-                            Intent().setClassName("com.android.settings", "com.android.settings.DevelopmentSettings"),
-                            Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS),
-                        )
-                    }) { Text("Ouvrir") }
+                    // L'écran direct d'abord : l'action générique tombe sur « non disponible » si Android hésite.
+                    TextButton(onClick = { openSettings(ctx, *devSettingsIntents()) }) { Text("Ouvrir") }
                 }
                 SettingRow("Source des données", vs.source) {}
                 SettingRow(
@@ -359,10 +355,19 @@ fun SettingsDialog(onDismiss: () -> Unit) {
         confirmButton = { TextButton(onClick = onDismiss) { Text("Fermer") } },
     )
     if (editingKm) OdometerDialog(vs.odometerKm) { editingKm = false }
+    if (optim) OptimDialog { optim = false }
 }
 
+/** Écran des options pour les développeurs (animations, débogage), selon la version d'Android. */
+internal fun devSettingsIntents() = arrayOf(
+    Intent().setClassName("com.android.settings", "com.android.settings.Settings\$DevelopmentSettingsDashboardActivity"),
+    Intent().setClassName("com.android.settings", "com.android.settings.Settings\$DevelopmentSettingsActivity"), // Android 8
+    Intent().setClassName("com.android.settings", "com.android.settings.DevelopmentSettings"),
+    Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS),
+)
+
 /** Ouvre le premier écran de réglages que l'autoradio accepte. */
-private fun openSettings(ctx: android.content.Context, vararg intents: Intent) {
+internal fun openSettings(ctx: android.content.Context, vararg intents: Intent) {
     val ok = intents.any { intent ->
         runCatching { ctx.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }.isSuccess
     }
