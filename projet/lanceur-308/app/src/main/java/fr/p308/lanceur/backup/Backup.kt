@@ -18,7 +18,7 @@ import java.io.File
  */
 object Backup {
     private const val FILE = "sauvegarde-308.json"
-    private val PREFS = listOf("maintenance", "vehicle", "ui", "fuel", "chrono", "trips", "battery", "gears", "warmup", "history", "fap")
+    private val PREFS = listOf("maintenance", "vehicle", "ui", "fuel", "chrono", "trips", "battery", "gears", "warmup", "history", "fap", "sound")
 
     /** Nombre de clés USB / cartes SD branchées (pour sauvegarder dès qu'une clé arrive). */
     fun usbCount(ctx: Context): Int = volumes(ctx).count { it.second }
@@ -110,6 +110,7 @@ object Backup {
         fr.p308.lanceur.vehicle.Vehicle.reloadOdometer()
         fr.p308.lanceur.maintenance.History.init(ctx)
         fr.p308.lanceur.vehicle.FapRegen.init(ctx)
+        fr.p308.lanceur.sound.SoundPrefs.init(ctx)
         return "Restauré depuis ${if (file.absolutePath.contains("emulated")) "la mémoire interne" else "la clé USB"} (sauvegarde du ${json.optString("date").take(10)})"
     }
 }

@@ -22,3 +22,8 @@ local.properties
 *.iml
 node_modules/
 __pycache__/
+
+# Outil de mesure du son : environnement Python et enregistrements faits dans la voiture
+.venv/
+outils/son/mesures/
+*.wav

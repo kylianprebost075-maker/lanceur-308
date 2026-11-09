@@ -20,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PhoneIphone
@@ -52,7 +53,7 @@ import fr.p308.lanceur.launchSlot
 import fr.p308.lanceur.maintenance.Maintenance
 import fr.p308.lanceur.vehicle.Vehicle
 
-enum class Tab { HOME, VEHICLE, ENGINE, MAINTENANCE }
+enum class Tab { HOME, VEHICLE, ENGINE, MAINTENANCE, SOUND }
 
 @Composable
 fun LanceurApp() {
@@ -91,6 +92,7 @@ fun LanceurApp() {
             DockButton(Icons.Filled.DirectionsCar, "Véhicule", tab == Tab.VEHICLE) { tab = Tab.VEHICLE }
             DockButton(Icons.Filled.Speed, "Moteur", tab == Tab.ENGINE) { tab = Tab.ENGINE }
             DockButton(Icons.Filled.Build, "Entretien", tab == Tab.MAINTENANCE) { tab = Tab.MAINTENANCE }
+            DockButton(Icons.Filled.GraphicEq, "Son", tab == Tab.SOUND) { tab = Tab.SOUND }
             DockButton(Icons.Filled.PhoneIphone, "CarPlay", tint = C.Green) { launchSlot(ctx, Slot.CARPLAY) }
             DockButton(Icons.Filled.MusicNote, "Musique", tint = Color(0xFFFF4FA3)) { launchSlot(ctx, Slot.MUSIC) }
             DockButton(Icons.Filled.Radio, "Radio", tint = C.Orange) { launchSlot(ctx, Slot.RADIO) }
@@ -103,6 +105,7 @@ fun LanceurApp() {
                 Tab.HOME, Tab.MAINTENANCE -> HomeAndMaintenanceScreen(vs, items, interior = tab == Tab.MAINTENANCE) { tab = it }
                 Tab.VEHICLE -> VehicleScreen(vs)
                 Tab.ENGINE -> EngineScreen()
+                Tab.SOUND -> SoundScreen()
             }
         }
     }

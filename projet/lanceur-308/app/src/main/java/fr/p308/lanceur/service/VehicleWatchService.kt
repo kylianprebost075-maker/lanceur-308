@@ -77,6 +77,7 @@ class VehicleWatchService : Service(), LocationListener {
             .setOngoing(true)
             .build())
 
+        fr.p308.lanceur.sound.Voice.init(this)
         overlay = DoorOverlay(this)
         banner = AlertBanner(this)
         perf = PerfOverlay(this) { PerfPanel.armed.value = false }
@@ -102,6 +103,8 @@ class VehicleWatchService : Service(), LocationListener {
                 fr.p308.lanceur.vehicle.TurboCool.tick(Engine.state.value, fr.p308.lanceur.drive.Trip.state.value.currentKmh)
                 fr.p308.lanceur.vehicle.FapRegen.tick(Engine.state.value, fr.p308.lanceur.drive.Trip.state.value.currentKmh,
                     Vehicle.state.value.odometerKm)
+                fr.p308.lanceur.sound.SpeedVolume.tick(this@VehicleWatchService, fr.p308.lanceur.drive.Trip.state.value.currentKmh)
+                voiceAlerts()
                 if (++ticks % 2 == 0) CarPlayWatch.tick(this@VehicleWatchService)
                 // Autonomie : recalculée toutes les 30 s (le kilométrage avance en roulant).
                 if (ticks % 30 == 1) {
@@ -147,14 +150,18 @@ class VehicleWatchService : Service(), LocationListener {
             var seen = fr.p308.lanceur.vehicle.FapRegen.state.value.records.firstOrNull()?.endMs ?: 0L
             fr.p308.lanceur.vehicle.FapRegen.state.collect { r ->
                 if (Vehicle.demo) return@collect
-                if (r.active && !wasActive && !AppVisibility.foreground.value) {
-                    banner.show("🔥  Régénération du FAP probable : roule encore 10 à 15 min sans couper si tu peux",
-                        0xE6C77700.toInt(), 15_000)
+                if (r.active && !wasActive) {
+                    fr.p308.lanceur.sound.Voice.say("Régénération du filtre à particules en cours. Évite de couper le moteur.")
+                    if (!AppVisibility.foreground.value) {
+                        banner.show("🔥  Régénération du FAP probable : roule encore 10 à 15 min sans couper si tu peux",
+                            0xE6C77700.toInt(), 15_000)
+                    }
                 }
                 wasActive = r.active
                 val last = r.records.firstOrNull() ?: return@collect
                 if (last.endMs <= seen) return@collect
                 seen = last.endMs
+                if (!last.interrupted) fr.p308.lanceur.sound.Voice.say("Régénération du filtre à particules terminée.")
                 val fap = fr.p308.lanceur.drive.FapAdvice.evaluate(TripLog.history.value)
                 fr.p308.lanceur.drive.FapAdvice.current = fap
                 if (last.interrupted) alertRegenCut(last)
@@ -205,6 +212,22 @@ class VehicleWatchService : Service(), LocationListener {
             .build())
     }
 
+    private var wasCooled = false
+    private var overheat = false
+
+    /** Annonces vocales qui suivent l'état moteur (au passage, pas en continu). */
+    private fun voiceAlerts() {
+        val turbo = fr.p308.lanceur.vehicle.TurboCool.state.value
+        val cooled = turbo.justCooled && turbo.stopped
+        if (cooled && !wasCooled) fr.p308.lanceur.sound.Voice.say("Turbo refroidi, tu peux couper le moteur.")
+        wasCooled = cooled
+        val c = Engine.state.value.coolantC
+        if (c != null && c >= 105 && !overheat) {
+            overheat = true
+            fr.p308.lanceur.sound.Voice.say("Attention, surchauffe du moteur. Arrête-toi dès que possible.")
+        } else if (c != null && c < 100) overheat = false
+    }
+
     private var rangeAlerted = false
 
     /** Réserve proche (autonomie estimée sous 50 km) : un bandeau une fois, réarmé après un plein. */
@@ -214,6 +237,7 @@ class VehicleWatchService : Service(), LocationListener {
         if (r.km >= 50 || rangeAlerted || Vehicle.demo) return
         rangeAlerted = true
         val msg = "Réserve bientôt : ≈ ${r.km} km d'autonomie (estimée depuis ton dernier plein)"
+        fr.p308.lanceur.sound.Voice.say("Réserve bientôt : environ ${r.km} kilomètres d'autonomie.")
         if (!AppVisibility.foreground.value) banner.show("⛽  $msg", 0xE6C77700.toInt(), 12_000)
     }
 
@@ -321,6 +345,7 @@ class VehicleWatchService : Service(), LocationListener {
         if (b.level == lastBatteryLevel) return
         lastBatteryLevel = b.level
         val msg = b.message ?: return
+        fr.p308.lanceur.sound.Voice.say(msg)
         getSystemService(NotificationManager::class.java).notify(BATTERY_NOTIF, NotificationCompat.Builder(this, CH_ALERT)
             .setSmallIcon(R.drawable.ic_car)
             .setContentTitle("Batterie")

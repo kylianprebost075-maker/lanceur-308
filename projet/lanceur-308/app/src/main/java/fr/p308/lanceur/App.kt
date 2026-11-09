@@ -26,5 +26,6 @@ class App : Application() {
         fr.p308.lanceur.vehicle.ObdLog.init(this)
         fr.p308.lanceur.maintenance.History.init(this)
         fr.p308.lanceur.vehicle.FapRegen.init(this)
+        fr.p308.lanceur.sound.SoundPrefs.init(this)
     }
 }
