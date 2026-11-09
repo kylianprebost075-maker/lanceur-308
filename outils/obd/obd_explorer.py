@@ -5,7 +5,7 @@ questions propres à PSA), pour programmer ensuite la version suivante du Lanceu
 
 Sécurité : chaque commande passe par `commande_autorisee()`. Seules les lectures sont permises (modes OBD
 01/02/03/07/09/0A, services de diagnostic 1A/17/18/19/21/22, maintien de session 3E, ouverture de session
-normale ou étendue). Effacement des codes, écriture, tests d'actionneurs, accès sécurisé, reprogrammation et
+normale ou étendue, début et fin de communication 81/82). Effacement des codes, écriture, tests d'actionneurs, accès sécurisé, reprogrammation et
 remise à zéro du calculateur sont refusés, sans exception.
 
 Connexion : Bluetooth classique (RFCOMM) de Windows, sans module externe. Appairer d'abord
@@ -14,6 +14,8 @@ Connexion : Bluetooth classique (RFCOMM) de Windows, sans module externe. Appair
 Commandes (lancer avec `python -I obd_explorer.py <commande>`) :
   connexion                 test du boîtier (version, tension, protocole)
   standard                  OBD normalisé : PID gérés et valeurs, VIN, codes défaut (mémorisés, en attente, permanents)
+  chercher                  demande à chaque calculateur PSA connu (90 adresses) s'il est là, sans rien lire d'autre
+  defauts --calculateur X   codes défaut d'un calculateur PSA (17FF00 puis 190209), sans rien effacer
   psa                       cherche les calculateurs PSA qui répondent, puis lit tous leurs identifiants 21xx
   instantane --nom NOM      relit les identifiants trouvés par `psa` et les enregistre sous NOM
   comparer NOM1 NOM2        octets qui ont changé entre deux instantanés (ex. phares éteints / allumés)
@@ -41,17 +43,102 @@ DOSSIER_DEFAUT = Path(__file__).resolve().parent / "journaux"
 
 # Calculateurs PSA candidats sur la prise diagnostic (CAN 500 kbit/s, 11 bits) : (nom, requête, réponse).
 # Paires couramment citées pour les PSA de cette époque ; À CONFIRMER dans la voiture (la découverte le dira).
+# Depuis le 09/11/2026 : table publique du projet arduino-psa-diag (ECU_LIST.md), qui corrige les paires
+# devinées le 07/11 (airbag, direction, stationnement, autoradio étaient fausses).
+# ATTENTION : sur les PSA de cette génération (AEE2004 / AEE2010), le réseau de diagnostic est sur les broches
+# 3 et 8 de la prise ; le vLinker écoute les broches 6 et 14 (réseau moteur), où seuls le moteur et l'ABS
+# répondent. Les autres calculateurs demandent un câble adaptateur (3→6, 8→14) : voir SEANCE_OBD_2.md.
 CALCULATEURS_PSA = [
     ("Moteur (CMM, EDC16C34)", 0x6A8, 0x688),
     ("BSI (boîtier de servitude)", 0x752, 0x652),
-    ("Combiné (compteur)", 0x75F, 0x65F),
     ("ABS / ESP", 0x6AD, 0x68D),
-    ("Airbag", 0x6B5, 0x695),
-    ("Boîte auto (BVA)", 0x6A9, 0x689),
+    ("Combiné (compteur)", 0x75F, 0x65F),
+    ("Additif FAP (pompe Eolys)", 0x6C1, 0x601),
+    ("Additif FAP (3e génération)", 0x775, 0x675),
+    ("Airbag", 0x744, 0x644),
+    ("Boîte auto ou pilotée", 0x6A9, 0x689),
     ("Climatisation", 0x76D, 0x66D),
-    ("Autoradio / écran (EMF)", 0x764, 0x664),
-    ("Direction assistée", 0x6B4, 0x694),
-    ("Aide au stationnement", 0x76C, 0x66C),
+    ("Écran multifonction (EMF)", 0x765, 0x665),
+    ("Autoradio d'origine", 0x760, 0x660),
+    ("Télématique / navigation", 0x764, 0x664),
+    ("Direction assistée", 0x6B5, 0x695),
+    ("Aide au stationnement", 0x75D, 0x65D),
+    ("Commandes sous volant", 0x742, 0x642),
+    ("Capteur de pluie et de luminosité", 0x74A, 0x64A),
+    ("Alarme", 0x75C, 0x65C),
+    ("Sirène d'alarme", 0x6E6, 0x626),
+    ("Changeur CD", 0x771, 0x671),
+    ("Chauffage additionnel", 0x731, 0x711),
+    ("Détection de sous-gonflage", 0x6AF, 0x68F),
+    ("Suspension", 0x6B8, 0x698),
+    ("Climatisation arrière", 0x778, 0x678),
+    ("Kit mains libres", 0x773, 0x673),
+    ("RHF", 0x746, 0x646),
+    ("Antipatinage / MCM", 0x6BD, 0x69D),
+    ("Charge de la batterie (BECB)", 0x6C4, 0x604),
+    ("Ampli audio", 0x77D, 0x67D),
+    ("Radar avant", 0x6B6, 0x696),
+    ("BIR", 0x6BE, 0x69E),
+    ("Correcteur de projecteurs", 0x6B7, 0x697),
+    ("Essuie-vitre", 0x779, 0x679),
+    ("Essuie-vitre (2)", 0x730, 0x710),
+    ("Frein de stationnement électrique", 0x6B3, 0x693),
+    ("Afficheur (MATT)", 0x772, 0x672),
+    ("Boîtier télématique autonome", 0x77C, 0x67C),
+    ("Porte conducteur", 0x74B, 0x64B),
+    ("Volant (VTH)", 0x770, 0x670),
+    ("Volant (VTH 2)", 0x738, 0x718),
+    ("Témoin de ceintures", 0x6C3, 0x603),
+    ("TBMU", 0x6B4, 0x694),
+    ("DMTC", 0x6BC, 0x69C),
+    ("IDVR", 0x763, 0x663),
+    ("Antivol électrique", 0x74F, 0x64F),
+    ("Écran (EMF DGT)", 0x743, 0x643),
+    ("Feux arrière / CCE", 0x732, 0x712),
+    ("Coffre motorisé", 0x76B, 0x66B),
+    ("Toit ouvrant / stores", 0x733, 0x713),
+    ("Toit (Inalfa 1)", 0x768, 0x668),
+    ("Toit (Inalfa 2)", 0x769, 0x669),
+    ("Toit (Inalfa 3)", 0x76A, 0x66A),
+    ("Levier de boîte", 0x6AA, 0x68A),
+    ("Commande de boîte auto", 0x74D, 0x64D),
+    ("CSS", 0x6B0, 0x690),
+    ("Façade multiplexée", 0x77B, 0x67B),
+    ("Tablette de clim arrière / CRT", 0x736, 0x716),
+    ("SCR (AdBlue)", 0x6A1, 0x681),
+    ("SIR", 0x6E5, 0x625),
+    ("LVNSD", 0x6BA, 0x69A),
+    ("VCU", 0x6A2, 0x682),
+    ("HCU2", 0x6A6, 0x686),
+    ("HCU1", 0x6A7, 0x687),
+    ("BML", 0x741, 0x641),
+    ("BSG E", 0x759, 0x659),
+    ("MAE", 0x75E, 0x65E),
+    ("LCE", 0x745, 0x645),
+    ("Alerte de franchissement de ligne", 0x762, 0x662),
+    ("BDMC", 0x76E, 0x66E),
+    ("BSG S", 0x754, 0x654),
+    ("BTO / compte-tours", 0x766, 0x666),
+    ("CRT", 0x777, 0x677),
+    ("PLCM", 0x755, 0x655),
+    ("MDPLC droit", 0x756, 0x656),
+    ("BEBA", 0x6BB, 0x69B),
+    ("Rétroviseur intérieur", 0x753, 0x653),
+    ("BPL", 0x6C2, 0x602),
+    ("BDMP", 0x76F, 0x66F),
+    ("BTE", 0x767, 0x667),
+    ("Détection de choc piéton", 0x749, 0x649),
+    ("Déflecteur", 0x774, 0x674),
+    ("CTPA", 0x737, 0x717),
+    ("IVC", 0x761, 0x661),
+    ("Surveillance d'angle mort", 0x75B, 0x65B),
+    ("BDM arrière", 0x757, 0x657),
+    ("Siège gauche", 0x751, 0x651),
+    ("Siège droit", 0x750, 0x650),
+    ("IDB", 0x740, 0x640),
+    ("DCU arrière droit", 0x758, 0x658),
+    ("CRT EMF", 0x74C, 0x64C),
+    ("VCI / SWEB", 0x6C8, 0x628),
 ]
 
 # ------------------------------------------------------------------ sécurité : liste blanche
@@ -79,6 +166,10 @@ def commande_autorisee(commande: str) -> bool:
         return False
     octets = bytes.fromhex(c)
     service = octets[0]
+    if service in (0x81, 0x82):
+        # Début / fin de communication KWP sur le réseau moteur (500 kbit/s) : l'équivalent de l'ouverture de
+        # session, sans aucun paramètre. C'est ce qu'attend l'EDC16C34, qui refuse 10C0 (séance du 08/11).
+        return len(octets) == 1
     if service == 0x10:
         return len(octets) == 2 and octets[1] in SESSIONS_PERMISES
     if service == 0x19:
@@ -168,6 +259,12 @@ class TransportSimulation:
         s = req[0]
         if s == 0x3E:
             return "\r".join(self._reponse(rep, bytes([0x7E, 0x00])))
+        if s == 0x81:
+            return "\r".join(self._reponse(rep, bytes([0xC1, 0xEF, 0x8F])))
+        if s == 0x82:
+            return "\r".join(self._reponse(rep, bytes([0xC2])))
+        if s == 0x17:  # codes défaut KWP : un seul, P0401 mémorisé
+            return "\r".join(self._reponse(rep, bytes([0x57, 0x01, 0x04, 0x01, 0x60])))
         if s == 0x10:
             return "\r".join(self._reponse(rep, bytes([0x50, req[1]])))
         if s == 0x1A:
@@ -475,7 +572,8 @@ def cmd_standard(s: Seance, args):
 def sonder(elm: Elm, requete: int, reponse: int) -> dict | None:
     """Le calculateur répond-il ? Essaie le maintien de session puis l'identification (lectures)."""
     elm.viser(requete, reponse)
-    for essai in ("3E00", "10C0", "1A80", "2180", "22F190"):
+    # L'ABS du 08/11 n'a répondu ni à 3E00 ni à 10C0, seulement à 1A80 : plusieurs questions sont nécessaires.
+    for essai in ("3E00", "81", "1A80", "10C0", "22F190"):
         rep = elm.demander(essai, 1.0).get(reponse)
         if rep:
             return {"premiere_reponse_a": essai, "reponse": rep.hex(" ").upper()}
@@ -506,7 +604,7 @@ def cmd_psa(s: Seance, args):
             print("pas de réponse")
             continue
         print("répond ; lecture des identifiants…", end=" ", flush=True)
-        s.elm.demander("10C0", 1.0)
+        ouvrir_session(s.elm, rep)
         ident = {k: s.elm.demander(k, 1.5).get(rep, b"").hex(" ").upper() for k in ("1A80", "1A81", "1A86")}
         ids = lire_identifiants_21(s.elm, rep)
         print(f"{len(ids)} identifiants")
@@ -531,7 +629,7 @@ def cmd_instantane(s: Seance, args):
     for nom, calc in charger_calculateurs(s.racine).items():
         req, rep = int(calc["requete"], 16), int(calc["reponse"], 16)
         s.elm.viser(req, rep)
-        s.elm.demander("10C0", 1.0)
+        ouvrir_session(s.elm, rep)
         photo[nom] = {}
         for ident in calc["identifiants_21"]:
             c = s.elm.demander(ident, 1.0).get(rep)
@@ -598,18 +696,50 @@ def lire_plages(texte: str) -> list[tuple[int, int]]:
 def trouver_calculateur(texte: str) -> tuple[str, int, int]:
     """Calculateur PSA dont le nom contient le texte donné (ex. « moteur », « abs »)."""
     for nom, req, rep in CALCULATEURS_PSA:
-        if texte.lower() in nom.lower():
+        if texte.lower() in nom.lower() or texte.upper() == f"{req:03X}":
             return nom, req, rep
     sys.exit(f"Calculateur inconnu : {texte}. Choix : " + ", ".join(n for n, _, _ in CALCULATEURS_PSA))
 
 
 def ouvrir_session(elm: Elm, reponse: int) -> str | None:
-    """Ouvre la session de diagnostic étendue PSA (C0), sinon UDS (03) ; renvoie celle acceptée."""
-    for session in ("10C0", "1003"):
-        c = elm.demander(session, 1.0).get(reponse)
-        if c and c[0] == 0x50:
+    """Ouvre la session de diagnostic : KWP du réseau moteur (81), KWP habitacle (10C0), sinon UDS (1003).
+
+    Renvoie celle que le calculateur a acceptée, ou None."""
+    for session in ("81", "10C0", "1003"):
+        c = elm.demander(session, 1.5).get(reponse)
+        if c and c[0] in (0xC1, 0x50):
             return session
     return None
+
+
+def cmd_chercher(s: Seance, args):
+    """Demande à chaque calculateur PSA connu s'il est là (sans rien lire d'autre) ; écrit presents.json."""
+    s.resultats["boitier"] = s.elm.initialiser()
+    presents = {}
+    for n, (nom, req, rep) in enumerate(CALCULATEURS_PSA, 1):
+        sonde = sonder(s.elm, req, rep)
+        if sonde:
+            presents[nom] = {"requete": f"{req:03X}", "reponse": f"{rep:03X}", "sonde": sonde}
+            print(f"  {nom} ({req:03X} → {rep:03X}) répond à {sonde['premiere_reponse_a']} : {sonde['reponse']}")
+        if n % 20 == 0:
+            print(f"  … {n}/{len(CALCULATEURS_PSA)} interrogés")
+    s.resultats["presents"] = presents
+    (s.racine / "presents.json").write_text(json.dumps(presents, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"{len(presents)} calculateur(s) sur {len(CALCULATEURS_PSA)} répondent : {', '.join(presents) or 'aucun'}")
+
+
+def cmd_defauts(s: Seance, args):
+    """Lit les codes défaut d'un calculateur PSA (KWP 17FF00, puis UDS 190209). Lecture seule : rien n'est effacé."""
+    nom, req, rep = trouver_calculateur(args.calculateur)
+    s.resultats["boitier"] = s.elm.initialiser()
+    s.elm.viser(req, rep)
+    session = ouvrir_session(s.elm, rep)
+    reponses = {}
+    for question in ("17FF00", "190209"):
+        c = s.elm.demander(question, 4.0).get(rep)
+        reponses[question] = c.hex(" ").upper() if c else "sans réponse"
+        print(f"{nom} {question} : {reponses[question]}")
+    s.resultats.update({"calculateur": nom, "session": session, "defauts_bruts": reponses})
 
 
 def balayer_identifiants(elm: Elm, reponse: int, service: int, identifiants: list[int],
@@ -731,6 +861,9 @@ def main(argv=None):
     sp.add_parser("connexion")
     sp.add_parser("standard")
     sp.add_parser("psa")
+    sp.add_parser("chercher")
+    f = sp.add_parser("defauts")
+    f.add_argument("--calculateur", required=True, help="ex. moteur, abs, bsi, ou l'adresse (6C1)")
     i = sp.add_parser("instantane")
     i.add_argument("--nom", required=True)
     c = sp.add_parser("comparer")
@@ -755,6 +888,7 @@ def main(argv=None):
     s = Seance(args, args.commande)
     try:
         {"connexion": cmd_connexion, "standard": cmd_standard, "psa": cmd_psa,
+         "chercher": cmd_chercher, "defauts": cmd_defauts,
          "instantane": cmd_instantane, "direct": cmd_direct, "balayer": cmd_balayer}[args.commande](s, args)
     finally:
         s.enregistrer()

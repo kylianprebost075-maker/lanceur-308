@@ -14,7 +14,8 @@ class ListeBlanche(unittest.TestCase):
 
     def test_lectures_permises(self):
         for c in ("ATZ", "ATSH6A8", "ATCRA688", "ATFCSD300000", "0100", "010C", "03", "07", "0A", "0902",
-                  "2180", "21FF", "22F190", "1A80", "3E00", "10C0", "1081", "1003", "1902FF", "18 00 FF 00", "@1"):
+                  "2180", "21FF", "22F190", "1A80", "3E00", "10C0", "1081", "1003", "1902FF", "18 00 FF 00", "@1",
+                  "81", "82", "17FF00", "190209"):
             self.assertTrue(o.commande_autorisee(c), c)
 
     def test_ecritures_refusees(self):
@@ -29,6 +30,7 @@ class ListeBlanche(unittest.TestCase):
                   "1101",        # remise à zéro du calculateur
                   "1002", "1085",  # session de programmation
                   "34", "36", "3D", "85",
+                  "8101", "83", "2783", "14FF00",  # 81 avec paramètre, accès sécurisé KWP, effacement KWP
                   "1904",        # sous-fonction 19 non prévue
                   "ATPP0CSV19", "ATBRD23", "ATMA", "ATCSM1",
                   "", "ZZ", "123"):
@@ -136,6 +138,27 @@ class SeancesSimulees(unittest.TestCase):
             self.assertEqual(len(r["identifiants"]), 2)
             diffs = self.lancer(d, "comparer", "arret", "tournant")
             self.assertEqual([(x["identifiant"], x["octet"], x["apres"]) for x in diffs], [("220100", 1, "2A")])
+
+    def test_table_des_calculateurs_sans_doublon(self):
+        self.assertEqual(len({n for n, _, _ in o.CALCULATEURS_PSA}), len(o.CALCULATEURS_PSA))
+        self.assertEqual(len({r for _, r, _ in o.CALCULATEURS_PSA}), len(o.CALCULATEURS_PSA))
+        self.assertEqual(o.trouver_calculateur("moteur")[1:], (0x6A8, 0x688))
+        self.assertEqual(o.trouver_calculateur("abs")[1:], (0x6AD, 0x68D))
+        self.assertEqual(o.trouver_calculateur("bsi")[1:], (0x752, 0x652))
+        self.assertEqual(o.trouver_calculateur("6C1")[1:], (0x6C1, 0x601))
+
+    def test_chercher_puis_defauts(self):
+        with tempfile.TemporaryDirectory() as d:
+            r = self.lancer(d, "chercher")
+            self.assertEqual(set(r["presents"]), {"Moteur (CMM, EDC16C34)", "BSI (boîtier de servitude)"})
+            self.assertTrue((Path(d) / "presents.json").exists())
+            r = self.lancer(d, "defauts", "--calculateur", "moteur")
+            self.assertEqual(r["session"], "81")
+            self.assertEqual(r["defauts_bruts"]["17FF00"], "57 01 04 01 60")
+            for journal in Path(d).glob("*/journal.txt"):
+                texte = journal.read_text(encoding="utf-8")
+                self.assertNotIn("REFUS", texte)
+                self.assertNotIn(">> 14", texte)  # jamais d'effacement des codes
 
     def test_balayage_arrete_si_service_inconnu(self):
         with tempfile.TemporaryDirectory() as d:
