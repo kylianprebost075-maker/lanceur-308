@@ -112,6 +112,8 @@ class VehicleWatchService : Service(), LocationListener {
                 voiceAlerts()
                 if (++ticks % 2 == 0) CarPlayWatch.tick(this@VehicleWatchService)
                 // Autonomie : recalculée toutes les 30 s (le kilométrage avance en roulant).
+                // Mémoire de l'autoradio : libérée toute seule si elle devient basse (v0.18).
+                if (ticks % 30 == 15 && !Vehicle.demo) fr.p308.lanceur.optim.Optim.autoTick(this@VehicleWatchService)
                 if (ticks % 30 == 1) {
                     fr.p308.lanceur.drive.FuelRange.update(
                         fr.p308.lanceur.maintenance.Fuel.entries.value, TripLog.history.value, Vehicle.state.value.odometerKm,

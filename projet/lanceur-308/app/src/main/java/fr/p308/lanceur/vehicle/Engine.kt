@@ -252,11 +252,17 @@ object Engine {
     }
 
     private var lastLoggedStatus = ""
+    private val statusLoggedAt = HashMap<String, Long>()
 
     private fun status(text: String, connected: Boolean = false) {
-        // Journal : chaque changement d'état de la connexion (pas les répétitions d'une même recherche).
-        if (text != lastLoggedStatus) {
+        // Journal : chaque changement d'état de la connexion, mais pas la ronde « Recherche… / Aucun boîtier »
+        // qui tournait toutes les 14 s (27 min de lignes le 09/11) : un même message, hors connexion réussie,
+        // n'est réécrit qu'au bout de 10 min.
+        val now = System.currentTimeMillis()
+        val recent = !connected && now - (statusLoggedAt[text] ?: 0L) < 10 * 60_000L
+        if (text != lastLoggedStatus && !recent) {
             lastLoggedStatus = text
+            statusLoggedAt[text] = now
             ObdLog.log("CONNEXION", text)
         }
         _state.update { it.copy(status = text, connected = connected) }
@@ -395,16 +401,19 @@ object Engine {
         // 308 T7 2007 : CAN ISO 15765-4 11 bits 500 kbit/s (protocole 6) → connexion immédiate,
         // sinon recherche automatique (ATSP0) pour tout autre véhicule.
         elm.cmd("ATSP6", 1500)
+        // Kilométrage du calculateur moteur → kilométrage d'entretien. Demandé AVANT toute question OBD normale,
+        // comme le fait l'outil PC qui le lit à coup sûr (v0.18) ; sinon nouveaux essais plus bas, après un silence.
+        var kmRead = tryEcuKm(elm, quiet = false)
         if (elm.pid("00", 4000) == null) {
             elm.cmd("ATSP0", 1500)
             if (elm.pid("00", 8000) == null) throw IOException("calculateur muet (mets le contact)")
         }
         status("Connecté à ${elm.name}", connected = true)
         ObdLog.log("CONNEXION", "tension ${elm.readBatteryVolts() ?: "?"} V à la connexion")
-        // Kilométrage du calculateur moteur (relevé le 08/11/2026 : identique au compteur) → kilométrage d'entretien.
-        // Moteur tournant, le calculateur répond souvent trop tard : nouvel essai plus tard s'il a échoué.
-        var kmRead = tryEcuKm(elm)
+        // Kilométrage pas lu à la connexion : 3 nouveaux essais au plus par connexion (chacun coupe la lecture
+        // OBD une dizaine de secondes), au lieu d'un toutes les 5 min pendant tout le trajet.
         var kmTriedAt = System.currentTimeMillis()
+        var kmRounds = 0
         val baro = elm.pid("33", minBytes = 1)?.firstOrNull() ?: 101
         CrankWatch.resetSession()
         var n = 0
@@ -415,9 +424,10 @@ object Engine {
                 runDiag(elm, req)
                 if (_diag.value.ecuKm != null) kmRead = true
             }
-            if (!kmRead) {
+            if (!kmRead && kmRounds < 3) {
                 val wait = if (engineOff) 60_000L else 5 * 60_000L
                 if (System.currentTimeMillis() - kmTriedAt > wait) {
+                    kmRounds++
                     kmRead = tryEcuKm(elm)
                     kmTriedAt = System.currentTimeMillis()
                 }
@@ -505,38 +515,44 @@ object Engine {
      * Kilométrage du calculateur moteur PSA EDC16C34 : requête KWP 21 10 vers 6A8, réponse 688
      * « 61 10 00 02 25 B1 » = 140 721 km. Lecture seule ; l'adressage OBD normal est toujours rétabli.
      */
-    private fun readEcuKm(elm: ElmTransport): Int? {
+    private fun readEcuKm(elm: ElmTransport, quiet: Boolean = true): Int? {
+        /** Réponse du boîtier sur une ligne, pour le journal. */
+        fun shown(s: String) = s.trim().replace(Regex("[\\r\\n]+"), " | ").ifEmpty { "(vide)" }
         try {
-            // Séance du 08/11 : moteur tournant, 2110 restait souvent sans réponse avec 400 ms d'attente (ATST64).
-            // On attend ici jusqu'à 1 s (ATSTFF, délai fixe), après un « testeur présent » (3E00), 3 essais.
-            listOf("ATAT0", "ATSTFF", "ATSH6A8", "ATCRA688", "ATFCSH6A8", "ATFCSD300000", "ATFCSM1").forEach { elm.cmd(it, 1500) }
-            val tp = elm.cmd("3E00", 2500)
+            // v0.18 (séance du 09/11 avec l'outil PC, même boîtier) : le calculateur ouvre le dialogue avec « 81 »
+            // (pas 10C0, restée sans réponse en v0.17) et donne alors 2110 moteur coupé comme moteur tournant.
+            // Dans la voiture, la v0.17 n'obtenait même pas de réponse à 3E00 alors que l'outil PC en avait une :
+            // seule différence, l'appli venait de poser des questions OBD normales (7DF). D'où deux façons :
+            //  - quiet = false : tout de suite, AVANT toute question OBD (à la connexion, comme l'outil PC) ;
+            //  - quiet = true : après un silence de 3 s puis de 6 s, le temps que le calculateur referme le dialogue OBD.
+            val pauses = if (quiet) listOf(3_000L, 6_000L) else listOf(0L)
             val engine = if ((_state.value.rpm ?: 0) > 400) "moteur tournant" else "moteur coupé"
-            var session = false
-            repeat(3) { k ->
-                // v0.17 : l'outil PC du 08/11, qui lisait le kilométrage, ouvrait d'abord la session de diagnostic
-                // PSA (10 C0, lecture seule, celle des valises) ; l'appli ne le faisait pas. Tentée dès le 2e essai.
-                if (k >= 1 && !session) {
-                    session = true
-                    val s = elm.cmd("10C0", 2500)
-                    ObdLog.log("KM", "session de diagnostic 10C0 → « ${s.trim().ifEmpty { "(vide)" }} »")
-                }
+            listOf("ATSH6A8", "ATCRA688", "ATFCSH6A8", "ATFCSD300000", "ATFCSM1").forEach { elm.cmd(it, 1500) }
+            pauses.forEachIndexed { k, pause ->
+                if (pause > 0) Thread.sleep(pause)
+                // Dernier essai : attente d'une seconde entière par réponse (ATSTFF) au lieu de 400 ms.
+                if (quiet && k == pauses.lastIndex) listOf("ATAT0", "ATSTFF").forEach { elm.cmd(it, 1500) }
+                val open = elm.cmd("81", 2500)
                 val raw = elm.cmd("2110", 3000)
                 val hex = raw.uppercase().filter { it.isLetterOrDigit() }
                 val i = hex.indexOf("6110")
                 if (i >= 0 && hex.length >= i + 12) {
                     hex.substring(i + 4, i + 12).toLongOrNull(16)?.toInt()?.takeIf { it in 1..1_999_999 }?.let {
-                        ObdLog.log("KM", "lu : $it km (essai ${k + 1}/3, $engine)")
+                        ObdLog.log("KM", "lu : $it km (essai ${k + 1}/${pauses.size}, $engine, silence ${pause / 1000} s)")
                         return it
                     }
                 }
-                // Réponse brute gardée : c'est elle qui dit pourquoi ça échoue (NO DATA, 7F 21 xx, rien…).
-                ObdLog.log("KM", "essai ${k + 1}/3 raté ($engine) : réponse « ${raw.trim().ifEmpty { "(vide)" }} », 3E00 → « ${tp.trim()} »")
+                // Réponses brutes gardées : ce sont elles qui disent pourquoi ça échoue (NO DATA, 7F 21 xx, rien…).
+                ObdLog.log(
+                    "KM",
+                    "essai ${k + 1}/${pauses.size} raté ($engine, silence ${pause / 1000} s) : " +
+                        "81 → « ${shown(open)} », 2110 → « ${shown(raw)} »",
+                )
             }
             return null
         } finally {
-            // Retour à la session normale du calculateur (sinon il y revient seul après quelques secondes).
-            runCatching { elm.cmd("1081", 1500) }
+            // Fin du dialogue (82), puis retour à l'adressage OBD normal.
+            runCatching { elm.cmd("82", 1500) }
             listOf("ATFCSM0", "ATCRA", "ATSH7DF", "ATST64", "ATAT1").forEach { runCatching { elm.cmd(it, 1500) } }
         }
     }
@@ -551,9 +567,9 @@ object Engine {
     }
 
     /** Lit le kilométrage moteur ; vrai s'il a été obtenu. Une coupure Bluetooth remonte (IOException). */
-    private fun tryEcuKm(elm: ElmTransport): Boolean {
+    private fun tryEcuKm(elm: ElmTransport, quiet: Boolean = true): Boolean {
         val km = try {
-            readEcuKm(elm)
+            readEcuKm(elm, quiet)
         } catch (e: IOException) {
             throw e
         } catch (e: Exception) {

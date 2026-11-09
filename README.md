@@ -1,7 +1,7 @@
-# Lanceur 308 — dossier de reprise (version 0.17)
+# Lanceur 308 — dossier de reprise (version 0.18)
 
 > **À lire en entier avant de toucher à quoi que ce soit.**
-> Ce dossier permet à une IA (ou à un développeur) de reprendre le projet. Dernière version : **0.17 du 9 novembre
+> Ce dossier permet à une IA (ou à un développeur) de reprendre le projet. Dernière version : **0.18 du 9 novembre
 > 2026** (nouveautés de chaque version juste sous la galerie ; les sections techniques plus bas datent de la 0.8 et
 > sont complétées par ces notes de version).
 > L'ancien README (version 0.4) est conservé dans `diagnostic/README_ancien_v0.4.md` pour l'historique.
@@ -52,7 +52,30 @@ de dessus en 2D, celle que l'appli affiche quand la 3D n'est pas disponible. Sur
 | **Réglages** | **Panneau à côté de CarPlay (v0.13, alerte FAP v0.14)** |
 | ![Réglages : mode démo, panneau CarPlay, côté](docs/captures/onglets/11-reglages.png) | ![Panneau : puissance, rapport conseillé, régime, eau, turbo, batterie](docs/captures/onglets/12-panneau-performances.png) |
 
-**Nouveau en v0.17 : corrections après le premier retour terrain (09/11, voiture encore en 0.13)**
+**Nouveau en v0.18 : mémoire libérée toute seule, kilométrage du calculateur (09/11 au soir)**
+- **Mémoire automatique** (`optim/Optim.kt` → `autoTick`, appelé toutes les 30 s par `VehicleWatchService`) : dès
+  qu'il reste moins de 25 % de mémoire libre (≈ 380 Mo sur 1536) ou qu'Android se dit à court, le Lanceur ferme les
+  applis en arrière-plan, avec les mêmes protections que le bouton « Libérer » (jamais l'appli à l'écran, la musique
+  en cours, CarPlay, le clavier ni les services de l'autoradio). Au plus une fois toutes les 5 min ; si le
+  nettoyage n'a presque rien rendu (moins de 15 Mo), le suivant attend 20 min. Interrupteur et bilan (« 3 fois,
+  210 Mo rendus ») dans Réglages → Optimiser l'autoradio ; chaque passage est noté au journal (`[OPTIM]`).
+  Limite connue : sans root, une appli ne peut fermer que ce qui est en arrière-plan ; Android relance ce dont il
+  a besoin.
+- **Kilométrage du calculateur moteur** (`Engine.kt` → `readEcuKm`) : dans la voiture, la v0.17 n'obtenait
+  aucune réponse (« NO DATA », même à `3E00`), alors que l'outil PC lit le kilométrage avec le même boîtier.
+  Deux corrections tirées de la séance OBD n° 2 : le dialogue s'ouvre avec `81` et se ferme avec `82` (au lieu de
+  `10C0` / `1081`), et la question est posée **avant** toute question OBD normale à la connexion, comme le fait
+  l'outil PC. En cas d'échec, 3 nouveaux essais au plus par connexion, chacun après un silence de 3 s puis 6 s
+  (hypothèse : le calculateur ignore le diagnostic tant qu'un dialogue OBD normal est en cours). Les réponses
+  brutes sont écrites au journal (`[KM]`). **À confirmer dans la voiture.**
+- **Journal moins bavard** : la ronde « Recherche vLinker… / Aucun boîtier OBD détecté » écrivait deux lignes
+  toutes les 14 s quand le boîtier était absent (27 min de lignes le 09/11) ; un même message n'est plus réécrit
+  qu'au bout de 10 min.
+- Séance OBD n° 2, partie A (vLinker seul) : 3 calculateurs sur 90 répondent sur ce réseau (moteur, ABS Bosch 8.1,
+  direction assistée électro-hydraulique), aucun code défaut ; le service 21 du moteur ne donne pas de mesure en
+  direct (les mesures restent celles des PID standard). Détails de la méthode : `outils/obd/SEANCE_OBD_2.md`.
+
+**v0.17 : corrections après le premier retour terrain (09/11, voiture encore en 0.13)**
 - **Température extérieure** (`vehicle/OutsideTemp.kt`, Réglages → Température extérieure) : l'estimation par l'air
   d'admission est supprimée (elle donnait 39 °C en novembre, moteur encore tiède). L'autoradio l'affiche via son
   service CAN (`com.syu.ms`), mais le canal dépend du boîtier : l'utilisateur recopie la valeur affichée, l'appli
@@ -307,7 +330,7 @@ Puis copier l'APK vers `livrables\Lanceur308.apk`, `E:\Lanceur308.apk` et `E:\30
 - AGP 8.7.3, **Kotlin 2.0.21**, Compose BOM 2024.12.01
 - **SceneView 2.2.1** (Filament 1.52) — SceneView 2.3+ exige Kotlin 2.2.
 - minSdk 26, targetSdk 33, compileSdk 35. R8 activé (`proguard-rules.pro` garde `com.google.android.filament.**` et `io.github.sceneview.**`).
-- Version dans `app/build.gradle.kts` : **incrémenter `versionCode` à chaque livraison** (actuellement 23 / "0.17").
+- Version dans `app/build.gradle.kts` : **incrémenter `versionCode` à chaque livraison** (actuellement 24 / "0.18").
 
 ---
 
@@ -427,8 +450,9 @@ Simule ouvrants, phares, marche arrière, batterie faible, accélérations ; les
    `outils/son`). Reste : piloter le DSP FYT directement, après étude des APK copiées sur la clé (`apk-fyt/`).
 8. FAP : seuil de détection des régénérations (débit d'air +25 %) à confirmer avec le journal OBD d'une vraie
    régénération. CarPlay : mesurer l'effet du mode CarPlay (v0.16) sur le lag, boîtier OBD branché / débranché.
-9. v0.17 à confirmer dans la voiture : canal CAN de la température extérieure trouvé, kilométrage lu avec `10C0`
-   (lire les lignes KM du journal OBD), chauffe normale ou eau qui plafonne (thermostat), export sur la clé.
+9. À confirmer dans la voiture : canal CAN de la température extérieure trouvé (v0.17), chauffe normale ou eau
+   qui plafonne (thermostat), export sur la clé ; v0.18 : kilométrage lu avec `81` (lignes `[KM]` du journal :
+   « lu : … km » ou les réponses brutes), nettoyages automatiques de la mémoire (lignes `[OPTIM]`).
 6. Codes défaut OBD (mode 03 / effacement 04) : faciles à ajouter dans `Engine.kt` maintenant que le boîtier est là.
 7. **Onglet Diagnostic (v0.9)** : d'abord une séance d'exploration dans la voiture avec un PC et le vLinker
    (`outils/obd/obd_explorer.py`, lecture seule garantie, fiche `outils/obd/SEANCE_OBD.md`) pour savoir ce que

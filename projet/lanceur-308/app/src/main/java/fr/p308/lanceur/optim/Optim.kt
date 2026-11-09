@@ -23,7 +23,8 @@ import fr.p308.lanceur.vehicle.ObdLog
  *    ce qui laisse la puce Bluetooth / Wi-Fi au CarPlay sans fil ; panneau redessiné 2 fois par seconde au plus).
  *  - Nettoyage de la mémoire : ferme les applis qui traînent EN ARRIÈRE-PLAN (jamais celle à l'écran, ni la musique
  *    en cours, ni les services de l'autoradio com.syu / com.fyt, ni CarPlay, ni le clavier). Automatique à l'ouverture
- *    de CarPlay (au plus toutes les 10 min).
+ *    de CarPlay (au plus toutes les 10 min) et, depuis la v0.18, dès que la mémoire libre passe sous 25 %
+ *    (surveillance toutes les 30 s par le service, voir autoTick).
  *  - Applis jamais ouvertes depuis 30 jours : à désactiver à la main (bouton qui ouvre leur page Android).
  */
 object Optim {
@@ -35,13 +36,19 @@ object Optim {
     /** Mémoire libérée automatiquement quand CarPlay s'ouvre. */
     var autoClean by mutableStateOf(true)
         private set
+    /** Mémoire surveillée en permanence : libérée toute seule dès qu'elle devient basse (v0.18). */
+    var autoRam by mutableStateOf(true)
+        private set
 
     fun init(ctx: Context) {
         val p = ctx.getSharedPreferences("optim", Context.MODE_PRIVATE)
         prefs = p
         carplayLight = p.getBoolean("carplayLight", true)
         autoClean = p.getBoolean("autoClean", true)
+        autoRam = p.getBoolean("autoRam", true)
     }
+
+    fun updateAutoRam(v: Boolean) { autoRam = v; prefs?.edit()?.putBoolean("autoRam", v)?.apply() }
 
     fun updateCarplayLight(v: Boolean) { carplayLight = v; prefs?.edit()?.putBoolean("carplayLight", v)?.apply() }
     fun updateAutoClean(v: Boolean) { autoClean = v; prefs?.edit()?.putBoolean("autoClean", v)?.apply() }
@@ -97,6 +104,52 @@ object Optim {
         val gain = (after.availMb - before.availMb).coerceAtLeast(0)
         ObdLog.log("OPTIM", "mémoire : ${before.availMb} → ${after.availMb} Mo libres sur ${after.totalMb}")
         return "Mémoire libre : ${before.availMb} → ${after.availMb} Mo (+$gain Mo) sur ${after.totalMb} Mo."
+    }
+
+    // --- Mémoire : surveillance automatique (v0.18) ---
+
+    /** Sous cette part de mémoire libre (25 %, soit ≈ 380 Mo sur 1536), le Lanceur libère la mémoire tout seul. */
+    const val AUTO_FREE_PCT = 25
+    private const val AUTO_MIN_GAP_MS = 5 * 60_000L
+    private const val AUTO_BACKOFF_MS = 20 * 60_000L
+
+    /** Bilan des nettoyages automatiques depuis le démarrage de l'autoradio, pour l'écran. */
+    data class AutoStats(val runs: Int = 0, val freedMb: Int = 0, val lastAtMs: Long = 0L, val lastGainMb: Int = 0)
+
+    var autoStats by mutableStateOf(AutoStats())
+        private set
+
+    @Volatile private var nextAutoMs = 0L
+    @Volatile private var autoRunning = false
+
+    /** Mémoire trop basse pour attendre : vrai sous le seuil ou quand Android lui-même se dit à court. */
+    fun needsClean(m: Mem): Boolean = m.low || m.availMb * 100 < m.totalMb * AUTO_FREE_PCT
+
+    /**
+     * Appelé toutes les 30 s par le service : si la mémoire libre passe sous le seuil, ferme les applis en
+     * arrière-plan (mêmes protections que le bouton « Libérer »). Au plus un nettoyage toutes les 5 min ; s'il n'a
+     * presque rien rendu (moins de 15 Mo), le suivant attend 20 min : inutile d'insister, rien ne traîne.
+     */
+    fun autoTick(ctx: Context) {
+        val now = System.currentTimeMillis()
+        if (!autoRam || autoRunning || now < nextAutoMs || !needsClean(mem(ctx))) return
+        autoRunning = true
+        val app = ctx.applicationContext
+        Thread({
+            try {
+                val before = mem(app).availMb
+                clean(app)
+                val gain = (mem(app).availMb - before).coerceAtLeast(0)
+                val s = autoStats
+                autoStats = AutoStats(s.runs + 1, s.freedMb + gain, System.currentTimeMillis(), gain)
+                nextAutoMs = System.currentTimeMillis() + if (gain < 15) AUTO_BACKOFF_MS else AUTO_MIN_GAP_MS
+                ObdLog.log("OPTIM", "nettoyage automatique (mémoire sous $AUTO_FREE_PCT %) : +$gain Mo")
+            } catch (_: Exception) {
+                nextAutoMs = System.currentTimeMillis() + AUTO_BACKOFF_MS
+            } finally {
+                autoRunning = false
+            }
+        }, "nettoyage-auto").start()
     }
 
     /** Nettoyage automatique à l'ouverture de CarPlay (au plus toutes les 10 min). */

@@ -91,6 +91,14 @@ fun OptimDialog(onDismiss: () -> Unit) {
                     "CarPlay ni les services de l'autoradio).", fontSize = 12.sp, color = if (cleanMsg != null) C.Green else C.Sub)
 
                 Spacer(Modifier.height(10.dp))
+                val auto = Optim.autoStats
+                Toggle("Libérer la mémoire automatiquement", "Le Lanceur surveille la mémoire toutes les 30 secondes et la " +
+                    "libère tout seul quand il en reste moins de ${Optim.AUTO_FREE_PCT} %. " +
+                    if (auto.runs == 0) "Pas encore eu besoin depuis le démarrage."
+                    else "Depuis le démarrage : ${auto.runs} fois, ${auto.freedMb} Mo rendus (dernière fois à " +
+                        "${java.text.SimpleDateFormat("HH:mm", Locale.FRANCE).format(java.util.Date(auto.lastAtMs))}, " +
+                        "+${auto.lastGainMb} Mo).",
+                    Optim.autoRam, Optim::updateAutoRam)
                 Toggle("Mode CarPlay", "Pendant CarPlay, le Lanceur lit l'OBD moins souvent (≈ 3 fois/s) et redessine son " +
                     "panneau 2 fois/s : plus de place pour le CarPlay sans fil (même puce Bluetooth / Wi-Fi).",
                     Optim.carplayLight, Optim::updateCarplayLight)
