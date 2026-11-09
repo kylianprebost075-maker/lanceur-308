@@ -135,7 +135,24 @@ object UiPrefs {
 
     fun updatePerfOnRight(v: Boolean) {
         perfOnRight = v
-        prefs.edit().putBoolean("perfOnRight", v).apply()
+        // Changer de côté remet le panneau à sa place d'origine (position déplacée au doigt oubliée).
+        prefs.edit().putBoolean("perfOnRight", v).remove("perfFullX").remove("perfPillX").remove("perfPillY").apply()
+    }
+
+    /** v0.17 : position du panneau CarPlay déplacé au doigt (null = place d'origine, en haut du côté choisi). */
+    fun perfPos(compact: Boolean): Pair<Int, Int>? {
+        if (!::prefs.isInitialized) return null
+        return if (compact) {
+            val x = prefs.getInt("perfPillX", -1)
+            val y = prefs.getInt("perfPillY", -1)
+            if (x >= 0 && y >= 0) x to y else null
+        } else prefs.getInt("perfFullX", -1).takeIf { it >= 0 }?.let { it to 0 }
+    }
+
+    fun savePerfPos(compact: Boolean, x: Int, y: Int) {
+        if (!::prefs.isInitialized) return
+        if (compact) prefs.edit().putInt("perfPillX", x).putInt("perfPillY", y).apply()
+        else prefs.edit().putInt("perfFullX", x).apply()
     }
 
     fun updateGlass(v: Boolean) {

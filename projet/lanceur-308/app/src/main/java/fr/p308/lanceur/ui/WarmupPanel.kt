@@ -106,6 +106,12 @@ fun WarmupPanel() {
             }
             Text(main, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = if (main.startsWith("Moteur et huile") || main.startsWith("Eau chaude (")) C.Green else Color.White)
             Text(sub, fontSize = 13.sp, color = C.Sub)
+            w.stalledC?.let { c ->
+                Spacer(Modifier.height(6.dp))
+                Text("L'eau plafonne à $c °C alors que tu roules depuis 10 min : le thermostat reste peut-être ouvert " +
+                    "(panne courante, le moteur chauffe mal et consomme plus). Si l'aiguille du tableau de bord reste basse " +
+                    "et que le chauffage est tiède, fais-le vérifier.", fontSize = 13.sp, color = C.Orange)
+            }
             Spacer(Modifier.weight(1f))
             Text(
                 "Pendant la chauffe : roule tout de suite en douceur, sous 2 500 tr/min, plutôt que de laisser tourner au " +
@@ -159,6 +165,7 @@ private fun WarmRow(r: WarmRecord) {
                     "eau ${r.startC} °C au départ",
                     r.outsideC?.let { "dehors ≈ ${it.roundToInt()} °C" },
                     if (r.idlePct >= 40) "ralenti ${r.idlePct} %" else "roulé tout de suite (${r.avgKmh} km/h)",
+                    if (r.stalled) "eau plafonnée" else if (r.abnormal) "anormalement longue, pas comptée" else null,
                 ).joinToString(" · "),
                 fontSize = 11.sp, color = C.Sub,
             )

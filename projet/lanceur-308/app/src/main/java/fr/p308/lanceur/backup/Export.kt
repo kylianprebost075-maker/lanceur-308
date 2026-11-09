@@ -27,7 +27,7 @@ object Export {
             append(header.joinToString(";")).append("\r\n")
             rows.forEach { r -> append(r.joinToString(";") { (it ?: "").toString().replace(';', ',') }).append("\r\n") }
         }
-        File(dir, name).writeText(text, Charsets.UTF_8)
+        UsbStorage.writeSafe(File(dir, name), text)
     }
 
     fun writeAll(dir: File) {

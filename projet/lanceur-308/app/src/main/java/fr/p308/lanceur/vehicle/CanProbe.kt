@@ -117,9 +117,8 @@ object CanProbe {
      * pour éviter un fichier de 0 octet si la clé USB est retirée rapidement.
      */
     fun copyApks(ctx: Context): String {
-        val usb = ctx.getExternalFilesDirs(null).filterNotNull()
-            .filter { runCatching { android.os.Environment.isExternalStorageRemovable(it) }.getOrDefault(false) }
-        if (usb.isEmpty()) return "Aucune clé USB détectée"
+        val usb = fr.p308.lanceur.backup.UsbStorage.keys(ctx)
+        if (usb.isEmpty()) return fr.p308.lanceur.backup.UsbStorage.missingReason(ctx)
         val reportBytes = if (_state.value.events.isNotEmpty()) {
             _state.value.events.joinToString("\n").toByteArray()
         } else {

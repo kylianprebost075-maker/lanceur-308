@@ -22,7 +22,15 @@ data class WarmRecord(
     /** Part du temps à l'arrêt (ralenti) pendant la chauffe. */
     val idlePct: Int,
     val avgKmh: Int,
-)
+    /** v0.17 : l'eau a plafonné sous 80 °C en roulant (10 min sans gagner 2 °C). */
+    val stalled: Boolean = false,
+) {
+    /**
+     * Chauffe anormale, écartée des prévisions : eau qui plafonne, ou durée plus de 2,5 fois la normale (relevé du
+     * 09/11 : 39,5 min depuis 43 °C, qui faisait prévoir plus de 40 min à chaque départ).
+     */
+    val abnormal: Boolean get() = stalled || minutes > 2.5f * Warmup.defaultMinutes(startC)
+}
 
 data class WarmState(
     /** Huile estimée (°C), null tant que l'eau n'a pas été lue. */
@@ -39,6 +47,8 @@ data class WarmState(
     val nextMin: Float? = null,
     val nextFromC: Int? = null,
     val basis: String = "",
+    /** v0.17 : l'eau plafonne à cette température en roulant (thermostat ?), sinon null. */
+    val stalledC: Int? = null,
 )
 
 /**
@@ -79,6 +89,11 @@ object Warmup {
     private var meters = 0.0
     private var coolMin: Float? = null
     private var oilMin: Float? = null
+    private var stallRefC = 0
+    private var noRiseMovingS = 0.0
+    private var stalled = false
+    /** 10 min de roulage (30 km/h ou plus) sans que l'eau gagne 2 °C, sous 80 °C : plafond. */
+    private const val STALL_S = 600.0
 
     /** Vrai en mode démo : rien n'est enregistré. */
     @Volatile
@@ -115,6 +130,7 @@ object Warmup {
         if (!wasRunning) {
             pendingStart = true
             idleS = 0; movingS = 0; meters = 0.0; coolMin = null; oilMin = null; active = false
+            noRiseMovingS = 0.0; stalled = false
         }
         wasRunning = true
         val coolant = e.coolantC
@@ -129,6 +145,7 @@ object Warmup {
             startMs = nowMs
             startC = coolant
             startOutside = outsideC
+            stallRefC = coolant
         }
         val kw = (e.powerCh ?: 0) * 0.7355
         val o = (oil ?: coolant.toDouble())
@@ -138,6 +155,12 @@ object Warmup {
         if (active) {
             if (kmh < 3f) idleS += dt.toInt().coerceAtLeast(1) else movingS += dt.toInt().coerceAtLeast(1)
             meters += kmh / 3.6 * dt
+            if (coolant >= stallRefC + 2) { stallRefC = coolant; noRiseMovingS = 0.0 }
+            else if (kmh >= 30f) noRiseMovingS += dt
+            if (!stalled && noRiseMovingS >= STALL_S && coolant in 50 until TARGET_C) {
+                stalled = true
+                ObdLog.log("CHAUFFE", "l'eau plafonne à $coolant °C après ${elapsedS / 60} min (10 min de roulage sans monter)")
+            }
             if (coolMin == null && coolant >= TARGET_C) coolMin = elapsedS / 60f
             if (oilMin == null && (oil ?: 0.0) >= TARGET_C) oilMin = elapsedS / 60f
             if (coolMin != null && oilMin != null) finish()
@@ -162,7 +185,8 @@ object Warmup {
             } else planned
         }
         return WarmState(oilC = o, coolantC = coolant, running = true, active = true, startC = startC, elapsedS = elapsedS,
-            remainingMin = remaining, oilRemainingMin = oilRemaining(coolant, remaining), basis = basis)
+            remainingMin = remaining, oilRemainingMin = oilRemaining(coolant, remaining), basis = basis,
+            stalledC = if (stalled) coolant else null)
     }
 
     /** Minutes avant que l'huile atteigne 80 °C : retard appris après l'eau, ou vitesse actuelle du modèle. */
@@ -206,7 +230,7 @@ object Warmup {
         if (demo) return
         val total = (idleS + movingS).coerceAtLeast(1)
         val r = WarmRecord(startMs, startC, startOutside, m, oilMin, idleS * 100 / total,
-            if (movingS > 0) (meters / movingS * 3.6).roundToInt() else 0)
+            if (movingS > 0) (meters / movingS * 3.6).roundToInt() else 0, stalled)
         val list = (listOf(r) + _history.value).take(MAX_RECORDS)
         _history.value = list
         prefs?.edit()?.putString("list", encode(list))?.apply()
@@ -220,8 +244,9 @@ object Warmup {
      * 4 chauffes ou plus avec des températures de départ assez différentes : droite des moindres carrés ;
      * sinon les valeurs de départ corrigées par l'écart médian observé.
      */
-    fun predict(startC: Int, recs: List<WarmRecord> = _history.value): Pair<Float, String> {
+    fun predict(startC: Int, all: List<WarmRecord> = _history.value): Pair<Float, String> {
         val d = (TARGET_C - startC).coerceAtLeast(5).toFloat()
+        val recs = all.filter { !it.abnormal }
         if (recs.size >= 4) {
             val xs = recs.map { (TARGET_C - it.startC).coerceAtLeast(5).toFloat() }
             val ys = recs.map { it.minutes }
@@ -251,7 +276,8 @@ object Warmup {
         fun norm(list: List<WarmRecord>) = list.takeIf { it.isNotEmpty() }?.let { l ->
             (l.map { it.minutes / defaultMinutes(it.startC) }.average().toFloat() * defaultMinutes(10)) to l.size
         }
-        return norm(recs.filter { it.idlePct < 30 }) to norm(recs.filter { it.idlePct >= 40 })
+        val ok = recs.filter { !it.abnormal }
+        return norm(ok.filter { it.idlePct < 30 }) to norm(ok.filter { it.idlePct >= 40 })
     }
 
     /** Exemple affiché en mode démo (jamais enregistré). */
@@ -269,7 +295,7 @@ object Warmup {
     private fun encode(list: List<WarmRecord>) = JSONArray(list.map {
         JSONObject().put("t", it.startMs).put("c", it.startC).put("ext", it.outsideC?.toDouble() ?: -999.0)
             .put("min", it.minutes.toDouble()).put("huile", it.oilMinutes?.toDouble() ?: -1.0)
-            .put("ralenti", it.idlePct).put("kmh", it.avgKmh)
+            .put("ralenti", it.idlePct).put("kmh", it.avgKmh).put("plafond", it.stalled)
     }).toString()
 
     private fun decode(s: String?): List<WarmRecord> {
@@ -281,7 +307,7 @@ object Warmup {
                 WarmRecord(
                     o.getLong("t"), o.getInt("c"), o.optDouble("ext", -999.0).toFloat().takeIf { it > -900f },
                     o.getDouble("min").toFloat(), o.optDouble("huile", -1.0).toFloat().takeIf { it >= 0f },
-                    o.optInt("ralenti"), o.optInt("kmh"),
+                    o.optInt("ralenti"), o.optInt("kmh"), o.optBoolean("plafond", false),
                 )
             }
         }.getOrDefault(emptyList())

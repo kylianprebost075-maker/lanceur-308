@@ -1,7 +1,6 @@
 package fr.p308.lanceur.backup
 
 import android.content.Context
-import android.os.Environment
 import fr.p308.lanceur.UiPrefs
 import fr.p308.lanceur.drive.Chrono
 import fr.p308.lanceur.maintenance.Fuel
@@ -18,13 +17,12 @@ import java.io.File
  */
 object Backup {
     private const val FILE = "sauvegarde-308.json"
-    private val PREFS = listOf("maintenance", "vehicle", "ui", "fuel", "chrono", "trips", "battery", "gears", "warmup", "history", "fap", "sound", "optim")
+    private val PREFS = listOf("maintenance", "vehicle", "ui", "fuel", "chrono", "trips", "battery", "gears", "warmup", "history", "fap", "sound", "optim", "can")
 
     /** Nombre de clés USB / cartes SD branchées (pour sauvegarder dès qu'une clé arrive). */
     fun usbCount(ctx: Context): Int = volumes(ctx).count { it.second }
 
-    private fun volumes(ctx: Context): List<Pair<File, Boolean>> =
-        ctx.getExternalFilesDirs(null).filterNotNull().map { it to runCatching { Environment.isExternalStorageRemovable(it) }.getOrDefault(false) }
+    private fun volumes(ctx: Context): List<Pair<File, Boolean>> = UsbStorage.volumes(ctx).map { it.dir to it.usb }
 
     fun save(ctx: Context): String {
         val json = JSONObject().put("version", 1).put("date", java.time.LocalDateTime.now().toString())
@@ -46,12 +44,15 @@ object Backup {
         val text = json.toString(2)
         val stamp = java.text.SimpleDateFormat("yyyyMMdd-HHmm", java.util.Locale.FRANCE).format(java.util.Date())
         vols.forEach { (dir, _) ->
-            runCatching { File(dir, FILE).writeText(text) }
+            UsbStorage.cleanTmp(dir)
+            UsbStorage.writeSafe(File(dir, FILE), text)
             // Copies datées (les 10 dernières) : une mauvaise manip ne fait pas perdre l'historique.
             runCatching {
                 val d = File(dir, "sauvegardes").apply { mkdirs() }
-                File(d, "sauvegarde-308-$stamp.json").writeText(text)
-                d.listFiles()?.filter { it.name.startsWith("sauvegarde-308-") }?.sortedByDescending { it.name }?.drop(10)
+                UsbStorage.writeSafe(File(d, "sauvegarde-308-$stamp.json"), text)
+                // Fichiers vides laissés par une copie coupée (avant la v0.17) : retirés, ils ne comptent pas.
+                d.listFiles()?.filter { it.name.startsWith("sauvegarde-308-") && it.length() == 0L }?.forEach { it.delete() }
+                d.listFiles()?.filter { it.name.startsWith("sauvegarde-308-") && it.name.endsWith(".json") }?.sortedByDescending { it.name }?.drop(10)
                     ?.forEach { it.delete() }
             }
         }
@@ -61,25 +62,29 @@ object Backup {
         usb.forEach { (dir, _) ->
             runCatching {
                 val j = File(dir, "journal").apply { mkdirs() }
-                fr.p308.lanceur.vehicle.ObdLog.dir?.listFiles()?.forEach { it.copyTo(File(j, it.name), overwrite = true) }
+                fr.p308.lanceur.vehicle.ObdLog.dir?.listFiles()?.forEach { UsbStorage.copySafe(it, File(j, it.name)) }
             }
             runCatching { Export.writeAll(File(dir, "export")) }
         }
-        return if (usb.isEmpty()) "Sauvegardé dans la mémoire interne (aucune clé USB détectée)"
+        return if (usb.isEmpty()) "Sauvegardé dans la mémoire interne. ${UsbStorage.missingReason(ctx)}"
         else "Sauvegardé sur la clé : Android/data/fr.p308.lanceur/files/ (sauvegarde, journal OBD, tableaux Excel dans « export »)"
     }
 
     /** Copie les journaux GPS sur la clé (dossier gps/ à côté de la sauvegarde). */
     fun copyGpsLogs(ctx: Context): String {
         val usb = volumes(ctx).filter { it.second }.map { it.first }
-        if (usb.isEmpty()) return "Aucune clé USB détectée"
+        if (usb.isEmpty()) return UsbStorage.missingReason(ctx)
         val logs = GpsMonitor.dir.listFiles()?.filter { it.extension == "csv" }.orEmpty()
-        usb.forEach { dir -> File(dir, "gps").mkdirs(); logs.forEach { runCatching { it.copyTo(File(dir, "gps/${it.name}"), overwrite = true) } } }
+        usb.forEach { dir -> File(dir, "gps").mkdirs(); logs.forEach { UsbStorage.copySafe(it, File(dir, "gps/${it.name}")) } }
         return "${logs.size} journal(aux) GPS copié(s) sur la clé : Android/data/fr.p308.lanceur/files/gps/"
     }
 
     fun restore(ctx: Context): String {
-        val file = volumes(ctx).sortedByDescending { it.second }.map { File(it.first, FILE) }.firstOrNull { it.exists() }
+        // Un fichier vide (copie coupée) est sauté : la sauvegarde datée entière la plus récente est prise à la place.
+        val file = volumes(ctx).sortedByDescending { it.second }.flatMap { (dir, _) ->
+            listOf(File(dir, FILE)) + (File(dir, "sauvegardes").listFiles()?.filter { it.name.startsWith("sauvegarde-308-") && it.name.endsWith(".json") }
+                ?.sortedByDescending { it.name }.orEmpty())
+        }.firstOrNull { it.exists() && it.length() > 0L }
             ?: return "Aucune sauvegarde trouvée (ni sur la clé, ni en mémoire interne)"
         val json = JSONObject(file.readText())
         for (name in PREFS) {
@@ -112,6 +117,7 @@ object Backup {
         fr.p308.lanceur.vehicle.FapRegen.init(ctx)
         fr.p308.lanceur.sound.SoundPrefs.init(ctx)
         fr.p308.lanceur.optim.Optim.init(ctx)
+        fr.p308.lanceur.vehicle.OutsideTemp.init(ctx)
         return "Restauré depuis ${if (file.absolutePath.contains("emulated")) "la mémoire interne" else "la clé USB"} (sauvegarde du ${json.optString("date").take(10)})"
     }
 }

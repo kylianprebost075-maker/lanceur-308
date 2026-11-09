@@ -26,7 +26,7 @@ import kotlin.math.roundToInt
  * Panneau « performances » posé sur un côté de l'écran pendant CarPlay (fenêtre flottante, comme DoorOverlay),
  * style verre comme le Lanceur : rapport et conseil de passage, puissance et couple, temps de chauffe restant,
  * puis eau, huile (estimée), turbo et régime avec une barre colorée chacun, et la batterie.
- * Toucher = réduire / agrandir ; appui long = fermer jusqu'au prochain lancement de CarPlay.
+ * Toucher = réduire / agrandir ; glisser = déplacer (v0.17) ; appui long = fermer jusqu'au prochain lancement de CarPlay.
  * Les touchers hors du panneau vont à CarPlay.
  */
 class PerfOverlay(private val ctx: Context, private val onClose: () -> Unit) {
@@ -298,9 +298,8 @@ class PerfOverlay(private val ctx: Context, private val onClose: () -> Unit) {
             orientation = LinearLayout.VERTICAL
             addView(f, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT))
             addView(m)
-            setOnClickListener { toggle() }
-            setOnLongClickListener { hide(); onClose(); true }
         }
+        r.setOnTouchListener(DragTouch())
         full = f
         mini = m
         root = r
@@ -336,9 +335,72 @@ class PerfOverlay(private val ctx: Context, private val onClose: () -> Unit) {
             WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
         PixelFormat.TRANSLUCENT,
     ).apply {
-        gravity = (if (rightSide) Gravity.END else Gravity.START) or Gravity.TOP
-        x = dp(6)
-        y = dp(6)
+        val pos = fr.p308.lanceur.UiPrefs.perfPos(collapsed)
+        if (pos != null) {
+            // Position choisie au doigt : comptée depuis le coin en haut à gauche.
+            gravity = Gravity.START or Gravity.TOP
+            x = pos.first
+            y = if (collapsed) pos.second else dp(6)
+        } else {
+            gravity = (if (rightSide) Gravity.END else Gravity.START) or Gravity.TOP
+            x = dp(6)
+            y = dp(6)
+        }
+    }
+
+    /**
+     * Toucher du panneau : glisser = le déplacer (la colonne de gauche à droite, la pastille partout), position
+     * gardée ; toucher court = réduire / agrandir ; appui long sans bouger = fermer. Réglages → changer de côté
+     * remet le panneau à sa place d'origine.
+     */
+    private inner class DragTouch : View.OnTouchListener {
+        private val handler = android.os.Handler(android.os.Looper.getMainLooper())
+        private val slop = dp(12)
+        private var downX = 0f
+        private var downY = 0f
+        private var startX = 0
+        private var startY = 0
+        private var dragging = false
+        private var longDone = false
+        private var lp: WindowManager.LayoutParams? = null
+        private val longPress = Runnable { longDone = true; hide(); onClose() }
+
+        override fun onTouch(v: View, ev: android.view.MotionEvent): Boolean {
+            when (ev.actionMasked) {
+                android.view.MotionEvent.ACTION_DOWN -> {
+                    downX = ev.rawX; downY = ev.rawY
+                    dragging = false; longDone = false; lp = null
+                    handler.postDelayed(longPress, android.view.ViewConfiguration.getLongPressTimeout().toLong().coerceAtLeast(600L))
+                }
+                android.view.MotionEvent.ACTION_MOVE -> {
+                    val dx = ev.rawX - downX
+                    val dy = ev.rawY - downY
+                    if (!dragging && (kotlin.math.abs(dx) > slop || kotlin.math.abs(dy) > slop)) {
+                        dragging = true
+                        handler.removeCallbacks(longPress)
+                        // Départ : position actuelle à l'écran, en coordonnées depuis le coin en haut à gauche.
+                        val loc = IntArray(2)
+                        v.getLocationOnScreen(loc)
+                        startX = loc[0]; startY = loc[1]
+                        lp = (v.layoutParams as? WindowManager.LayoutParams)?.also { it.gravity = Gravity.START or Gravity.TOP }
+                    }
+                    if (dragging) {
+                        val p = lp ?: return true
+                        val dm = ctx.resources.displayMetrics
+                        p.x = (startX + dx).roundToInt().coerceIn(0, (dm.widthPixels - v.width).coerceAtLeast(0))
+                        p.y = if (collapsed) (startY + dy).roundToInt().coerceIn(0, (dm.heightPixels - v.height).coerceAtLeast(0)) else dp(6)
+                        runCatching { wm.updateViewLayout(v, p) }
+                    }
+                }
+                android.view.MotionEvent.ACTION_UP -> {
+                    handler.removeCallbacks(longPress)
+                    if (dragging) lp?.let { fr.p308.lanceur.UiPrefs.savePerfPos(collapsed, it.x, it.y) }
+                    else if (!longDone) toggle()
+                }
+                android.view.MotionEvent.ACTION_CANCEL -> handler.removeCallbacks(longPress)
+            }
+            return true
+        }
     }
 
     /** Couleur d'une température d'eau ou d'huile : bleu froid, orange tiède, vert à bonne température, rouge trop chaud. */

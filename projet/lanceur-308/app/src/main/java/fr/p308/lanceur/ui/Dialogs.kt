@@ -90,7 +90,7 @@ private val DATE_FR: DateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy
 private fun digits(s: String) = s.filter(Char::isDigit).take(7)
 
 @Composable
-private fun Field(value: String, onChange: (String) -> Unit, label: String, modifier: Modifier = Modifier, number: Boolean = false, placeholder: String? = null) {
+internal fun Field(value: String, onChange: (String) -> Unit, label: String, modifier: Modifier = Modifier, number: Boolean = false, placeholder: String? = null) {
     OutlinedTextField(
         value, onChange, modifier, singleLine = true,
         label = { Text(label) },
@@ -234,6 +234,7 @@ fun SettingsDialog(onDismiss: () -> Unit) {
     var editingKm by remember { mutableStateOf(false) }
     var backupMessage by remember { mutableStateOf<String?>(null) }
     var optim by remember { mutableStateOf(false) }
+    var outsideTemp by remember { mutableStateOf(false) }
     val vs by Vehicle.state.collectAsStateValue()
 
     AlertDialog(
@@ -265,6 +266,14 @@ fun SettingsDialog(onDismiss: () -> Unit) {
                     vs.odometerText()?.let { t -> t + (vs.odometerOrigin()?.let { " · $it" } ?: "") } ?: "Non saisi",
                 ) {
                     TextButton(onClick = { editingKm = true }) { Text("Modifier") }
+                }
+                SettingRow(
+                    "Température extérieure",
+                    if (fr.p308.lanceur.vehicle.OutsideTemp.status.collectAsStateValue().value.found != null)
+                        "Lue sur l'autoradio" + (vs.outsideTempC?.let { " : %.0f °C".format(it) } ?: "")
+                    else "Pas encore trouvée : recopie celle de l'autoradio une fois",
+                ) {
+                    TextButton(onClick = { outsideTemp = true }) { Text("Régler") }
                 }
                 SettingRow("Thème", if (Night.active) "Nuit en ce moment" else "Jour en ce moment") {
                     Segmented(NightMode.entries.map { it to it.label }, UiPrefs.nightMode) { UiPrefs.updateNightMode(it) }
@@ -356,6 +365,7 @@ fun SettingsDialog(onDismiss: () -> Unit) {
     )
     if (editingKm) OdometerDialog(vs.odometerKm) { editingKm = false }
     if (optim) OptimDialog { optim = false }
+    if (outsideTemp) OutsideTempDialog { outsideTemp = false }
 }
 
 /** Écran des options pour les développeurs (animations, débogage), selon la version d'Android. */

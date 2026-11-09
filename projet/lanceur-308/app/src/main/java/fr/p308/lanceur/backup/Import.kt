@@ -27,9 +27,8 @@ object Import {
         if (nowMs - lastCheckMs < 60_000L || Vehicle.demo) return null
         lastCheckMs = nowMs
         // Clé USB d'abord, puis la mémoire de l'autoradio (même dossier Android/data/fr.p308.lanceur/files/).
-        val file = ctx.getExternalFilesDirs(null).filterNotNull()
-            .sortedByDescending { runCatching { Environment.isExternalStorageRemovable(it) }.getOrDefault(false) }
-            .map { File(it, FILE) }.firstOrNull { it.exists() } ?: return null
+        val file = UsbStorage.volumes(ctx).sortedByDescending { it.usb }
+            .map { File(it.dir, FILE) }.firstOrNull { it.exists() } ?: return null
         val msg = runCatching { apply(JSONObject(file.readText())) }.getOrElse { "Import des factures impossible : ${it.message}" }
         runCatching { file.renameTo(File(file.parentFile, "$FILE.importé")) }
         fr.p308.lanceur.vehicle.ObdLog.log("IMPORT", msg)

@@ -1,7 +1,7 @@
-# Lanceur 308 — dossier de reprise (version 0.16)
+# Lanceur 308 — dossier de reprise (version 0.17)
 
 > **À lire en entier avant de toucher à quoi que ce soit.**
-> Ce dossier permet à une IA (ou à un développeur) de reprendre le projet. Dernière version : **0.16 du 9 novembre
+> Ce dossier permet à une IA (ou à un développeur) de reprendre le projet. Dernière version : **0.17 du 9 novembre
 > 2026** (nouveautés de chaque version juste sous la galerie ; les sections techniques plus bas datent de la 0.8 et
 > sont complétées par ces notes de version).
 > L'ancien README (version 0.4) est conservé dans `diagnostic/README_ancien_v0.4.md` pour l'historique.
@@ -51,6 +51,26 @@ de dessus en 2D, celle que l'appli affiche quand la 3D n'est pas disponible. Sur
 | ![Échéances d'entretien](docs/captures/onglets/09-entretien.png) | ![Consommation et coût des pleins](docs/captures/onglets/10-entretien-pleins.png) |
 | **Réglages** | **Panneau à côté de CarPlay (v0.13, alerte FAP v0.14)** |
 | ![Réglages : mode démo, panneau CarPlay, côté](docs/captures/onglets/11-reglages.png) | ![Panneau : puissance, rapport conseillé, régime, eau, turbo, batterie](docs/captures/onglets/12-panneau-performances.png) |
+
+**Nouveau en v0.17 : corrections après le premier retour terrain (09/11, voiture encore en 0.13)**
+- **Température extérieure** (`vehicle/OutsideTemp.kt`, Réglages → Température extérieure) : l'estimation par l'air
+  d'admission est supprimée (elle donnait 39 °C en novembre, moteur encore tiède). L'autoradio l'affiche via son
+  service CAN (`com.syu.ms`), mais le canal dépend du boîtier : l'utilisateur recopie la valeur affichée, l'appli
+  garde les couples (module 0/7, canal 0..300, rang 0..3, codage v, v/2, v/10, v-40, v/2-40, signé 8/16 bits) qui
+  la donnent, puis les recoupe à une autre température jusqu'à n'en garder qu'un (préférences « can »).
+- **Chauffe** (`vehicle/Warmup.kt`) : une chauffe plus de 2,5 fois plus longue que la normale (39,5 min depuis 43 °C
+  le 09/11) ou dont l'eau a plafonné (10 min de roulage à 30 km/h ou plus sans gagner 2 °C, sous 80 °C) est
+  « anormale » : affichée, jamais utilisée pour prévoir (elle faisait prévoir plus de 40 min à chaque départ).
+  Plafond en cours = message « thermostat peut-être resté ouvert ».
+- **Kilométrage** : la lecture 21 10 (6A8 → 688) ouvre maintenant la session de diagnostic PSA `10C0` dès le 2e
+  essai, comme l'outil PC du 08/11 qui y arrivait (`1081` ensuite). Cause du kilométrage faux : l'import des
+  factures avait posé celui de la dernière vidange faute de relevé moteur ; à corriger une fois à la main.
+- **Clé USB** (`backup/UsbStorage.kt`) : toute mémoire de l'appli hors mémoire interne et montée compte comme clé
+  (la clé n'était pas toujours « amovible » pour Android : « aucune clé » à l'export). Écriture dans un `.tmp`,
+  sync, puis renommage : le 09/11, une copie coupée avait laissé des fichiers de 0 octet. Restauration : saute un
+  fichier vide et prend la sauvegarde datée la plus récente.
+- **Panneau CarPlay déplaçable** (`service/PerfOverlay.kt`) : glisser = déplacer (colonne de gauche à droite,
+  pastille partout), position gardée ; toucher = réduire, appui long = fermer ; changer de côté la remet à sa place.
 
 **Nouveau en v0.16 : optimisation de l'autoradio** (Réglages → Optimiser l'autoradio ; `optim/Optim.kt`,
 `ui/OptimDialog.kt`). Android 8 sans root ni ADB : seulement ce qu'une appli normale peut faire, le reste guidé.
@@ -287,7 +307,7 @@ Puis copier l'APK vers `livrables\Lanceur308.apk`, `E:\Lanceur308.apk` et `E:\30
 - AGP 8.7.3, **Kotlin 2.0.21**, Compose BOM 2024.12.01
 - **SceneView 2.2.1** (Filament 1.52) — SceneView 2.3+ exige Kotlin 2.2.
 - minSdk 26, targetSdk 33, compileSdk 35. R8 activé (`proguard-rules.pro` garde `com.google.android.filament.**` et `io.github.sceneview.**`).
-- Version dans `app/build.gradle.kts` : **incrémenter `versionCode` à chaque livraison** (actuellement 22 / "0.16").
+- Version dans `app/build.gradle.kts` : **incrémenter `versionCode` à chaque livraison** (actuellement 23 / "0.17").
 
 ---
 
@@ -407,6 +427,8 @@ Simule ouvrants, phares, marche arrière, batterie faible, accélérations ; les
    `outils/son`). Reste : piloter le DSP FYT directement, après étude des APK copiées sur la clé (`apk-fyt/`).
 8. FAP : seuil de détection des régénérations (débit d'air +25 %) à confirmer avec le journal OBD d'une vraie
    régénération. CarPlay : mesurer l'effet du mode CarPlay (v0.16) sur le lag, boîtier OBD branché / débranché.
+9. v0.17 à confirmer dans la voiture : canal CAN de la température extérieure trouvé, kilométrage lu avec `10C0`
+   (lire les lignes KM du journal OBD), chauffe normale ou eau qui plafonne (thermostat), export sur la clé.
 6. Codes défaut OBD (mode 03 / effacement 04) : faciles à ajouter dans `Engine.kt` maintenant que le boîtier est là.
 7. **Onglet Diagnostic (v0.9)** : d'abord une séance d'exploration dans la voiture avec un PC et le vLinker
    (`outils/obd/obd_explorer.py`, lecture seule garantie, fiche `outils/obd/SEANCE_OBD.md`) pour savoir ce que

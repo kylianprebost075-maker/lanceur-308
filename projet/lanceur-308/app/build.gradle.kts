@@ -1,4 +1,4 @@
-﻿plugins {
+plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
@@ -12,8 +12,8 @@ android {
         applicationId = "fr.p308.lanceur"
         minSdk = 26
         targetSdk = 33 // l'autoradio est trÃ¨s probablement en API 33
-        versionCode = 22
-        versionName = "0.16"
+        versionCode = 23
+        versionName = "0.17"
         ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
     }
     buildTypes {

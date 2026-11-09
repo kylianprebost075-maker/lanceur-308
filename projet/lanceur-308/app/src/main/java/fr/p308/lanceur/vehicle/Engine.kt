@@ -401,7 +401,6 @@ object Engine {
         }
         status("Connecté à ${elm.name}", connected = true)
         ObdLog.log("CONNEXION", "tension ${elm.readBatteryVolts() ?: "?"} V à la connexion")
-        estimateOutsideTemp(elm)
         // Kilométrage du calculateur moteur (relevé le 08/11/2026 : identique au compteur) → kilométrage d'entretien.
         // Moteur tournant, le calculateur répond souvent trop tard : nouvel essai plus tard s'il a échoué.
         var kmRead = tryEcuKm(elm)
@@ -513,7 +512,15 @@ object Engine {
             listOf("ATAT0", "ATSTFF", "ATSH6A8", "ATCRA688", "ATFCSH6A8", "ATFCSD300000", "ATFCSM1").forEach { elm.cmd(it, 1500) }
             val tp = elm.cmd("3E00", 2500)
             val engine = if ((_state.value.rpm ?: 0) > 400) "moteur tournant" else "moteur coupé"
+            var session = false
             repeat(3) { k ->
+                // v0.17 : l'outil PC du 08/11, qui lisait le kilométrage, ouvrait d'abord la session de diagnostic
+                // PSA (10 C0, lecture seule, celle des valises) ; l'appli ne le faisait pas. Tentée dès le 2e essai.
+                if (k >= 1 && !session) {
+                    session = true
+                    val s = elm.cmd("10C0", 2500)
+                    ObdLog.log("KM", "session de diagnostic 10C0 → « ${s.trim().ifEmpty { "(vide)" }} »")
+                }
                 val raw = elm.cmd("2110", 3000)
                 val hex = raw.uppercase().filter { it.isLetterOrDigit() }
                 val i = hex.indexOf("6110")
@@ -528,6 +535,8 @@ object Engine {
             }
             return null
         } finally {
+            // Retour à la session normale du calculateur (sinon il y revient seul après quelques secondes).
+            runCatching { elm.cmd("1081", 1500) }
             listOf("ATFCSM0", "ATCRA", "ATSH7DF", "ATST64", "ATAT1").forEach { runCatching { elm.cmd(it, 1500) } }
         }
     }
@@ -557,28 +566,6 @@ object Engine {
         }
         _diag.update { it.copy(ecuKm = km) }
         return true
-    }
-
-    /**
-     * Température extérieure : la 308 ne la donne pas sur la prise OBD (PID 46 absent, séance du 08/11 ; c'est le
-     * BSI qui la connaît). Estimation : après un arrêt assez long, l'air d'admission (PID 0F) et l'eau sont à la
-     * température ambiante. Si l'eau est à moins de 6 °C de l'air et sous 45 °C, l'air d'admission = l'extérieur.
-     * Sinon (moteur encore chaud), la dernière estimation de moins de 3 h est reprise.
-     */
-    private fun estimateOutsideTemp(elm: ElmTransport) {
-        val iat = elm.pid("0F", minBytes = 1)?.let { it[0] - 40 }
-        val coolant = elm.pid("05", minBytes = 1)?.let { it[0] - 40 }
-        val p = appCtx?.let(::prefs)
-        val now = System.currentTimeMillis()
-        val value: Float? = if (iat != null && coolant != null && iat in -35..50 && coolant < 45 && abs(coolant - iat) <= 6) {
-            p?.edit()?.putFloat("outsideC", iat.toFloat())?.putLong("outsideAt", now)?.apply()
-            iat.toFloat()
-        } else {
-            p?.takeIf { now - it.getLong("outsideAt", 0L) < 3 * 3_600_000L }?.getFloat("outsideC", Float.NaN)?.takeIf { !it.isNaN() }
-        }
-        if (value != null) {
-            Vehicle.update { s -> if (s.outsideTempC == null || s.outsideTempEstimated) s.copy(outsideTempC = value, outsideTempEstimated = true) else s }
-        }
     }
 
     /**

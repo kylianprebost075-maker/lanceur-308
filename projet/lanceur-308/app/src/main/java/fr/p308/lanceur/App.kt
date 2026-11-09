@@ -28,5 +28,6 @@ class App : Application() {
         fr.p308.lanceur.vehicle.FapRegen.init(this)
         fr.p308.lanceur.sound.SoundPrefs.init(this)
         fr.p308.lanceur.optim.Optim.init(this)
+        fr.p308.lanceur.vehicle.OutsideTemp.init(this)
     }
 }

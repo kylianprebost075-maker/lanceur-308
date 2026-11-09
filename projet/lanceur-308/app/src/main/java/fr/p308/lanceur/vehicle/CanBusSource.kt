@@ -6,6 +6,7 @@ import android.content.Context
  * Données véhicule des autoradios FYT via le service com.syu.ms (boîtier Raise PSA-RZ-15-0127-B1) :
  * - Module 7 (FinalCanbus) : ouvrants (0..5) et autonomie carburant (103).
  * - Module 0 (FinalMain)   : marche arrière (12 = U_BACKCAR) et veilleuses éventuelles (4 = U_LAMPLET).
+ * - Température extérieure : canal appris par OutsideTemp (Réglages), dans l'un des deux modules.
  * Sur 308 T7 2007 avec faisceau PSA-RZ-15-0127-B1, le commodo de phares n'est pas câblé vers le boîtier CAN :
  * l'application gère donc les phares automatiquement avec le coucher du soleil (Mode Auto) + bouton Phares.
  */
@@ -30,11 +31,16 @@ object CanBusSource {
         if (bridge != null) return
         everSeenCanLightOn = false
 
-        val mainCodes = setOf(U_LAMPLET, U_BACKCAR)
-        val canCodes = setOf(0, 1, 2, 3, 4, 5, U_DRIVING_MILEAGE)
+        // v0.17 : tous les canaux des deux modules, pour trouver et suivre la température extérieure (OutsideTemp).
+        val mainCodes = 0..300
+        val canCodes = 0..300
 
         bridge = FytBridge(onUpdate = { module, code, ints, _, _ ->
+            val temp = ints?.let { OutsideTemp.onValue(module, code, it) }
             if (Vehicle.demo) return@FytBridge
+            if (temp != null && (Vehicle.state.value.outsideTempC != temp || Vehicle.state.value.outsideTempEstimated)) {
+                Vehicle.update { s -> s.copy(outsideTempC = temp, outsideTempEstimated = false) }
+            }
             val v = ints?.firstOrNull() ?: return@FytBridge
 
             when (module) {

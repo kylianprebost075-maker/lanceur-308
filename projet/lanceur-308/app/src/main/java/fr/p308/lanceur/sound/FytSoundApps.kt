@@ -35,9 +35,8 @@ object FytSoundApps {
 
     /** Copie les fichiers sur la clé (dossier apk-fyt/). Renvoie un message pour l'écran. */
     fun copyToUsb(ctx: Context): String {
-        val usb = ctx.getExternalFilesDirs(null).filterNotNull()
-            .filter { runCatching { Environment.isExternalStorageRemovable(it) }.getOrDefault(false) }
-        if (usb.isEmpty()) return "Aucune clé USB détectée"
+        val usb = fr.p308.lanceur.backup.UsbStorage.keys(ctx)
+        if (usb.isEmpty()) return fr.p308.lanceur.backup.UsbStorage.missingReason(ctx)
         val apps = list(ctx)
         var copied = 0
         var refused = 0
