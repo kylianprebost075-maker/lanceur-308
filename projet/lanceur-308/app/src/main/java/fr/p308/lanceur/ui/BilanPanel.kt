@@ -85,9 +85,12 @@ fun BilanPanel() {
             }
         }
         Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Tile(Modifier.weight(1f).fillMaxWidth()) {
+            Tile(Modifier.weight(1.3f).fillMaxWidth()) {
+              Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
                 Text("Filtre à particules", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.height(4.dp))
+                RegenBlock()
+                Spacer(Modifier.height(6.dp))
                 if (fap == null) {
                     Text("Pas encore de trajet enregistré.", fontSize = 14.sp, color = C.Sub)
                 } else {
@@ -100,8 +103,10 @@ fun BilanPanel() {
                     Text("Depuis la dernière voie rapide : ${fap.tripsSince} trajet(s), ${f0(fap.kmSince)} km.",
                         fontSize = 12.sp, color = C.Sub)
                 }
-                Spacer(Modifier.weight(1f))
-                Text("Déduit de tes trajets : le FAP n'est pas lisible sur la prise OBD.", fontSize = 11.sp, color = C.Sub)
+                Spacer(Modifier.height(4.dp))
+                Text("Conseil déduit de tes trajets ; régénérations repérées au débit d'air (le calculateur refuse " +
+                    "de donner le FAP lui-même).", fontSize = 11.sp, color = C.Sub)
+              }
             }
             Tile(Modifier.weight(1f).fillMaxWidth()) {
                 Text("Consommation", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
@@ -150,6 +155,49 @@ private fun Line(label: String, cur: String, prev: String, delta: Double?, highe
         Text(prev, fontSize = 13.sp, color = C.Sub, modifier = Modifier.weight(0.9f))
     }
 }
+
+/** Régénérations repérées au débit d'air : en cours, dernière, intervalle moyen, ou apprentissage. */
+@Composable
+private fun RegenBlock() {
+    val r by fr.p308.lanceur.vehicle.FapRegen.state.collectAsStateWithLifecycle()
+    val vs by Vehicle.state.collectAsStateWithLifecycle()
+    val now = System.currentTimeMillis()
+    when {
+        r.active -> {
+            val min = r.activeSinceMs?.let { ((now - it) / 60_000L).toInt() } ?: 0
+            Text("Régénération en cours ($min min)", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = C.Orange)
+            Text("Le filtre se nettoie : roule encore 10 à 15 min sans couper si tu peux, de préférence hors ville.",
+                fontSize = 13.sp)
+        }
+        r.learnPct < 100 -> {
+            Text("Détection des régénérations : apprentissage ${r.learnPct} %", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            Text("Le Lanceur apprend le débit d'air normal moteur chaud (quelques trajets variés).",
+                fontSize = 12.sp, color = C.Sub)
+        }
+        else -> Text("Pas de régénération en cours.", fontSize = 14.sp, color = C.Sub)
+    }
+    val last = r.records.firstOrNull()
+    if (last != null) {
+        val days = ((now - last.endMs) / 86_400_000L).toInt()
+        val ago = when (days) { 0 -> "aujourd'hui"; 1 -> "hier"; else -> "il y a $days j" }
+        val kmAgo = if (last.km != null && vs.odometerKm != null) " (${fmtKmShort(vs.odometerKm!! - last.km)} km)" else ""
+        Text(
+            (if (last.interrupted) "Dernière : interrompue $ago$kmAgo après ${last.minutes} min"
+            else "Dernière : $ago$kmAgo, ${last.minutes} min"),
+            fontSize = 13.sp, color = if (last.interrupted) C.Orange else C.Text,
+        )
+        if (last.interrupted) {
+            Text("Moteur coupé pendant le nettoyage : il reprendra, aide-le avec 20 min de voie rapide.",
+                fontSize = 12.sp, color = C.Sub)
+        }
+        fr.p308.lanceur.vehicle.FapRegen.avgKmBetween()?.let { avg ->
+            Text("En moyenne tous les ${fmtKmShort(avg)} km (${r.records.count { !it.interrupted }} repérées).",
+                fontSize = 12.sp, color = C.Sub)
+        }
+    }
+}
+
+private fun fmtKmShort(km: Int) = "%,d".format(Locale.FRANCE, km.coerceAtLeast(0)).replace(',', ' ')
 
 private fun summary(cur: MonthStats, prev: MonthStats): String {
     if (cur.trips == 0) return "Aucun trajet ce mois-ci pour l'instant."

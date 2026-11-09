@@ -50,6 +50,8 @@ data class EngineState(
     val boostBar: Float? = null,
     /** Tension mesurée par le calculateur (PID 42) ou par le boîtier Vgate (ATRV), utile pour l'alerte batterie. */
     val voltage: Float? = null,
+    /** Débit d'air (PID 10, g/s) : sert à repérer les régénérations du FAP (vanne EGR fermée → plus d'air frais). */
+    val mafGs: Float? = null,
     val torqueNm: Int? = null,
     val powerCh: Int? = null,
     val peakCh: Int = 0,
@@ -226,7 +228,10 @@ object Engine {
         start(ctx)
     }
 
-    private fun publish(rpm: Int?, load: Int?, speed: Int? = null, coolant: Int? = null, boost: Float? = null, voltage: Float? = null) {
+    private fun publish(
+        rpm: Int?, load: Int?, speed: Int? = null, coolant: Int? = null, boost: Float? = null, voltage: Float? = null,
+        maf: Float? = null,
+    ) {
         _state.update { s ->
             val (torque, power) = if (rpm != null && load != null) estimate(rpm, load) else (null to null)
             val r = rpm ?: s.rpm
@@ -237,6 +242,7 @@ object Engine {
                 rpm = r, loadPct = l,
                 speedKmh = v, coolantC = c, boostBar = boost ?: s.boostBar,
                 voltage = voltage ?: s.voltage,
+                mafGs = maf ?: s.mafGs,
                 torqueNm = torque ?: s.torqueNm, powerCh = power ?: s.powerCh,
                 peakCh = max(s.peakCh, power ?: 0),
                 // « Moteur froid » : la plus basse de l'eau et de l'huile estimée (l'huile chauffe moins vite).
@@ -456,6 +462,10 @@ object Engine {
                 CrankWatch.onRunningVolts(volts)
                 if (n % 600 == 1) ObdLog.log("TENSION", "moteur tournant : ${volts ?: "?"} V, eau ${coolant ?: "?"} °C, turbo ${boost ?: "?"} bar")
                 publish(rpm, load, speed, coolant, boost, volts)
+            } else if (n % 2 == 1) {
+                // Débit d'air un tour sur deux (≈ 1 fois par seconde) : détection des régénérations du FAP.
+                val maf = elm.pid("10", minBytes = 2)?.let { (it[0] * 256 + it[1]) / 100f }
+                publish(rpm, load, speed, maf = maf)
             } else {
                 publish(rpm, load, speed)
             }

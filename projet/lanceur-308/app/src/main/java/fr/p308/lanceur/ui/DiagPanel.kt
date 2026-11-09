@@ -111,7 +111,8 @@ fun DiagPanel() {
                 }
             }
             Text(
-                "FAP, vanne EGR et feux : non lisibles avec ce boîtier (vérifié le 08/11/2026). Huile : température non fournie par le calculateur.",
+                "FAP et vanne EGR : refusés par le calculateur (vérifié le 08/11/2026) ; les régénérations sont repérées " +
+                    "au débit d'air (Moteur → Bilan). Feux et température d'huile : non fournis par le calculateur.",
                 fontSize = 11.sp, color = C.Sub,
             )
         }

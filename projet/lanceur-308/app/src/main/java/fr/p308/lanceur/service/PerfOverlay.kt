@@ -119,6 +119,9 @@ class PerfOverlay(private val ctx: Context, private val onClose: () -> Unit) {
             running && v != null && v < 12.8f -> Alert("Batterie ne charge pas (%.1f V)".format(Locale.FRANCE, v), ORANGE, true)
             running && v != null && v > 15.2f -> Alert("Surtension (%.1f V)".format(Locale.FRANCE, v), ORANGE, true)
             // À l'arrêt après un effort : laisser tourner avant de couper (huile qui refroidit le turbo).
+            // Régénération du FAP probable : la laisser finir (ne pas couper le moteur si possible).
+            fr.p308.lanceur.vehicle.FapRegen.state.value.active ->
+                Alert(if ((e.speedKmh ?: 0) < 3) "Régénération FAP : évite de couper" else "Régénération FAP : continue de rouler", ORANGE, false)
             turbo.stopped && turbo.waitS >= 5 -> Alert("Turbo chaud : attends ${turbo.waitS} s avant de couper", ORANGE, false)
             turbo.justCooled && turbo.stopped -> Alert("Turbo refroidi ✓ tu peux couper", GREEN, false)
             range != null && range.km < 60 -> Alert("Réserve bientôt : ≈ ${range.km} km", ORANGE, false)

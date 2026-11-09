@@ -44,6 +44,16 @@ de dessus en 2D, celle que l'appli affiche quand la 3D n'est pas disponible. Sur
 | **Réglages** | **Panneau performances à côté de CarPlay** |
 | ![Réglages : mode démo, panneau CarPlay, côté](docs/captures/onglets/11-reglages.png) | ![Panneau : puissance, rapport conseillé, régime, eau, turbo, batterie](docs/captures/onglets/12-panneau-performances.png) |
 
+**Nouveau en v0.14** :
+- **Régénérations du FAP** (`vehicle/FapRegen.kt`) : l'EDC16C34 refuse de donner le FAP aux lectures autorisées
+  (services 21, 22 et 1A, séance du 08/11/2026). Pendant une régénération il ferme la vanne EGR : le débitmètre
+  (PID 10, désormais lu ≈ 1 fois par seconde) voit alors bien plus d'air frais. Le Lanceur apprend le débit normal
+  moteur chaud par case régime × charge, puis signale une régénération probable quand le débit reste ≥ 25 % au-dessus
+  pendant 2 min (charge 8-69 %, 750-3 250 tr/min). Moins de 4 min : ignoré ; moteur coupé pendant : « interrompue ».
+  Affichage : accueil, panneau CarPlay (« continue de rouler » / « évite de couper »), Moteur → Bilan (dernière,
+  intervalle moyen), bandeau au début, notification si coupée, `regenerations-fap.csv` à l'export, journal OBD
+  (débit mesuré et attendu, pour vérifier). Une régénération complète remet à zéro le conseil voie rapide.
+
 **Nouveau en v0.13.1** :
 - **Autonomie estimée** (`drive/Insights.kt`, `FuelRange`) : réservoir de 60 L au dernier plein complet, moins les
   km parcourus × la conso (mesurée entre les pleins, sinon estimée, sinon 6 L/100), plus les pleins partiels ;

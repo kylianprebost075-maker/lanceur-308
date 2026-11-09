@@ -117,9 +117,14 @@ object FapAdvice {
 
     private fun good(t: TripRecord) = if (t.fastS >= 0) t.fastS >= 900 else t.distanceKm >= 25 && t.maxKmh >= 90f
 
-    fun evaluate(trips: List<TripRecord>, nowMs: Long = System.currentTimeMillis()): FapStatus? {
+    fun evaluate(
+        trips: List<TripRecord>,
+        nowMs: Long = System.currentTimeMillis(),
+        regenEndMs: Long? = fr.p308.lanceur.vehicle.FapRegen.lastCompleteEndMs(),
+    ): FapStatus? {
         if (trips.isEmpty()) return null
-        val since = trips.takeWhile { !good(it) }
+        // Une régénération complète repérée au débit d'air vaut une voie rapide : le filtre vient d'être nettoyé.
+        val since = trips.takeWhile { !good(it) && (regenEndMs == null || it.startMs > regenEndMs) }
         val lastGood = trips.getOrNull(since.size)
         val short = since.count { it.distanceKm < 10 || it.movingS < 900 }
         val km = since.sumOf { it.distanceKm }

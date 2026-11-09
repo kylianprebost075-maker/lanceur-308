@@ -84,5 +84,13 @@ object Export {
                     n(w.minutes), n(w.oilMinutes), w.idlePct, w.avgKmh)
             },
         )
+        write(
+            dir, "regenerations-fap.csv",
+            listOf("Date", "Début", "Fin", "Durée (min)", "Kilométrage", "Interrompue"),
+            fr.p308.lanceur.vehicle.FapRegen.state.value.records.reversed().map { r ->
+                listOf(dateFmt.format(Date(r.startMs)), timeFmt.format(Date(r.startMs)), timeFmt.format(Date(r.endMs)),
+                    r.minutes, r.km, if (r.interrupted) "oui" else "non")
+            },
+        )
     }
 }

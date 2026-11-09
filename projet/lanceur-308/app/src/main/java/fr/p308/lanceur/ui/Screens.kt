@@ -287,7 +287,10 @@ fun HomeAndMaintenanceScreen(vs: VehicleState, items: List<MaintenanceItem>, int
                         EngineMetrics(Modifier.weight(1f).clickable { onTab(Tab.ENGINE) })
                         // Conseil turbo à l'arrêt après un effort, sinon la source des données.
                         val turbo by fr.p308.lanceur.vehicle.TurboCool.state.collectAsStateWithLifecycle()
+                        val regen by fr.p308.lanceur.vehicle.FapRegen.state.collectAsStateWithLifecycle()
                         when {
+                            regen.active -> Text("Régénération du FAP probable : évite de couper, roule encore si tu peux",
+                                fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = C.Orange)
                             turbo.stopped && turbo.waitS >= 5 -> Text("Turbo chaud : laisse tourner ${turbo.waitS} s avant de couper",
                                 fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = C.Orange)
                             turbo.stopped && turbo.justCooled -> Text("Turbo refroidi ✓ tu peux couper le moteur",

@@ -100,6 +100,8 @@ class VehicleWatchService : Service(), LocationListener {
                 AutoBackup.tick(this@VehicleWatchService)
                 checkBattery()
                 fr.p308.lanceur.vehicle.TurboCool.tick(Engine.state.value, fr.p308.lanceur.drive.Trip.state.value.currentKmh)
+                fr.p308.lanceur.vehicle.FapRegen.tick(Engine.state.value, fr.p308.lanceur.drive.Trip.state.value.currentKmh,
+                    Vehicle.state.value.odometerKm)
                 if (++ticks % 2 == 0) CarPlayWatch.tick(this@VehicleWatchService)
                 // Autonomie : recalculée toutes les 30 s (le kilométrage avance en roulant).
                 if (ticks % 30 == 1) {
@@ -140,6 +142,25 @@ class VehicleWatchService : Service(), LocationListener {
             }
         }
         scope.launch {
+            // Régénération du FAP : bandeau au début, notification si elle a été coupée, conseil FAP recalculé à la fin.
+            var wasActive = false
+            var seen = fr.p308.lanceur.vehicle.FapRegen.state.value.records.firstOrNull()?.endMs ?: 0L
+            fr.p308.lanceur.vehicle.FapRegen.state.collect { r ->
+                if (Vehicle.demo) return@collect
+                if (r.active && !wasActive && !AppVisibility.foreground.value) {
+                    banner.show("🔥  Régénération du FAP probable : roule encore 10 à 15 min sans couper si tu peux",
+                        0xE6C77700.toInt(), 15_000)
+                }
+                wasActive = r.active
+                val last = r.records.firstOrNull() ?: return@collect
+                if (last.endMs <= seen) return@collect
+                seen = last.endMs
+                val fap = fr.p308.lanceur.drive.FapAdvice.evaluate(TripLog.history.value)
+                fr.p308.lanceur.drive.FapAdvice.current = fap
+                if (last.interrupted) alertRegenCut(last)
+            }
+        }
+        scope.launch {
             // Seuls les démarrages mesurés après le lancement du service déclenchent une alerte.
             var seen = CrankWatch.history.value.firstOrNull()?.atMs ?: 0L
             CrankWatch.history.collect { list ->
@@ -169,6 +190,19 @@ class VehicleWatchService : Service(), LocationListener {
             .setAutoCancel(true)
             .build())
         if (!AppVisibility.foreground.value) banner.show("🛣  ${s.text}", 0xE6C77700.toInt(), 15_000)
+    }
+
+    /** Moteur coupé pendant une régénération : le filtre reste à moitié nettoyé, une voie rapide l'aide à finir. */
+    private fun alertRegenCut(r: fr.p308.lanceur.vehicle.RegenRecord) {
+        val msg = "Régénération du FAP coupée après ${r.minutes} min (moteur arrêté). Elle reprendra seule ; " +
+            "20 min de voie rapide au prochain trajet l'aident à finir."
+        getSystemService(NotificationManager::class.java).notify(REGEN_NOTIF, NotificationCompat.Builder(this, CH_ALERT)
+            .setSmallIcon(R.drawable.ic_car)
+            .setContentTitle("Filtre à particules")
+            .setContentText(msg)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(msg))
+            .setAutoCancel(true)
+            .build())
     }
 
     private var rangeAlerted = false
@@ -341,6 +375,7 @@ class VehicleWatchService : Service(), LocationListener {
         private const val FAP_NOTIF = 4244
         private const val HEALTH_NOTIF = 4245
         private const val IMPORT_NOTIF = 4246
+        private const val REGEN_NOTIF = 4247
 
         fun start(ctx: Context) =
             ContextCompat.startForegroundService(ctx, Intent(ctx, VehicleWatchService::class.java))
