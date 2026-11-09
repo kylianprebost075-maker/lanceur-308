@@ -29,6 +29,9 @@ object AutoBackup {
     @Volatile
     private var busy = false
 
+    @Volatile
+    private var infoWritten = false
+
     /** Appelé chaque seconde par le service (thread principal). */
     fun tick(ctx: Context, nowMs: Long = System.currentTimeMillis()) {
         if (nowMs - lastCheckMs < 60_000L) return
@@ -41,6 +44,12 @@ object AutoBackup {
             Warmup.history.value.firstOrNull()?.startMs, Vehicle.state.value.odometerKm,
         ).joinToString("|")
         val usb = Backup.usbCount(ctx)
+        // Fiche technique de l'autoradio (v0.19) : écrite sur la clé une fois par lancement, dès qu'une clé est là.
+        if (usb > 0 && !infoWritten) {
+            infoWritten = true
+            val appCtx = ctx.applicationContext
+            scope.launch { if (runCatching { DeviceInfo.write(appCtx) }.getOrDefault(0) == 0) infoWritten = false }
+        }
         val due = nowMs - p.getLong("at", 0L) > EVERY_MS ||
             (lastKey != null && key != lastKey) ||
             (lastUsb >= 0 && usb > lastUsb)

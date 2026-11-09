@@ -1,7 +1,7 @@
-# Lanceur 308 — dossier de reprise (version 0.18)
+# Lanceur 308 — dossier de reprise (version 0.19)
 
 > **À lire en entier avant de toucher à quoi que ce soit.**
-> Ce dossier permet à une IA (ou à un développeur) de reprendre le projet. Dernière version : **0.18 du 9 novembre
+> Ce dossier permet à une IA (ou à un développeur) de reprendre le projet. Dernière version : **0.19 du 9 novembre
 > 2026** (nouveautés de chaque version juste sous la galerie ; les sections techniques plus bas datent de la 0.8 et
 > sont complétées par ces notes de version).
 > L'ancien README (version 0.4) est conservé dans `diagnostic/README_ancien_v0.4.md` pour l'historique.
@@ -51,6 +51,20 @@ de dessus en 2D, celle que l'appli affiche quand la 3D n'est pas disponible. Sur
 | ![Échéances d'entretien](docs/captures/onglets/09-entretien.png) | ![Consommation et coût des pleins](docs/captures/onglets/10-entretien-pleins.png) |
 | **Réglages** | **Panneau à côté de CarPlay (v0.13, alerte FAP v0.14)** |
 | ![Réglages : mode démo, panneau CarPlay, côté](docs/captures/onglets/11-reglages.png) | ![Panneau : puissance, rapport conseillé, régime, eau, turbo, batterie](docs/captures/onglets/12-panneau-performances.png) |
+
+**Nouveau en v0.19 : fiche technique de l'autoradio écrite sur la clé USB (09/11 au soir)**
+- **Fiche technique** (`backup/DeviceInfo.kt`, lancée par `AutoBackup.tick` une fois par lancement dès qu'une clé est
+  branchée) : écrit `Android/data/fr.p308.lanceur/files/infos-autoradio.txt` sur la clé (et en mémoire interne). On y
+  trouve ce que le tableau du §1 ne dit pas : version réelle d'Android et correctif de sécurité, type de système
+  (`user` / `userdebug`), `ro.debuggable`, `ro.secure`, état du débogage ADB et des options développeur, SELinux,
+  démarrage vérifié, présence d'une commande `su`, noyau, processeur, mémoire, stockage, partitions, toutes les
+  propriétés système (`getprop`) et la liste des applis installées (système / ajoutée / désactivée).
+- **But** : savoir depuis le PC ce que l'autoradio permet (mode développeur ADB, `adb root`, ou rien) avant de tenter
+  quoi que ce soit. **Lecture seule** : l'appli ne modifie rien sur l'autoradio.
+- **Vie privée** : les numéros de série, adresses réseau et identifiants sont retirés de la fiche. Le fichier reste sur
+  la clé : **il n'est jamais publié dans ce dépôt**.
+- Non vérifié sur l'autoradio (compilation seulement) : certaines lignes peuvent dire « illisible » ou « impossible »,
+  Android 8 interdisant quelques lectures à une appli ordinaire.
 
 **Nouveau en v0.18 : mémoire libérée toute seule, kilométrage du calculateur (09/11 au soir)**
 - **Mémoire automatique** (`optim/Optim.kt` → `autoTick`, appelé toutes les 30 s par `VehicleWatchService`) : dès
@@ -330,7 +344,7 @@ Puis copier l'APK vers `livrables\Lanceur308.apk`, `E:\Lanceur308.apk` et `E:\30
 - AGP 8.7.3, **Kotlin 2.0.21**, Compose BOM 2024.12.01
 - **SceneView 2.2.1** (Filament 1.52) — SceneView 2.3+ exige Kotlin 2.2.
 - minSdk 26, targetSdk 33, compileSdk 35. R8 activé (`proguard-rules.pro` garde `com.google.android.filament.**` et `io.github.sceneview.**`).
-- Version dans `app/build.gradle.kts` : **incrémenter `versionCode` à chaque livraison** (actuellement 24 / "0.18").
+- Version dans `app/build.gradle.kts` : **incrémenter `versionCode` à chaque livraison** (actuellement 25 / "0.19").
 
 ---
 
