@@ -335,6 +335,18 @@ sur le bouton CarPlay pour montrer le panneau. Le bandeau rouge est une alerte d
 
 ## 3. Compiler l'appli
 
+### Tests des calculs (depuis le 10/11/2026)
+`.\gradlew.bat testDebugUnitTest --no-daemon` (≈ 1 min, sans autoradio ni émulateur) lance 21 tests dans
+`app/src/test/java/fr/p308/lanceur/vehicle/` :
+- `DtcAndPowerTest` : lecture des codes défaut (réponse simple, CAN, plusieurs trames, vide) et puissance du DV6 ;
+- `GearTest` : rapport engagé, conseil de passage, apprentissage de l'étagement (`GearCalib.learnFrom`) ;
+- `FapRegenTest` : apprentissage du débit d'air, régénération détectée, débit haut trop court ignoré, régénération
+  interrompue par l'arrêt du moteur.
+
+**À relancer avant chaque livraison** ; GitHub les lance aussi à chaque envoi (`.github/workflows/tests.yml`, qui ne
+construit pas l'APK : le modèle 3D et la clé de signature ne sont pas publiés). Les tests vérifient les calculs,
+pas les réponses réelles de la voiture : l'essai sur l'autoradio reste nécessaire.
+
 ### Outils (Windows)
 - `JAVA_HOME = %LOCALAPPDATA%\Programs\jdk-17` (JDK 17)
 - `ANDROID_HOME = %LOCALAPPDATA%\Android\Sdk` (build-tools 35.0.0)
@@ -497,8 +509,21 @@ Simule ouvrants, phares, marche arrière, batterie faible, accélérations ; les
    effacement 04 sur demande, onglet Moteur → Diagnostic). Rien à ajouter.
 10. Suite de la revue de code du 10/11/2026 (avis extérieur, vérifié dans le code) : sortir les calculs de chaque
    seconde du fil de l'écran (`Dispatchers.Main` dans `VehicleWatchService` et `Vehicle`) après mesure en séance
-   ADB ; tests JUnit de la logique pure (FAP, chauffe, rapports appris, score) ; plus tard seulement, découper
-   `VehicleWatchService` (cadences en « ticks % n ») et regrouper les constantes de la 308 en un profil.
+   ADB ; **tests JUnit commencés le 10/11** (voir §3 « Tests ») : restent la chauffe (`Warmup`), le score des trajets
+   (`TripLog`), la batterie (`CrankWatch`) et la température extérieure (`OutsideTemp`) ; plus tard seulement,
+   découper `VehicleWatchService` (cadences en « ticks % n ») et regrouper les constantes de la 308 en un profil.
+11. Projets voisins regardés le 10/11/2026 (pages GitHub lues, code non étudié en détail) :
+   - **Dashphonic** (`vsevalid/dashphonic`, licence **MIT**, panneau musique pour FYT) : le plus utile pour nous.
+     Il parle au même service `com.syu.ms` par AIDL (`com.syu.ipc.IRemoteToolkit` / `IRemoteModule` / `IModuleCallback`,
+     mêmes appels `cmd` / `register` / `unregister` que notre `FytBridge.kt`) et lit le titre, l'artiste et le volume
+     de la musique Bluetooth, que notre onglet Musique n'a pas. Piste : lire ses codes de modules pour la musique et
+     les appels. Attention : son identifiant d'appli est `com.ava.car` car le firmware FYT n'envoie certaines
+     diffusions qu'à une liste d'applis autorisées ; notre `fr.p308.lanceur` n'y est sans doute pas.
+   - **Dashwheel** (`deviloufr-ai/Dashwheel`, licence propriétaire : lecture seule, **aucune reprise de code**) :
+     lanceur complet pour beaucoup d'autoradios, Android 9+ (le nôtre est en Android 8 : pas installable tel quel).
+     Idée à retenir seulement : un module qui reconnaît la famille de l'autoradio, avec ses tests.
+   - **AndrOBD** (`fr3ts0n/AndrOBD`, **GPL-3.0**) : référence du diagnostic OBD. À lire pour l'organisation
+     (transport / dialogue ELM / PID), **sans rien copier** (la GPL obligerait à publier ce projet sous GPL).
 7. **Onglet Diagnostic (v0.9)** : d'abord une séance d'exploration dans la voiture avec un PC et le vLinker
    (`outils/obd/obd_explorer.py`, lecture seule garantie, fiche `outils/obd/SEANCE_OBD.md`) pour savoir ce que
    la 308 donne vraiment (codes défaut, vanne EGR, FAP, kilométrage, état des feux par le BSI).

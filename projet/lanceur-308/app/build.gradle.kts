@@ -31,6 +31,8 @@ android {
     }
     kotlinOptions { jvmTarget = "17" }
     buildFeatures { compose = true }
+    // Tests des calculs sur le PC (sans autoradio) : les appels Android non simulés renvoient une valeur vide.
+    testOptions { unitTests.isReturnDefaultValues = true }
 }
 
 dependencies {
@@ -43,4 +45,5 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("io.github.sceneview:sceneview:2.2.1")
+    testImplementation("junit:junit:4.13.2")
 }

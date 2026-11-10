@@ -1,0 +1,28 @@
+# Lance les tests des calculs (codes défaut, puissance, rapports, FAP) à chaque envoi sur GitHub.
+# Ne construit pas l'APK : le modèle 3D et la clé de signature ne sont pas publiés.
+name: Tests des calculs
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: projet/lanceur-308
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Tests
+        run: |
+          chmod +x gradlew
+          ./gradlew testDebugUnitTest --no-daemon
