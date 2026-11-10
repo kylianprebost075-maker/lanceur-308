@@ -41,16 +41,18 @@ de dessus en 2D, celle que l'appli affiche quand la 3D n'est pas disponible. Sur
 | ![Santé de la batterie mesurée à chaque démarrage](docs/captures/onglets/13-moteur-batterie.png) | ![Trajet en cours avec score de conduite souple, historique des trajets](docs/captures/onglets/08-moteur-trajets.png) |
 | **Moteur — Chrono** | **Moteur — Bilan et FAP (v0.14)** |
 | ![Chrono 0-100 et 80-120 km/h](docs/captures/onglets/07-moteur-chrono.png) | ![Bilan du mois, régénération du FAP en cours repérée au débit d'air, conseil voie rapide](docs/captures/onglets/14-moteur-bilan-fap.png) |
+| **Moteur — Chauffe (v0.11)** | |
+| ![Huile estimée, temps de chauffe prévu d'après les chauffes passées, comparaison rouler / ralenti](docs/captures/onglets/21-moteur-chauffe.png) | |
 | **Son — Alignement (v0.15)** | **Son — Tests et polarité (v0.15)** |
 | ![Distances oreille / haut-parleurs et retards à recopier dans le DSP](docs/captures/onglets/15-son-alignement.png) | ![Sons de test par côté, balayage, test de polarité A / B en cours](docs/captures/onglets/16-son-tests.png) |
 | **Son — Mesure au micro du PC (v0.15)** | **Son — Options (v0.15)** |
 | ![Bruit rose, clics gauche / droite, montée en volume pour l'outil PC](docs/captures/onglets/17-son-mesure-pc.png) | ![Volume selon la vitesse, annonces vocales, applis son de l'autoradio](docs/captures/onglets/18-son-options.png) |
 | **Optimiser l'autoradio (v0.16)** | **Optimiser — réglages guidés (v0.16)** |
-| ![Mémoire libérée, mode CarPlay, nettoyage à l'ouverture de CarPlay](docs/captures/onglets/19-optimisation.png) | ![Animations, recherche Wi-Fi / Bluetooth, veille FYT, applis inutilisées](docs/captures/onglets/20-optimisation-reglages.png) |
+| ![Mémoire libérée à la main ou toute seule (v0.18), mode CarPlay, nettoyage à l'ouverture de CarPlay](docs/captures/onglets/19-optimisation.png) | ![Animations, recherche Wi-Fi / Bluetooth, veille FYT, applis inutilisées](docs/captures/onglets/20-optimisation-reglages.png) |
 | **Entretien** | **Entretien — Pleins** |
 | ![Échéances d'entretien](docs/captures/onglets/09-entretien.png) | ![Consommation et coût des pleins](docs/captures/onglets/10-entretien-pleins.png) |
 | **Réglages** | **Panneau à côté de CarPlay (v0.13, alerte FAP v0.14)** |
-| ![Réglages : mode démo, panneau CarPlay, côté](docs/captures/onglets/11-reglages.png) | ![Panneau : puissance, rapport conseillé, régime, eau, turbo, batterie](docs/captures/onglets/12-panneau-performances.png) |
+| ![Réglages : couleur, 5 portes, Optimiser l'autoradio, kilométrage, température extérieure, thème](docs/captures/onglets/11-reglages.png) | ![Panneau : puissance, rapport conseillé, régime, eau, turbo, batterie](docs/captures/onglets/12-panneau-performances.png) |
 
 **Nouveau en v0.19 : fiche technique de l'autoradio écrite sur la clé USB (09/11 au soir)**
 - **Fiche technique** (`backup/DeviceInfo.kt`, lancée par `AutoBackup.tick` une fois par lancement dès qu'une clé est
