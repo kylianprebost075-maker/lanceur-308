@@ -281,8 +281,11 @@ sur le bouton CarPlay pour montrer le panneau. Le bandeau rouge est une alerte d
 - **Pas d'ADB** (pas de débogage sans fil sous Android 8, port 5555 fermé). Le « débridage » (mode développeur,
   `adb root`, éventuellement root) n'est pas fait : la v0.19 écrit d'abord une **fiche technique** sur la clé
   (`infos-autoradio.txt`, voir `backup/DeviceInfo.kt`) pour savoir ce que le système permet. Piste la moins risquée :
-  code d'usine du menu développeur puis ADB, sans root (codes à vérifier pour ce modèle, non confirmés). Root (Magisk)
-  déconseillé : risque de briquer l'autoradio.
+  menu « Paramètres d'usine » (**code `3368`**, donné par le vendeur, indiqué par le propriétaire le 10/11/2026) puis
+  ADB, sans root. Dans ce menu, ne changer **que** ce qui concerne ADB / le mode USB : le type de boîtier CAN, le
+  modèle de voiture, l'écran ou le logo se règlent au même endroit et un mauvais choix coupe les portes, la caméra ou
+  l'affichage (photographier chaque page avant de toucher). Le code `adbon`, cité pour d'autres FYT, n'est pas
+  confirmé ici. Root (Magisk) déconseillé : risque de briquer l'autoradio.
 - Installation **uniquement par fichier APK** : clé USB (`E:\` sur le PC) → gestionnaire de fichiers de l'autoradio → installer **par-dessus** l'ancienne version.
 - Sur la clé, l'APK est copiée à **deux endroits** : `E:\Lanceur308.apk` et `E:\308-2\Lanceur308.apk`.
 
