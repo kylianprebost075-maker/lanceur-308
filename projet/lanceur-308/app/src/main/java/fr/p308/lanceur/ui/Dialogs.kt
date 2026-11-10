@@ -238,7 +238,7 @@ fun WelcomeDialog(onSettings: () -> Unit) {
         title = { Text("Bienvenue dans Lanceur 308", fontWeight = FontWeight.Bold) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
-                Text("Un écran d'accueil pour autoradio Android, fait pour une Peugeot 308 (2007-2013).", fontSize = 15.sp)
+                Text("Un écran d'accueil pour autoradio Android, réglé pour : ${fr.p308.lanceur.vehicle.CarProfile.NAME} ${fr.p308.lanceur.vehicle.CarProfile.ENGINE_LABEL}.", fontSize = 15.sp)
                 Spacer(Modifier.height(8.dp))
                 listOf(
                     "Pour tout voir bouger sans rien brancher : « Voir la démo ».",

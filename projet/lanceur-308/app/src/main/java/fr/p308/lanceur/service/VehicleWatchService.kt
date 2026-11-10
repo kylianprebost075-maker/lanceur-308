@@ -105,8 +105,9 @@ class VehicleWatchService : Service(), LocationListener {
                     Vehicle.state.value.outsideTempC)
                 AutoBackup.tick(this@VehicleWatchService)
                 checkBattery()
-                fr.p308.lanceur.vehicle.TurboCool.tick(Engine.state.value, fr.p308.lanceur.drive.Trip.state.value.currentKmh)
-                fr.p308.lanceur.vehicle.FapRegen.tick(Engine.state.value, fr.p308.lanceur.drive.Trip.state.value.currentKmh,
+                if (fr.p308.lanceur.vehicle.CarProfile.HAS_TURBO)
+                    fr.p308.lanceur.vehicle.TurboCool.tick(Engine.state.value, fr.p308.lanceur.drive.Trip.state.value.currentKmh)
+                if (fr.p308.lanceur.vehicle.CarProfile.HAS_DPF) fr.p308.lanceur.vehicle.FapRegen.tick(Engine.state.value, fr.p308.lanceur.drive.Trip.state.value.currentKmh,
                     Vehicle.state.value.odometerKm)
                 fr.p308.lanceur.sound.SpeedVolume.tick(this@VehicleWatchService, fr.p308.lanceur.drive.Trip.state.value.currentKmh)
                 voiceAlerts()

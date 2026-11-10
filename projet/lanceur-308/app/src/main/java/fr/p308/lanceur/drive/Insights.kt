@@ -60,8 +60,8 @@ data class RangeInfo(val km: Int, val liters: Double, val l100: Double, val basi
  * Résultat donné jusqu'au témoin de réserve (≈ 6 L restants).
  */
 object FuelRange {
-    const val TANK_L = 60.0
-    const val RESERVE_L = 6.0
+    const val TANK_L = fr.p308.lanceur.vehicle.CarProfile.TANK_L
+    const val RESERVE_L = fr.p308.lanceur.vehicle.CarProfile.RESERVE_L
 
     private val _state = kotlinx.coroutines.flow.MutableStateFlow<RangeInfo?>(null)
     val state: kotlinx.coroutines.flow.StateFlow<RangeInfo?> = _state

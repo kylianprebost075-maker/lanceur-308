@@ -1,6 +1,8 @@
 # Fichiers gardés sur le PC mais jamais publiés
 # - modèles 3D : contiennent la plaque d'immatriculation, et la licence du modèle d'origine est à vérifier
 *.glb
+# ... sauf le modèle public (plaque d'exemple AB-123-CD, licence CC BY 4.0) : publié depuis la v0.24 pour que le projet se compile
+!projet/lanceur-308/app/src/main/assets/models/car.glb
 modele-3d/plaque.png
 # - APK compilées (embarquent le modèle 3D)
 *.apk

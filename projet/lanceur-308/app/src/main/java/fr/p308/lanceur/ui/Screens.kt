@@ -193,7 +193,7 @@ fun HomeAndMaintenanceScreen(vs: VehicleState, items: List<MaintenanceItem>, int
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (!interior) {
                     Column(Modifier.weight(1f)) {
-                        Text("Peugeot 308", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                        Text(fr.p308.lanceur.vehicle.CarProfile.NAME, fontSize = 24.sp, fontWeight = FontWeight.Bold)
                         StatusLine(vs)
                     }
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -453,7 +453,7 @@ private fun MaintenancePanel(vs: VehicleState, items: List<MaintenanceItem>) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("Entretien", fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                Text("Peugeot 308 · 1.6 HDi 110", fontSize = 13.sp, color = C.Accent)
+                Text("${fr.p308.lanceur.vehicle.CarProfile.NAME} · ${fr.p308.lanceur.vehicle.CarProfile.ENGINE_LABEL}", fontSize = 13.sp, color = C.Accent)
             }
             Column(Modifier.clip(RoundedCornerShape(12.dp)).clickable { editingKm = true }.padding(8.dp), horizontalAlignment = Alignment.End) {
                 Text("Kilométrage", fontSize = 12.sp, color = C.Sub)

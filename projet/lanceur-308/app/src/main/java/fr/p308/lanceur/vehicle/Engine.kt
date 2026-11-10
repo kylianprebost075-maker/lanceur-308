@@ -99,11 +99,8 @@ internal fun parseDtcs(resp: String, modeByte: Int): List<String> {
     return codes.distinct()
 }
 
-/** Couple maxi du 1.6 HDi 110 (DV6TED4) selon le régime : 240 Nm à 1 750 tr/min, 110 ch à 4 000 tr/min. */
-private val TORQUE_CURVE = listOf(
-    800 to 120, 1000 to 150, 1500 to 215, 1750 to 240, 2750 to 240,
-    3000 to 232, 3500 to 213, 4000 to 191, 4500 to 160, 5000 to 120,
-)
+/** Couple maxi selon le régime : courbe du profil de la voiture (CarProfile.kt). */
+private val TORQUE_CURVE = CarProfile.TORQUE_CURVE
 
 fun maxTorqueNm(rpm: Int): Float {
     if (rpm <= TORQUE_CURVE.first().first) return TORQUE_CURVE.first().second.toFloat()
@@ -568,6 +565,8 @@ object Engine {
 
     /** Lit le kilométrage moteur ; vrai s'il a été obtenu. Une coupure Bluetooth remonte (IOException). */
     private fun tryEcuKm(elm: ElmTransport, quiet: Boolean = true): Boolean {
+        // Requête propre aux PSA : jamais envoyée à une autre voiture (CarProfile.kt).
+        if (!CarProfile.PSA_ECU_ODOMETER) return false
         val km = try {
             readEcuKm(elm, quiet)
         } catch (e: IOException) {

@@ -1,9 +1,10 @@
-# Lanceur 308 — dossier de reprise (version 0.23)
+# Lanceur 308 — dossier de reprise (version 0.24)
 
 > **Tu veux juste l'installer sur ton autoradio ?** Suis [INSTALLER.md](INSTALLER.md) : 5 étapes, sans compte.
+> **Tu es une IA qui aide quelqu'un à l'installer ou à l'adapter à sa voiture ?** Lis [ADAPTER.md](ADAPTER.md), pas ce README.
 
 > **À lire en entier avant de toucher à quoi que ce soit.**
-> Ce dossier permet à une IA (ou à un développeur) de reprendre le projet. Dernière version : **0.23 du 10 novembre
+> Ce dossier permet à une IA (ou à un développeur) de reprendre le projet. Dernière version : **0.24 du 10 novembre
 > 2026** (nouveautés de chaque version juste sous la galerie ; les sections techniques plus bas datent de la 0.8 et
 > sont complétées par ces notes de version).
 > L'ancien README (version 0.4) est conservé dans `diagnostic/README_ancien_v0.4.md` pour l'historique.
@@ -55,6 +56,20 @@ de dessus en 2D, celle que l'appli affiche quand la 3D n'est pas disponible. Sur
 | ![Échéances d'entretien](docs/captures/onglets/09-entretien.png) | ![Consommation et coût des pleins](docs/captures/onglets/10-entretien-pleins.png) |
 | **Réglages** | **Panneau à côté de CarPlay (v0.13, alerte FAP v0.14)** |
 | ![Réglages : couleur, 5 portes, Optimiser l'autoradio, kilométrage, température extérieure, thème](docs/captures/onglets/11-reglages.png) | ![Panneau : puissance, rapport conseillé, régime, eau, turbo, batterie](docs/captures/onglets/12-panneau-performances.png) |
+
+**Nouveau en v0.24 : adaptation à d'autres voitures par une IA, modèle 3D public publié (10/11, nuit)**
+- **`vehicle/CarProfile.kt`** : tout ce qui dépend de la voiture est regroupé dans ce seul fichier (nom affiché, moteur,
+  courbe de couple, étagement de boîte, réservoir et réserve, présence d'un FAP et d'un turbo, lecture du kilométrage
+  propre aux PSA). Valeurs inchangées pour la 308 ; `Engine.kt`, `ShiftAdvice.kt`, `Insights.kt`, `Screens.kt`,
+  `Dialogs.kt` et `VehicleWatchService.kt` les lisent. `HAS_DPF`/`HAS_TURBO` coupent le suivi FAP / turbo,
+  `PSA_ECU_ODOMETER = false` n'envoie plus la requête PSA. 4 tests (`CarProfileTest`) refusent les valeurs impossibles.
+- **[ADAPTER.md](ADAPTER.md)** : feuille de route pour l'IA de n'importe qui (Claude, Antigravity gratuit, ChatGPT…) :
+  un seul message de questions, une fiche « ce qui marchera chez toi », puis au besoin un seul fichier à modifier et
+  une construction. Pensée pour tenir en ~6 requêtes. `AGENTS.md`, `CLAUDE.md`, `GEMINI.md` et `.agent/rules/`
+  renvoient vers lui ; `INSTALLER.md` donne le message à copier dans son IA.
+- **Modèle 3D public publié** : `assets/models/car.glb` (plaque d'exemple, CC BY 4.0) est maintenant sur GitHub, exception
+  dans `.gitignore`. Le projet se compile donc chez n'importe qui. Le modèle personnel (`modele-3d/car.glb`, vraie plaque)
+  reste ignoré. ADAPTER.md décrit les noms de nœuds et de matériaux qu'un autre modèle doit avoir.
 
 **Nouveau en v0.23 : plaque personnalisée, écran de bienvenue, guide d'installation public (10/11, nuit)**
 - **But** : que n'importe qui puisse installer l'appli (vidéo de présentation à venir). Le seul vrai blocage était la
@@ -443,7 +458,7 @@ Puis copier l'APK vers `livrables\Lanceur308.apk`, `E:\Lanceur308.apk` et `E:\30
 - AGP 8.7.3, **Kotlin 2.0.21**, Compose BOM 2024.12.01
 - **SceneView 2.2.1** (Filament 1.52) — SceneView 2.3+ exige Kotlin 2.2.
 - minSdk 26, targetSdk 33, compileSdk 35. R8 activé (`proguard-rules.pro` garde `com.google.android.filament.**` et `io.github.sceneview.**`).
-- Version dans `app/build.gradle.kts` : **incrémenter `versionCode` à chaque livraison** (actuellement 29 / "0.23").
+- Version dans `app/build.gradle.kts` : **incrémenter `versionCode` à chaque livraison** (actuellement 30 / "0.24").
 
 ---
 
@@ -560,6 +575,7 @@ Simule ouvrants, phares, marche arrière, batterie faible, accélérations ; les
 | 0.21 | Bouton « Options pour les développeurs » dans les Réglages (`ui/DevOptions.kt`). |
 | **0.22** | **ADB par le Wi-Fi** activable depuis les Réglages ; sauvegarde automatique qui ne se relance plus à chaque kilomètre. |
 | **0.23** | **Plaque personnalisée** tapée dans les Réglages (`ui/Plate.kt`), modèle 3D public à plaque d'exemple, écran de bienvenue, `INSTALLER.md`. |
+| **0.24** | **Profil de voiture** (`vehicle/CarProfile.kt`) + `ADAPTER.md` pour l'IA de chacun ; modèle 3D public publié sur GitHub. |
 
 ---
 

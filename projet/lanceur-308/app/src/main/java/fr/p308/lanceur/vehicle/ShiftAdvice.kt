@@ -9,7 +9,7 @@ import kotlin.math.abs
  */
 object ShiftAdvice {
     /** km/h à 1 000 tr/min, 1re → 5e (valeurs approchées pour 308 1.6 HDi 110, pneus 205/55 R16). */
-    val KMH_PER_1000 = floatArrayOf(7.9f, 14.6f, 22.9f, 31.6f, 40.6f)
+    val KMH_PER_1000 = CarProfile.KMH_PER_1000
 
     enum class Kind { NONE, UP, DOWN, COLD }
 

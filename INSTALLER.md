@@ -8,6 +8,22 @@ les données du moteur, l'entretien. Il est gratuit, sans compte et sans publici
 > partie marche, une partie non (tableau plus bas). Tu l'installes à tes risques : elle ne modifie rien dans la
 > voiture, mais personne ne l'a testée sur la tienne.
 
+## Le plus simple : demande à ton IA
+
+Tu utilises Claude, Gemini (Antigravity, même gratuit), ChatGPT ou une autre IA ? Donne-lui ce projet et copie-lui ce
+message :
+
+```
+Aide-moi à installer Lanceur 308 dans ma voiture : https://github.com/kylianprebost075-maker/lanceur-308
+Lis le fichier ADAPTER.md de ce dépôt et suis-le : pose-moi d'abord tes questions sur ma voiture.
+```
+
+Elle te pose une seule série de questions (voiture, carburant, boîte, autoradio, boîtier OBD), te dit ce qui marchera
+chez toi et quoi régler. Si tu veux, elle adapte aussi l'appli à ta voiture (puissance, rapports, réservoir) : il faut
+alors un ordinateur pour fabriquer l'appli. Elle ne te demandera jamais ta plaque ni ton numéro de série.
+
+Tu préfères tout faire toi-même ? Suis les étapes ci-dessous.
+
 ## Ce qu'il te faut
 
 - Un autoradio **Android 8 ou plus récent** (écran large, type 1024 × 600).
