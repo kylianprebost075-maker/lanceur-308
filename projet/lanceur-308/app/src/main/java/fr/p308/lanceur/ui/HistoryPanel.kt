@@ -46,8 +46,22 @@ private fun HistoryEntry.whenText() = date?.format(HIST_DATE) ?: dateNote.ifEmpt
 fun HistoryPanel() {
     val list by History.entries.collectAsStateWithLifecycle()
     var open by remember { mutableStateOf<HistoryEntry?>(null) }
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    var pdfMessage by remember { mutableStateOf<String?>(null) }
+    var pdfBusy by remember { mutableStateOf(false) }
     Tile(Modifier.fillMaxSize()) {
-        Text("Historique", fontSize = 22.sp, fontWeight = FontWeight.Bold)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Historique", fontSize = 22.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+            // v0.26 : carnet d'entretien en PDF (échéances + interventions), écrit sur la clé.
+            TextButton(enabled = !pdfBusy, onClick = {
+                pdfBusy = true
+                Thread {
+                    pdfMessage = runCatching { fr.p308.lanceur.backup.MaintenancePdf.write(ctx) }.getOrElse { "PDF impossible : ${it.message}" }
+                    pdfBusy = false
+                }.start()
+            }) { Text(if (pdfBusy) "…" else "Carnet en PDF") }
+        }
+        pdfMessage?.let { Text(it, fontSize = 12.sp, color = C.Accent) }
         val total = list.mapNotNull { it.priceEur }.sum()
         Text(
             if (list.isEmpty()) "Interventions passées : factures, contrôles techniques, entretiens faits soi-même"

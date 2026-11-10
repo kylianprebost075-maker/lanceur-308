@@ -32,6 +32,8 @@ object Export {
 
     fun writeAll(dir: File) {
         dir.mkdirs()
+        // v0.26 : le carnet d'entretien en PDF, à côté des tableaux.
+        runCatching { UsbStorage.writeSafe(File(dir, MaintenancePdf.NAME), MaintenancePdf.bytes()) }
         write(
             dir, "trajets.csv",
             listOf("Date", "Départ", "Arrivée", "Distance (km)", "Roulage (min)", "Moyenne (km/h)", "Maxi (km/h)",

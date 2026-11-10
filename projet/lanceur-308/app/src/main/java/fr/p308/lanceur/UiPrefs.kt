@@ -85,7 +85,21 @@ object UiPrefs {
     var welcomed by mutableStateOf(true)
         private set
 
+    /** v0.26 : bilan « Prêt à partir » affiché au lancement. */
+    var readyScreen by mutableStateOf(true)
+        private set
+
     val carColor get() = CAR_COLORS[colorIndex.coerceIn(CAR_COLORS.indices)]
+
+    fun updateReadyScreen(v: Boolean) {
+        readyScreen = v
+        prefs.edit().putBoolean("readyScreen", v).apply()
+    }
+
+    /** Vrai si le bilan n'a pas été montré depuis 30 minutes (un simple retour dans l'appli ne le réaffiche pas). */
+    fun readyDue(nowMs: Long = System.currentTimeMillis()) = nowMs - prefs.getLong("readyAt", 0L) !in 0..30 * 60_000L
+
+    fun markReadyShown(nowMs: Long = System.currentTimeMillis()) = prefs.edit().putLong("readyAt", nowMs).apply()
 
     fun updatePlate(v: String) {
         plate = v
@@ -114,6 +128,7 @@ object UiPrefs {
         glass = prefs.getBoolean("glass", true)
         plate = prefs.getString("plate", "") ?: ""
         welcomed = prefs.getBoolean("welcomed", false)
+        readyScreen = prefs.getBoolean("readyScreen", true)
         Slot.entries.forEach { s -> prefs.getString("slot_${s.name}", null)?.let { slots[s] = it } }
     }
 

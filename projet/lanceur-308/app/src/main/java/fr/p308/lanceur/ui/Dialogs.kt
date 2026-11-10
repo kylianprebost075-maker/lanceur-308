@@ -275,6 +275,7 @@ fun SettingsDialog(onDismiss: () -> Unit) {
     var wifiAdbMessage by remember { mutableStateOf(DevOptions.wifiAdbStatus()) }
     var wifiAdbBusy by remember { mutableStateOf(false) }
     var plateText by remember { mutableStateOf(UiPrefs.plate) }
+    var readyNow by remember { mutableStateOf(false) }
     var plateMessage by remember { mutableStateOf<String?>(null) }
     var plateBusy by remember { mutableStateOf(false) }
     val plateImage = remember(plateText) { PlateModel.bitmap(PlateModel.normalize(plateText).ifEmpty { PlateModel.EXAMPLE }).asImageBitmap() }
@@ -318,6 +319,10 @@ fun SettingsDialog(onDismiss: () -> Unit) {
                             plateBusy = false
                         }.start()
                     }) { Text(if (plateBusy) "…" else "Poser") }
+                }
+                SettingRow("Bilan « Prêt à partir »", "Au démarrage : verglas, batterie, carburant, entretien (se ferme tout seul)") {
+                    TextButton(onClick = { readyNow = true }) { Text("Voir") }
+                    Switch(UiPrefs.readyScreen, UiPrefs::updateReadyScreen)
                 }
                 SettingRow("Optimiser l'autoradio", "Mémoire, applis inutiles, mode CarPlay, réglages qui accélèrent Android") {
                     Button(onClick = { optim = true }) { Text("Ouvrir") }
@@ -442,6 +447,7 @@ fun SettingsDialog(onDismiss: () -> Unit) {
         confirmButton = { TextButton(onClick = onDismiss) { Text("Fermer") } },
     )
     if (editingKm) OdometerDialog(vs.odometerKm) { editingKm = false }
+    if (readyNow) ReadyDialog(autoCloseS = 0) { readyNow = false }
     if (optim) OptimDialog { optim = false }
     if (outsideTemp) OutsideTempDialog { outsideTemp = false }
 }

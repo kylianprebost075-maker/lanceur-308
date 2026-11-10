@@ -112,6 +112,20 @@ fun LanceurApp() {
     if (showApps) AppDrawer { showApps = false }
     if (showSettings) SettingsDialog { showSettings = false }
     if (!UiPrefs.welcomed) WelcomeDialog(onSettings = { showSettings = true })
+    // v0.26 : bilan « Prêt à partir », une fois au lancement, 8 s après (le temps que le boîtier OBD réponde),
+    // seulement à l'arrêt et s'il y a quelque chose à dire.
+    var showReady by remember { mutableStateOf(false) }
+    LaunchedEffect(UiPrefs.welcomed, UiPrefs.readyScreen) {
+        if (UiPrefs.welcomed && UiPrefs.readyScreen && UiPrefs.readyDue()) {
+            delay(8_000)
+            val moving = fr.p308.lanceur.drive.Trip.state.value.currentKmh > 5f && !Vehicle.demo
+            if (!moving && !showSettings && readyLinesNow().isNotEmpty()) {
+                UiPrefs.markReadyShown()
+                showReady = true
+            }
+        }
+    }
+    if (showReady) ReadyDialog(autoCloseS = 15) { showReady = false }
 }
 
 @Composable
