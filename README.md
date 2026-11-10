@@ -1,13 +1,15 @@
-# Lanceur 308 — dossier de reprise (version 0.22)
+# Lanceur 308 — dossier de reprise (version 0.23)
+
+> **Tu veux juste l'installer sur ton autoradio ?** Suis [INSTALLER.md](INSTALLER.md) : 5 étapes, sans compte.
 
 > **À lire en entier avant de toucher à quoi que ce soit.**
-> Ce dossier permet à une IA (ou à un développeur) de reprendre le projet. Dernière version : **0.22 du 10 novembre
+> Ce dossier permet à une IA (ou à un développeur) de reprendre le projet. Dernière version : **0.23 du 10 novembre
 > 2026** (nouveautés de chaque version juste sous la galerie ; les sections techniques plus bas datent de la 0.8 et
 > sont complétées par ces notes de version).
 > L'ancien README (version 0.4) est conservé dans `diagnostic/README_ancien_v0.4.md` pour l'historique.
 >
-> **Non publiés dans ce dépôt** (voir `.gitignore`) : les modèles 3D `.glb` et l'APK compilée (ils contiennent
-> la plaque d'immatriculation, et la licence du modèle d'origine est à vérifier), `modele-3d/plaque.png`, et
+> **Non publiés dans ce dépôt** (voir `.gitignore`) : les modèles 3D `.glb` (le modèle personnel contient la vraie
+> plaque ; depuis la v0.23 l'appli embarque `car-public.glb`, à plaque d'exemple), `modele-3d/plaque.png`, et
 > `fyt-extraits/` (code décompilé des applis FYT, propriété du fabricant). Pour reconstruire le modèle, voir §5.
 
 ## Aperçu
@@ -53,6 +55,25 @@ de dessus en 2D, celle que l'appli affiche quand la 3D n'est pas disponible. Sur
 | ![Échéances d'entretien](docs/captures/onglets/09-entretien.png) | ![Consommation et coût des pleins](docs/captures/onglets/10-entretien-pleins.png) |
 | **Réglages** | **Panneau à côté de CarPlay (v0.13, alerte FAP v0.14)** |
 | ![Réglages : couleur, 5 portes, Optimiser l'autoradio, kilométrage, température extérieure, thème](docs/captures/onglets/11-reglages.png) | ![Panneau : puissance, rapport conseillé, régime, eau, turbo, batterie](docs/captures/onglets/12-panneau-performances.png) |
+
+**Nouveau en v0.23 : plaque personnalisée, écran de bienvenue, guide d'installation public (10/11, nuit)**
+- **But** : que n'importe qui puisse installer l'appli (vidéo de présentation à venir). Le seul vrai blocage était la
+  plaque, dessinée dans le modèle 3D donc présente dans chaque APK.
+- **Modèle public** : `outils/plaque_glb.py` remplace l'image de la plaque du modèle personnel par une plaque d'exemple
+  « AB-123-CD » (`modele-3d/plaque-factice.png`) et lui réserve 128 Ko. Résultat : `modele-3d/car-public.glb`, **c'est
+  lui qui est maintenant dans `assets/models/car.glb`**. Plus aucune APK ne contient la vraie plaque.
+- **Réglages → Plaque** (`ui/Plate.kt`) : l'utilisateur tape sa plaque, l'appli la dessine (aperçu dans la ligne),
+  puis écrit dans son dossier privé une copie du modèle où seule l'image de la plaque est remplacée, **sur place et à
+  taille égale** (`GlbPlate.replace` : rien d'autre ne bouge dans le fichier). `CarModel.location` charge cette copie ;
+  si elle ne s'affiche pas, retour automatique au modèle d'origine (ligne `[PLAQUE]` au journal, sans le texte de la
+  plaque). La copie est refaite après chaque mise à jour de l'appli. 5 tests (`GlbPlateTest`).
+- **Écran de bienvenue** au premier lancement (`WelcomeDialog`) : à quoi sert l'appli, mode démo, plaque, boîtier OBD.
+- **[INSTALLER.md](INSTALLER.md)** : guide pour le public (installation, premier lancement, ce qui marche selon la
+  voiture, questions fréquentes). Licence du modèle 3D vérifiée sur Sketchfab le 10/11 : CC BY 4.0 (crédit obligatoire).
+- **Vérifié** : tests ; modèle public rendu dans three.js (plaque d'exemple à l'endroit, avant et arrière) ; dans
+  l'émulateur, bienvenue, aperçu pendant la frappe et bouton « Poser », puis le modèle fabriqué par l'appli relu dans
+  three.js (la plaque tapée y est, même taille de fichier). **Pas vérifié** : l'affichage sur l'autoradio
+  (l'émulateur ne sait pas afficher la 3D) ; le chargement d'un modèle depuis un fichier n'y a jamais été essayé.
 
 **Nouveau en v0.22 : ADB par le Wi-Fi depuis les Réglages, sauvegarde moins fréquente (10/11 au soir)**
 - **Ce que la clé du 10/11 a appris** (fiche `infos-autoradio.txt` de la v0.19, voir le tableau du §1) : le vrai
@@ -373,6 +394,7 @@ sur le bouton CarPlay pour montrer le panneau. Le bandeau rouge est une alerte d
 ├── outils/
 │   ├── assembler_308.mjs      ← étape 1 du modèle 3D (Node + gltf-transform)
 │   ├── finaliser_car_glb.py   ← étape 2 du modèle 3D (Python pur, sans dépendance)
+│   ├── plaque_glb.py          ← étape 3 : pose la plaque d'exemple → car-public.glb (celui de l'APK)
 │   ├── *.sh / analyse_gps.py  ← outils Mac (émulateur, mesures, GPS)
 │   └── obd/                   ← explorateur OBD en lecture seule (PC + vLinker), tests, fiche de séance
 ├── fyt-extraits/              ← APK FYT décompilées (référence CAN) — non publié
@@ -421,7 +443,7 @@ Puis copier l'APK vers `livrables\Lanceur308.apk`, `E:\Lanceur308.apk` et `E:\30
 - AGP 8.7.3, **Kotlin 2.0.21**, Compose BOM 2024.12.01
 - **SceneView 2.2.1** (Filament 1.52) — SceneView 2.3+ exige Kotlin 2.2.
 - minSdk 26, targetSdk 33, compileSdk 35. R8 activé (`proguard-rules.pro` garde `com.google.android.filament.**` et `io.github.sceneview.**`).
-- Version dans `app/build.gradle.kts` : **incrémenter `versionCode` à chaque livraison** (actuellement 28 / "0.22").
+- Version dans `app/build.gradle.kts` : **incrémenter `versionCode` à chaque livraison** (actuellement 29 / "0.23").
 
 ---
 
@@ -509,7 +531,7 @@ Simule ouvrants, phares, marche arrière, batterie faible, accélérations ; les
 1. `node outils/assembler_308.mjs modele-3d/308_5p.glb modele-3d/car_base_assemblee.glb`
    (garde la phase 1 5 portes, roues, charnières, matériaux, plaque, simplification ~60 000 triangles).
 2. `python outils/finaliser_car_glb.py`
-   → écrit `modele-3d/car.glb` **et** `projet/lanceur-308/app/src/main/assets/models/car.glb`. Il :
+   → écrit `modele-3d/car.glb` (modèle personnel, vraie plaque). **Depuis la v0.23, étape 3 obligatoire** : `python outils/plaque_glb.py modele-3d/car.glb modele-3d/plaque-factice.png modele-3d/car-public.glb`, puis copier `car-public.glb` vers `projet/lanceur-308/app/src/main/assets/models/car.glb` (un test échoue si l'APK contient un modèle sans place de plaque). L'étape 2 :
    - retire le clearcoat (trop coûteux), règle la peinture noire ;
    - crée les matériaux émissifs pilotés par l'appli : `phare_avant`, `phare_reflecteur`, `vitre_phare_avant`, `feu_position_ar`, `feu_blanc` (recul), `antibrouillard`, `aiguille`, `voyant_feux`, + `chrome` (lion du volant) et `alu_satine` ;
    - **redresse le volant** `p308_steer` (-72,7° autour de X, posé sur la colonne en `[0.3248, -0.3610, 0.8453]`) et les **4 aiguilles** (plan du combiné à -71,41°) : dans l'export BeamNG ils étaient à plat ;
@@ -537,6 +559,7 @@ Simule ouvrants, phares, marche arrière, batterie faible, accélérations ; les
 | 0.20 | Journal des plantages écrit sur la clé (`CrashLog.kt`). |
 | 0.21 | Bouton « Options pour les développeurs » dans les Réglages (`ui/DevOptions.kt`). |
 | **0.22** | **ADB par le Wi-Fi** activable depuis les Réglages ; sauvegarde automatique qui ne se relance plus à chaque kilomètre. |
+| **0.23** | **Plaque personnalisée** tapée dans les Réglages (`ui/Plate.kt`), modèle 3D public à plaque d'exemple, écran de bienvenue, `INSTALLER.md`. |
 
 ---
 

@@ -111,6 +111,7 @@ fun LanceurApp() {
     }
     if (showApps) AppDrawer { showApps = false }
     if (showSettings) SettingsDialog { showSettings = false }
+    if (!UiPrefs.welcomed) WelcomeDialog(onSettings = { showSettings = true })
 }
 
 @Composable

@@ -181,7 +181,7 @@ fun HomeAndMaintenanceScreen(vs: VehicleState, items: List<MaintenanceItem>, int
     val open = vs.visibleOpen()
     val lightsOn = vs.effectiveHeadlights()
     val ctx = LocalContext.current
-    var model3d by remember { mutableStateOf(CarModel.location(ctx)) }
+    var model3d by remember(UiPrefs.plate) { mutableStateOf(CarModel.location(ctx)) }
     val spinCtrl = remember { CarSpinController() }
 
     Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -222,7 +222,8 @@ fun HomeAndMaintenanceScreen(vs: VehicleState, items: List<MaintenanceItem>, int
             Row(Modifier.weight(1f).fillMaxWidth().padding(vertical = 2.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 val location = model3d
                 if (location != null) {
-                    Car3D(
+                    // key : une nouvelle plaque = un nouveau fichier, la voiture est rechargée en entier.
+                    androidx.compose.runtime.key(location) { Car3D(
                         location = location,
                         interior = interior,
                         open = open,
@@ -231,8 +232,9 @@ fun HomeAndMaintenanceScreen(vs: VehicleState, items: List<MaintenanceItem>, int
                         reverse = vs.reverse,
                         spinController = spinCtrl,
                         modifier = Modifier.weight(1f).fillMaxHeight(),
-                        onFail = { model3d = null },
-                    )
+                        // Si le modèle à plaque personnalisée ne s'affiche pas, on revient au modèle d'origine.
+                        onFail = { model3d = if (PlateModel.isPlate(location)) { PlateModel.markFailed(); CarModel.location(ctx) } else null },
+                    ) }
                     if (!interior && vs.rearRadarCm.isNotEmpty()) {
                         CarTopView(open, carColor, UiPrefs.fiveDoors, vs.rearRadarCm, horizontal = false,
                             modifier = Modifier.fillMaxHeight().width(106.dp)

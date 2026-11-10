@@ -59,6 +59,8 @@ object CarModel {
     fun location(ctx: Context): String? {
         val pushed = File(ctx.getExternalFilesDir(null), FILE_NAME)
         if (pushed.exists()) return Uri.fromFile(pushed).toString()
+        // v0.23 : le modèle embarqué, avec la plaque tapée dans les Réglages.
+        PlateModel.location(ctx)?.let { return it }
         if (ctx.assets.list("models")?.contains(FILE_NAME) == true) return "models/$FILE_NAME"
         return null
     }

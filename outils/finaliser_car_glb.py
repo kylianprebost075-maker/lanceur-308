@@ -1,13 +1,14 @@
-﻿import copy, json, math, struct
+import copy, json, math, struct
 import os
 # Usage : python finaliser_car_glb.py  (depuis n'importe où)
 # Entrée : modele-3d/car_base_assemblee.glb (sortie de assembler_308.mjs)
-# Sorties : modele-3d/car.glb + projet/lanceur-308/app/src/main/assets/models/car.glb
+# Sortie : modele-3d/car.glb (modele personnel, avec la vraie plaque : jamais dans l'APK depuis la v0.23).
+# Ensuite : python plaque_glb.py ../modele-3d/car.glb ../modele-3d/plaque-factice.png ../modele-3d/car-public.glb
+# puis copier car-public.glb vers projet/lanceur-308/app/src/main/assets/models/car.glb
 _root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 src = os.path.join(_root, 'modele-3d', 'car_base_assemblee.glb')
 dsts = [
     os.path.join(_root, 'modele-3d', 'car.glb'),
-    os.path.join(_root, 'projet', 'lanceur-308', 'app', 'src', 'main', 'assets', 'models', 'car.glb'),
 ]
 
 with open(src, "rb") as f:

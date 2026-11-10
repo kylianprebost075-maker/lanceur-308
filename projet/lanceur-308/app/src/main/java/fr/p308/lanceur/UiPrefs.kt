@@ -78,7 +78,24 @@ object UiPrefs {
     var glass by mutableStateOf(true)
         private set
 
+    /** v0.23 : plaque d'immatriculation tapée par l'utilisateur (vide = plaque d'exemple). Ne quitte pas l'autoradio. */
+    var plate by mutableStateOf("")
+        private set
+    /** v0.23 : false tant que l'écran de bienvenue n'a pas été vu. */
+    var welcomed by mutableStateOf(true)
+        private set
+
     val carColor get() = CAR_COLORS[colorIndex.coerceIn(CAR_COLORS.indices)]
+
+    fun updatePlate(v: String) {
+        plate = v
+        prefs.edit().putString("plate", v).apply()
+    }
+
+    fun markWelcomed() {
+        welcomed = true
+        prefs.edit().putBoolean("welcomed", true).apply()
+    }
 
     fun init(ctx: Context) {
         prefs = ctx.getSharedPreferences("ui", Context.MODE_PRIVATE)
@@ -95,6 +112,8 @@ object UiPrefs {
         }
         perfAutoCarPlay = prefs.getBoolean("perfAutoCarPlay", true)
         glass = prefs.getBoolean("glass", true)
+        plate = prefs.getString("plate", "") ?: ""
+        welcomed = prefs.getBoolean("welcomed", false)
         Slot.entries.forEach { s -> prefs.getString("slot_${s.name}", null)?.let { slots[s] = it } }
     }
 

@@ -227,6 +227,40 @@ private fun SettingRow(title: String, sub: String? = null, trailing: @Composable
     }
 }
 
+/** v0.23 : écran de bienvenue, affiché une seule fois au premier lancement (pour ceux qui découvrent l'appli). */
+@Composable
+fun WelcomeDialog(onSettings: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = {},
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+        modifier = Modifier.widthIn(max = 640.dp).padding(16.dp),
+        containerColor = C.Card,
+        title = { Text("Bienvenue dans Lanceur 308", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                Text("Un écran d'accueil pour autoradio Android, fait pour une Peugeot 308 (2007-2013).", fontSize = 15.sp)
+                Spacer(Modifier.height(8.dp))
+                listOf(
+                    "Pour tout voir bouger sans rien brancher : « Voir la démo ».",
+                    "Ta plaque sur la voiture : Réglages → Plaque.",
+                    "Données du moteur : un boîtier OBD Bluetooth (ELM327, Vgate vLinker, iCar), puis l'onglet Moteur.",
+                    "Portes et phares en direct : seulement sur les autoradios de marque FYT.",
+                    "Garder cet écran au démarrage : Réglages → Utiliser comme écran d'accueil.",
+                ).forEachIndexed { i, line -> Text("${i + 1}. $line", fontSize = 14.sp, modifier = Modifier.padding(vertical = 3.dp)) }
+                Spacer(Modifier.height(8.dp))
+                Text("L'appli n'a pas accès à Internet : rien ne sort de ton autoradio.", fontSize = 12.sp, color = C.Sub)
+            }
+        },
+        confirmButton = { Button(onClick = { UiPrefs.markWelcomed() }) { Text("Commencer") } },
+        dismissButton = {
+            Row {
+                TextButton(onClick = { UiPrefs.markWelcomed(); onSettings() }) { Text("Réglages") }
+                TextButton(onClick = { Vehicle.updateDemo(true); UiPrefs.markWelcomed() }) { Text("Voir la démo") }
+            }
+        },
+    )
+}
+
 @Composable
 fun SettingsDialog(onDismiss: () -> Unit) {
     val ctx = LocalContext.current
@@ -240,6 +274,10 @@ fun SettingsDialog(onDismiss: () -> Unit) {
     var wifiAdbOn by remember { mutableStateOf(DevOptions.wifiAdbPort() != null) }
     var wifiAdbMessage by remember { mutableStateOf(DevOptions.wifiAdbStatus()) }
     var wifiAdbBusy by remember { mutableStateOf(false) }
+    var plateText by remember { mutableStateOf(UiPrefs.plate) }
+    var plateMessage by remember { mutableStateOf<String?>(null) }
+    var plateBusy by remember { mutableStateOf(false) }
+    val plateImage = remember(plateText) { PlateModel.bitmap(plateText.ifEmpty { PlateModel.EXAMPLE }).asImageBitmap() }
     val vs by Vehicle.state.collectAsStateValue()
 
     AlertDialog(
@@ -262,6 +300,19 @@ fun SettingsDialog(onDismiss: () -> Unit) {
                 }
                 SettingRow("5 portes", "Décoche pour une 308 3 portes") {
                     Switch(UiPrefs.fiveDoors, UiPrefs::updateFiveDoors)
+                }
+                // v0.23 : chacun tape sa plaque ; elle est dessinée ici puis posée sur la voiture 3D.
+                SettingRow("Plaque", plateMessage ?: "Affichée sur la voiture ; ne quitte pas l'autoradio") {
+                    androidx.compose.foundation.Image(plateImage, null, Modifier.height(30.dp).padding(end = 8.dp))
+                    Field(plateText, { plateText = PlateModel.normalize(it) }, "Plaque", Modifier.width(170.dp), placeholder = PlateModel.EXAMPLE)
+                    Button(enabled = !plateBusy, modifier = Modifier.padding(start = 8.dp), onClick = {
+                        plateBusy = true
+                        val wanted = plateText
+                        Thread {
+                            plateMessage = runCatching { PlateModel.apply(ctx, wanted) }.getOrElse { "Échec : ${it.message}" }
+                            plateBusy = false
+                        }.start()
+                    }) { Text(if (plateBusy) "…" else "Poser") }
                 }
                 SettingRow("Optimiser l'autoradio", "Mémoire, applis inutiles, mode CarPlay, réglages qui accélèrent Android") {
                     Button(onClick = { optim = true }) { Text("Ouvrir") }
