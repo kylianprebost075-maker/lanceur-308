@@ -50,6 +50,11 @@ object AutoBackup {
             val appCtx = ctx.applicationContext
             scope.launch { if (runCatching { DeviceInfo.write(appCtx) }.getOrDefault(0) == 0) infoWritten = false }
         }
+        // Plantages (v0.20) : signalés au journal et recopiés sur la clé ; vérifié une fois par minute (rapide si rien).
+        run {
+            val appCtx = ctx.applicationContext
+            scope.launch { runCatching { CrashLog.syncToKeys(appCtx) } }
+        }
         val due = nowMs - p.getLong("at", 0L) > EVERY_MS ||
             (lastKey != null && key != lastKey) ||
             (lastUsb >= 0 && usb > lastUsb)

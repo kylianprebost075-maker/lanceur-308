@@ -1,7 +1,7 @@
-# Lanceur 308 — dossier de reprise (version 0.19)
+# Lanceur 308 — dossier de reprise (version 0.20)
 
 > **À lire en entier avant de toucher à quoi que ce soit.**
-> Ce dossier permet à une IA (ou à un développeur) de reprendre le projet. Dernière version : **0.19 du 9 novembre
+> Ce dossier permet à une IA (ou à un développeur) de reprendre le projet. Dernière version : **0.20 du 10 novembre
 > 2026** (nouveautés de chaque version juste sous la galerie ; les sections techniques plus bas datent de la 0.8 et
 > sont complétées par ces notes de version).
 > L'ancien README (version 0.4) est conservé dans `diagnostic/README_ancien_v0.4.md` pour l'historique.
@@ -53,6 +53,14 @@ de dessus en 2D, celle que l'appli affiche quand la 3D n'est pas disponible. Sur
 | ![Échéances d'entretien](docs/captures/onglets/09-entretien.png) | ![Consommation et coût des pleins](docs/captures/onglets/10-entretien-pleins.png) |
 | **Réglages** | **Panneau à côté de CarPlay (v0.13, alerte FAP v0.14)** |
 | ![Réglages : couleur, 5 portes, Optimiser l'autoradio, kilométrage, température extérieure, thème](docs/captures/onglets/11-reglages.png) | ![Panneau : puissance, rapport conseillé, régime, eau, turbo, batterie](docs/captures/onglets/12-panneau-performances.png) |
+
+**Nouveau en v0.20 : journal des plantages sur la clé USB (10/11)**
+- **Plantages enregistrés** (`backup/CrashLog.kt`, installé en tout premier dans `App.onCreate`) : si l'appli plante,
+  le détail (pile d'appels, version, fil, mémoire libre) est écrit dans `plantages/plantage-<date>.txt`, dans la
+  mémoire de l'appli et tout de suite sur la clé si elle est branchée. Au lancement suivant, `AutoBackup` le signale
+  au journal (`[PLANTAGE]`) et le recopie sur la clé. 20 plantages gardés au plus. Android ferme ensuite l'appli
+  comme avant (gestionnaire d'origine rappelé). But : savoir pourquoi l'appli plante dans la voiture, sans ADB.
+- Ne contient ni position ni identifiant ; reste sur la clé, jamais publié.
 
 **Nouveau en v0.19 : fiche technique de l'autoradio écrite sur la clé USB (09/11 au soir)**
 - **Fiche technique** (`backup/DeviceInfo.kt`, lancée par `AutoBackup.tick` une fois par lancement dès qu'une clé est
@@ -353,7 +361,7 @@ Puis copier l'APK vers `livrables\Lanceur308.apk`, `E:\Lanceur308.apk` et `E:\30
 - AGP 8.7.3, **Kotlin 2.0.21**, Compose BOM 2024.12.01
 - **SceneView 2.2.1** (Filament 1.52) — SceneView 2.3+ exige Kotlin 2.2.
 - minSdk 26, targetSdk 33, compileSdk 35. R8 activé (`proguard-rules.pro` garde `com.google.android.filament.**` et `io.github.sceneview.**`).
-- Version dans `app/build.gradle.kts` : **incrémenter `versionCode` à chaque livraison** (actuellement 25 / "0.19").
+- Version dans `app/build.gradle.kts` : **incrémenter `versionCode` à chaque livraison** (actuellement 26 / "0.20").
 
 ---
 
@@ -465,7 +473,8 @@ Simule ouvrants, phares, marche arrière, batterie faible, accélérations ; les
 | 0.9 – 0.15 | Panneau performances à côté de CarPlay, onglet Moteur (diagnostic, batterie, trajets, chauffe, bilan, FAP), sauvegarde automatique sur la clé, style Verre, onglet Son (alignement, tests, mesure au micro du PC). Détail dans les « Nouveau en v0.x » plus haut. |
 | 0.16 – 0.17 | Optimisation de l'autoradio (mémoire, mode CarPlay, réglages guidés) ; température extérieure apprise, chauffe corrigée, panneau CarPlay déplaçable, clé USB mieux détectée. |
 | 0.18 | Mémoire libérée automatiquement ; kilométrage du calculateur demandé dès la connexion (session `81` + `2110`) ; journal moins bavard. |
-| **0.19** | **Fiche technique de l'autoradio** écrite sur la clé USB à chaque lancement (`DeviceInfo.kt`), pour préparer le débridage. |
+| 0.19 | Fiche technique de l'autoradio écrite sur la clé USB à chaque lancement (`DeviceInfo.kt`), pour préparer le débridage. |
+| **0.20** | **Journal des plantages** écrit sur la clé (`CrashLog.kt`). |
 
 ---
 
@@ -484,7 +493,12 @@ Simule ouvrants, phares, marche arrière, batterie faible, accélérations ; les
    « lu : … km » ou les réponses brutes), nettoyages automatiques de la mémoire (lignes `[OPTIM]`) ;
    v0.19 : lire `infos-autoradio.txt` sur la clé (jamais le publier) pour choisir la voie de débridage
    (`ro.debuggable`, `ro.secure`, `su`, SELinux), vérifier que les lignes ne sont pas toutes « illisible ».
-6. Codes défaut OBD (mode 03 / effacement 04) : faciles à ajouter dans `Engine.kt` maintenant que le boîtier est là.
+6. Codes défaut OBD : **faits depuis la v0.9** (`Engine.kt` : lecture des modes 03, 07 et 0A par `parseDtcs`,
+   effacement 04 sur demande, onglet Moteur → Diagnostic). Rien à ajouter.
+10. Suite de la revue de code du 10/11/2026 (avis extérieur, vérifié dans le code) : sortir les calculs de chaque
+   seconde du fil de l'écran (`Dispatchers.Main` dans `VehicleWatchService` et `Vehicle`) après mesure en séance
+   ADB ; tests JUnit de la logique pure (FAP, chauffe, rapports appris, score) ; plus tard seulement, découper
+   `VehicleWatchService` (cadences en « ticks % n ») et regrouper les constantes de la 308 en un profil.
 7. **Onglet Diagnostic (v0.9)** : d'abord une séance d'exploration dans la voiture avec un PC et le vLinker
    (`outils/obd/obd_explorer.py`, lecture seule garantie, fiche `outils/obd/SEANCE_OBD.md`) pour savoir ce que
    la 308 donne vraiment (codes défaut, vanne EGR, FAP, kilométrage, état des feux par le BSI).

@@ -12,6 +12,8 @@ import fr.p308.lanceur.vehicle.Vehicle
 class App : Application() {
     override fun onCreate() {
         super.onCreate()
+        // En tout premier : un plantage pendant le démarrage est lui aussi enregistré (v0.20).
+        fr.p308.lanceur.backup.CrashLog.install(this)
         UiPrefs.init(this)
         Vehicle.init(this)
         Maintenance.init(this)
