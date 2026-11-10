@@ -33,7 +33,8 @@ Tu préfères tout faire toi-même ? Suis les étapes ci-dessous.
 ## Installation en 5 étapes
 
 1. Sur ton ordinateur ou ton téléphone, ouvre la page
-   [Versions](https://github.com/kylianprebost075-maker/lanceur-308/releases/latest) et télécharge `Lanceur308.apk`.
+   [Versions](https://github.com/kylianprebost075-maker/lanceur-308/releases/latest) et télécharge `Lanceur308.apk` (lien direct, toujours la dernière version :
+   https://github.com/kylianprebost075-maker/lanceur-308/releases/latest/download/Lanceur308.apk ).
 2. Copie ce fichier sur la clé USB.
 3. Branche la clé sur l'autoradio et ouvre son **gestionnaire de fichiers**.
 4. Touche `Lanceur308.apk`. Si Android demande d'autoriser les « sources inconnues », accepte pour le gestionnaire
