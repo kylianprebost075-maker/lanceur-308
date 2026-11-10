@@ -67,8 +67,7 @@ de dessus en 2D, celle que l'appli affiche quand la 3D n'est pas disponible. Sur
     (« clio-3 » → « CLIO-CLIO- »). Le clavier met maintenant les majuscules lui-même ; le texte est normalisé à « Poser ».
 - Libellé « Décoche pour une 308 3 portes » → « … une voiture 3 portes ».
 - **`docs/guide-antigravity/`** : guide PDF de 10 pages (installation d'Antigravity, questions de l'IA, fiche, adaptation,
-  installation sur l'autoradio écran par écran) + `guide.html` (source) + captures. Les écrans internes d'Antigravity ne
-  sont pas capturés (connexion Google nécessaire) : décrits d'après sa documentation officielle du 10/11/2026.
+  installation sur l'autoradio écran par écran) + `guide.html` (source) + captures. Captures réelles d'Antigravity (10/11, prises en pilotant l'appli de l'utilisateur) : modèle **Gemini 4 Argon High** (le plus récent gratuit ; Gemini 4 Carbon « Unavailable »), questions en 24 s, fiche conforme, un seul fichier modifié, tests 16 OK / 14 ignorés, APK fabriquée en ~3 min.
 
 **Nouveau en v0.24 : adaptation à d'autres voitures par une IA, modèle 3D public publié (10/11, nuit)**
 - **`vehicle/CarProfile.kt`** : tout ce qui dépend de la voiture est regroupé dans ce seul fichier (nom affiché, moteur,

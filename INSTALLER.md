@@ -21,6 +21,9 @@ Aide-moi à installer Lanceur 308 dans ma voiture : https://github.com/kylianpre
 Lis le fichier ADAPTER.md de ce dépôt et suis-le : pose-moi d'abord tes questions sur ma voiture.
 ```
 
+Dans Antigravity, choisis d'abord le modèle **Gemini 4 Argon** avec la réflexion **High** (menu du modèle, au survol) :
+c'est le plus récent du forfait gratuit, et le plus fiable pour suivre le guide.
+
 Elle te pose une seule série de questions (voiture, carburant, boîte, autoradio, boîtier OBD), te dit ce qui marchera
 chez toi et quoi régler. Si tu veux, elle adapte aussi l'appli à ta voiture (puissance, rapports, réservoir) : il faut
 alors un ordinateur pour fabriquer l'appli. Elle ne te demandera jamais ta plaque ni ton numéro de série.

@@ -19,22 +19,25 @@
   .num { flex: 0 0 30px; height: 30px; border-radius: 50%; background: var(--accent); color: #fff; font-weight: 700; display: flex; align-items: center; justify-content: center; font-size: 13pt; }
   .step > div { flex: 1; }
   .shot { max-width: 100%; max-height: 340px; width: auto; border: 1px solid var(--line); border-radius: 6px; display: block; margin: 6px auto 2px; }
+  .shot.tall { max-height: 600px; }
+  .shot.mid { max-height: 260px; }
   .shot.half { width: 49%; max-height: none; display: inline-block; vertical-align: top; margin: 6px 0 2px; }
-  .cap { font-size: 9pt; color: var(--sub); margin: 0 0 10px; }
+  .cap { font-size: 9pt; color: var(--sub); margin: 0 0 10px; text-align: center; }
   .box { border: 1px solid var(--line); border-left: 4px solid var(--accent); background: var(--soft); border-radius: 6px; padding: 8px 12px; margin: 8px 0 10px; }
   .warn { border-left-color: var(--warnline); background: var(--warn); }
   .ok { border-left-color: var(--okline); background: var(--ok); }
-  pre { font-family: Consolas, "Courier New", monospace; font-size: 9pt; white-space: pre-wrap; margin: 4px 0; line-height: 1.35; }
-  .add { color: #1d6b3a; } .del { color: #a3262e; }
+  .key { border: 2px solid #e0352b; background: #fff1f0; border-radius: 8px; padding: 10px 14px; margin: 10px 0; font-size: 12.5pt; }
+  pre { font-family: Consolas, "Courier New", monospace; font-size: 9.5pt; white-space: pre-wrap; margin: 4px 0; line-height: 1.35; }
   table { border-collapse: collapse; width: 100%; font-size: 10pt; margin: 6px 0 10px; }
   td, th { border: 1px solid var(--line); padding: 4px 6px; vertical-align: top; text-align: left; }
   th { background: var(--soft); }
   .wrap { position: relative; width: fit-content; margin: 0 auto; }
   .arrow { position: absolute; border: 3px solid #e0352b; border-radius: 8px; }
-  .tag { display: inline-block; font-size: 8.5pt; font-weight: 700; color: #fff; background: var(--sub); border-radius: 4px; padding: 1px 6px; margin-right: 4px; }
   .cover { padding-top: 20px; }
   .toc li { margin: 3px 0; }
   .small { font-size: 9.5pt; color: var(--sub); }
+  .row { display: flex; gap: 10px; align-items: flex-start; }
+  .row > * { flex: 1; }
 </style>
 </head>
 <body>
@@ -42,238 +45,209 @@
 <!-- ============ COUVERTURE ============ -->
 <section class="page cover">
   <h1>Installer Lanceur 308<br>avec Antigravity</h1>
-  <p class="lead">Guide pas à pas, avec une démonstration complète sur une autre voiture que la 308 :
-  une <b>Renault Clio 3 1.2 16V 75 ch essence de 2008</b>.</p>
+  <p class="lead">Guide pas à pas, avec une démonstration réelle dans Antigravity (gratuit) sur une autre voiture
+  que la 308 : une <b>Renault Clio 3 1.2 16V 75 ch essence de 2008</b>.</p>
 
-  <img class="shot" style="max-height:270px" src="images/accueil-3d.png" alt="La voiture en 3D sur l'autoradio">
+  <img class="shot" style="max-height:250px" src="images/accueil-3d.png" alt="La voiture en 3D sur l'autoradio">
   <p class="cap">Ce que l'appli affiche sur l'autoradio (voiture en 3D, plaque d'exemple).</p>
 
-  <div class="box">
-    <b>Lanceur 308</b> est un écran d'accueil pour autoradio Android : la voiture en 3D, les données du moteur
-    (avec un boîtier OBD Bluetooth), le carnet d'entretien, les trajets. Gratuit, sans compte, sans Internet.
-  </div>
+  <div class="key">⚠️ <b>Le réglage le plus important</b> : dans Antigravity, choisis le modèle gratuit le plus récent
+  avec la réflexion au maximum, <b>Gemini 4 Argon → High</b> (étape 5). Avec un modèle moins réfléchi, l'IA se trompe
+  plus souvent et gaspille ton quota gratuit.</div>
 
   <h3>Il te faut</h3>
   <ul>
     <li>un <b>autoradio Android 8.0 ou plus récent</b> et une <b>clé USB</b> ;</li>
-    <li>un <b>ordinateur</b> (Windows 10/11, Mac ou Linux) avec un <b>compte Google</b> pour Antigravity ;</li>
+    <li>un <b>ordinateur</b> (Windows 10/11, Mac ou Linux) et un <b>compte Google</b> pour Antigravity ;</li>
     <li>en option : un <b>boîtier OBD Bluetooth</b> (ELM327, Vgate vLinker MC+, iCar Pro) ;</li>
-    <li>seulement si tu veux adapter l'appli à ta voiture : <b>Android Studio</b> (gratuit).</li>
+    <li>seulement pour adapter l'appli à ta voiture : <b>Android Studio</b> (gratuit).</li>
   </ul>
 
   <h3>Les étapes</h3>
   <ol class="toc">
-    <li>Installer Antigravity et récupérer le projet</li>
-    <li>Demander à l'IA de t'aider : ses questions, tes réponses</li>
-    <li>Ce que l'IA te répond (exemple réel avec la Clio)</li>
-    <li>Option : l'IA adapte l'appli à ta voiture</li>
-    <li>Installer l'appli sur l'autoradio (captures de chaque écran)</li>
-    <li>Premiers réglages, et si ça ne marche pas</li>
+    <li>Installer Antigravity · 2. Récupérer le projet · 3. Choisir le modèle</li>
+    <li>Les questions de l'IA et ses réponses (captures réelles)</li>
+    <li>Installer l'appli sur l'autoradio · Premiers réglages · Dépannage</li>
   </ol>
-  <p class="small">Démonstration faite le 10 novembre 2026 avec la version 0.25. Les captures de l'autoradio viennent d'un
-  émulateur Android 8 réglé comme un autoradio (écran 1024 × 600) : la voiture y est dessinée en 2D, vue de dessus ;
-  sur un vrai autoradio, elle est en 3D comme ci-dessus.</p>
+  <p class="small">Démonstration faite le 10 novembre 2026 avec Antigravity 2.31 et Lanceur 308 version 0.25. Les captures
+  d'Antigravity sont réelles (interface en anglais). Celles de l'autoradio viennent d'un émulateur Android 8 réglé comme un
+  autoradio (1024 × 600) : la voiture y est dessinée en 2D ; sur un vrai autoradio, elle est en 3D comme ci-dessus.</p>
 </section>
 
 <!-- ============ 1. ANTIGRAVITY ============ -->
 <section class="page">
-  <h2>1. Installer Antigravity et récupérer le projet</h2>
-
+  <h2>1. Installer Antigravity</h2>
   <div class="step"><div class="num">1</div><div>
-    <b>Télécharge Antigravity</b> sur <b>antigravity.google/download</b>, onglet de ton système (ici Windows),
-    bouton <b>« Télécharger pour x64 »</b>. Lance le fichier <code>.exe</code> et suis l'installation.
+    <b>Télécharge Antigravity</b> sur <b>antigravity.google/download</b>, onglet de ton système (ici Windows), bouton
+    <b>« Télécharger pour x64 »</b>. Lance le fichier <code>.exe</code> et suis l'installation.
   </div></div>
   <img class="shot" src="images/01-antigravity-telecharger.png" alt="Page de téléchargement d'Antigravity">
-  <p class="cap">Page officielle de téléchargement. Le forfait gratuit (0 $) suffit : il a des limites d'utilisation
-  par semaine, d'où l'importance de suivre ce guide sans détour.</p>
+  <p class="cap">Page officielle de téléchargement. Le forfait gratuit (0 $) suffit ; il a des limites par semaine.</p>
 
   <div class="step"><div class="num">2</div><div>
-    <b>Ouvre Antigravity et connecte-toi</b> avec ton compte Google (la connexion se fait dans ton navigateur).
-    Quand il te demande ce qui décrit ton activité, choisis <b>« Ingénierie logicielle »</b>, puis accepte les conditions.
+    <b>Ouvre Antigravity et connecte-toi</b> avec ton compte Google (la connexion se fait dans ton navigateur). Quand il
+    demande ce qui décrit ton activité, choisis <b>« Software Engineering »</b> (Ingénierie logicielle), puis accepte les
+    conditions.
   </div></div>
-
 </section>
+
+<!-- ============ 2. PROJET ============ -->
 <section class="page">
-  <h2>1. Récupérer le projet</h2>
+  <h2>2. Récupérer le projet et l'ouvrir</h2>
   <div class="step"><div class="num">3</div><div>
-    <b>Télécharge le projet</b> : sur <b>github.com/kylianprebost075-maker/lanceur-308</b>, clique sur le bouton vert
-    <b>« Code »</b> puis <b>« Download ZIP »</b>. Décompresse le fichier (clic droit → « Extraire tout ») dans
-    <b>Documents</b>, par exemple.
+    <b>Télécharge le projet</b> : sur <b>github.com/kylianprebost075-maker/lanceur-308</b>, bouton vert <b>« Code »</b>
+    puis <b>« Download ZIP »</b>. Décompresse-le (clic droit → « Extraire tout ») dans <b>Documents</b>, par exemple.
   </div></div>
   <div class="wrap">
     <img class="shot" src="images/03-github-projet.png" alt="Page du projet sur GitHub">
     <div class="arrow" style="left:62.2%; top:31.1%; width:9.6%; height:5.2%;"></div>
   </div>
-  <p class="cap">Le bouton vert « Code » (entouré en rouge) ouvre un menu avec « Download ZIP ».</p>
+  <p class="cap">Le bouton vert « Code » (entouré) ouvre un menu avec « Download ZIP ».</p>
 
   <div class="step"><div class="num">4</div><div>
-    <b>Ouvre le projet dans Antigravity</b> : dans la barre de gauche, clique sur l'icône <b>Nouveau projet</b>
-    (un dossier avec un « + »), puis <b>« Ajouter un dossier »</b>, choisis le dossier <b>lanceur-308</b> décompressé,
-    et <b>« Créer »</b>. Si on te demande un mode, choisis <b>« Mode local »</b>.
+    <b>Crée un projet dans Antigravity</b> : à gauche, à côté de « Projects », clique sur l'icône
+    <b>« Create New Project »</b> (un dossier avec un +), puis <b>« Add Folder »</b>, choisis le dossier
+    <b>lanceur-308</b> décompressé, et <b>« Create »</b>. Ouvre ensuite une conversation dans ce projet avec
+    <b>« New Conversation »</b>, et garde <b>« Local Checkout »</b> (travail directement dans le dossier).
   </div></div>
-  <p class="small">Les écrans d'Antigravity changent souvent d'une version à l'autre : repère-toi aux mots en gras.</p>
+  <img class="shot mid" src="images/ag1-nouveau-projet.png" alt="Bouton Create New Project">
+  <p class="cap">Capture réelle : le bouton « Create New Project » (entouré). Ici le projet s'appelle « demo ».</p>
 </section>
 
-<!-- ============ 2. QUESTIONS ============ -->
+<!-- ============ 3. MODELE ============ -->
 <section class="page">
-  <h2>2. Demander à l'IA de t'aider</h2>
-
+  <h2>3. Choisir le modèle : Gemini 4 Argon, réflexion High</h2>
   <div class="step"><div class="num">5</div><div>
-    <b>Copie ce message</b> dans la zone de saisie d'Antigravity et appuie sur <b>Entrée</b> :
+    En bas de la zone de message, clique sur le <b>nom du modèle</b> (par exemple « Gemini 3.8 Flash »). Dans la liste,
+    <b>passe la souris</b> sur <b>« Gemini 4 Argon »</b> (le plus récent disponible gratuitement) sans cliquer :
+    un petit menu s'ouvre à droite.
+  </div></div>
+  <img class="shot" src="images/ag2-menu-modeles.png" alt="Menu des modèles">
+  <p class="cap">« Gemini 4 Carbon » est marqué « Unavailable » : il n'est pas inclus dans le forfait gratuit.</p>
+
+  <div class="step"><div class="num">6</div><div>
+    Dans le petit menu, choisis <b>« High »</b> : c'est le niveau de réflexion maximal. En dessous, le bouton doit
+    maintenant afficher <b>« Gemini 4 Argon High »</b>.
+  </div></div>
+  <div class="row">
+    <img class="shot" style="max-height:230px" src="images/ag3-niveau-high.png" alt="Niveau de réflexion High">
+  </div>
+  <div class="box warn">Si tu cliques directement sur « Gemini 4 Argon », il se met en <b>Medium</b> : rouvre le menu et
+  choisis <b>High</b> au survol. Si un modèle Gemini plus récent apparaît un jour sans la mention « Unavailable »,
+  prends-le, toujours en <b>High</b>.</div>
+</section>
+
+<!-- ============ 4. MESSAGE + QUESTIONS ============ -->
+<section class="page">
+  <h2>4. Demander à l'IA de t'aider</h2>
+  <div class="step"><div class="num">7</div><div>
+    <b>Copie ce message</b> dans la zone de saisie, vérifie le modèle (<b>Gemini 4 Argon High</b>), puis envoie avec la
+    <b>flèche bleue</b> :
   </div></div>
   <div class="box"><pre>Aide-moi à installer Lanceur 308 dans ma voiture.
 Lis le fichier ADAPTER.md de ce projet et suis-le : pose-moi d'abord tes questions sur ma voiture.</pre></div>
-  <p class="small">Le projet contient un fichier <b>ADAPTER.md</b> écrit pour les IA : il leur dit quoi demander, ce qui marche
-  selon la voiture, et le seul fichier à modifier. L'IA ne lit pas tout le reste : ça économise ton quota gratuit.</p>
-
-  <div class="step"><div class="num">6</div><div>
-    <b>L'IA t'envoie toutes ses questions d'un coup.</b> Réponds à tout dans un seul message
-    (« je ne sais pas » est une réponse valable). Voici ses questions, et les réponses de notre exemple :
-  </div></div>
-  <table>
-    <tr><th style="width:52%">Question de l'IA</th><th>Réponse (exemple Clio)</th></tr>
-    <tr><td>1. Marque, modèle et année</td><td>Renault Clio 3 de 2008</td></tr>
-    <tr><td>2. Moteur : cylindrée et puissance</td><td>1.2 16V 75 ch</td></tr>
-    <tr><td>3. Carburant</td><td>Essence</td></tr>
-    <tr><td>4. Boîte manuelle (combien de rapports ?) ou automatique</td><td>Manuelle, 5 rapports</td></tr>
-    <tr><td>5. 3 ou 5 portes</td><td>5 portes</td></tr>
-    <tr><td>6. Taille des pneus (sur le flanc)</td><td>185/60 R15</td></tr>
-    <tr><td>7. Contenance du réservoir</td><td>55 litres</td></tr>
-    <tr><td>8. Autoradio : marque, version d'Android</td><td>Autoradio chinois 9 pouces, Android 10</td></tr>
-    <tr><td>9. Est-ce un autoradio FYT ?</td><td>Je ne sais pas</td></tr>
-    <tr><td>10. Portes ouvertes ou radar affichés par l'écran d'origine ?</td><td>Non</td></tr>
-    <tr><td>11. Appli CarPlay / Android Auto</td><td>ZLink</td></tr>
-    <tr><td>12. Boîtier OBD (modèle, Bluetooth ou Wi-Fi)</td><td>ELM327 bleu à 10 €, Bluetooth</td></tr>
-    <tr><td>13. A) juste installer, ou B) adapter l'appli à ta voiture</td><td>B</td></tr>
-  </table>
-  <div class="box warn">L'IA ne te demande <b>jamais</b> ta plaque, ton numéro de série (VIN) ni ton adresse.
-  Ta plaque se tape directement dans l'appli et ne quitte pas l'autoradio.</div>
-</section>
-
-<!-- ============ 3. FICHE ============ -->
-<section class="page">
-  <h2>3. Ce que l'IA te répond</h2>
-  <p>D'après tes réponses, l'IA te fait une <b>fiche « ce qui marchera chez toi »</b>. Voici celle de la Clio,
-  obtenue en suivant ADAPTER.md à la lettre :</p>
-  <div class="box ok">
-    <b>✅ Ça marchera</b>
-    <ul>
-      <li>Android 10 : l'appli s'installe (il faut Android 8.0 au minimum).</li>
-      <li>Écran d'accueil, voiture 3D, plaque, mode démo, vitesse GPS, chrono, trajets, carnet d'entretien, pleins.</li>
-      <li>Ta Clio essence de 2008 a une prise OBD : régime, température d'eau, tension et codes défaut s'afficheront
-      avec ton boîtier.</li>
-    </ul>
-    <b>❌ Ça ne marchera pas</b>
-    <ul>
-      <li>Portes, coffre, phares et radar en direct : il faut un autoradio FYT avec un boîtier CAN réglé ; l'écran
-      d'origine n'affiche pas les portes, donc il n'y en a pas.</li>
-      <li>Suivi du filtre à particules et conseil « turbo chaud » : sans objet sur un moteur essence sans turbo.</li>
-      <li>Lecture du kilométrage dans le calculateur : réservée aux Peugeot-Citroën diesel. Tu le taperas une fois.</li>
-      <li>Boîtier OBD en Wi-Fi : non pris en charge (le tien est en Bluetooth, c'est bon).</li>
-    </ul>
-    <b>⚙️ À faire</b>
-    <ul>
-      <li>Ton ELM327 est en Bluetooth « classique » : associe-le d'abord dans les réglages Bluetooth de l'autoradio
-      (code <b>1234</b> ou <b>0000</b>), puis onglet Moteur → « Rechercher OBD ». Les ELM327 à bas prix répondent
-      parfois mal : si ça coince, un Vgate vLinker MC+ se connecte tout seul.</li>
-      <li>Dans l'appli : Réglages → <b>Kilométrage</b> (une fois), <b>Plaque</b>, <b>couleur</b> la plus proche,
-      <b>Fenêtre flottante sur CarPlay</b> (pour ZLink), <b>Utiliser comme écran d'accueil</b>.</li>
-      <li>La voiture dessinée reste une Peugeot 308 : seuls le nom et les calculs changent.</li>
-    </ul>
-  </div>
-  <p>Si tu avais répondu <b>A</b> à la question 13, c'est fini : passe directement à l'étape 5 (installer l'appli
-  téléchargée sur GitHub). Puissance, rapports et autonomie seraient alors calculés pour la 308.</p>
-</section>
-
-<!-- ============ 4. ADAPTER ============ -->
-<section class="page">
-  <h2>4. Option B : l'IA adapte l'appli à ta voiture</h2>
-  <div class="box warn">Il faut <b>Android Studio</b> sur l'ordinateur (gratuit, sur developer.android.com) : il fournit les
-  outils pour fabriquer l'appli. Installe-le avant, puis dis à l'IA « Android Studio est installé ».</div>
-
-  <div class="step"><div class="num">7</div><div>
-    <b>L'IA modifie un seul fichier</b>, <code>CarProfile.kt</code>, qui contient tout ce qui dépend de la voiture.
-    Voici exactement ce qui a changé pour la Clio (en rouge l'ancienne valeur, en vert la nouvelle) :
-  </div></div>
-  <div class="box"><pre><span class="del">-  NAME = "Peugeot 308"</span>                 <span class="add">+  NAME = "Renault Clio 3"</span>
-<span class="del">-  ENGINE_LABEL = "1.6 HDi 110"</span>         <span class="add">+  ENGINE_LABEL = "1.2 16V 75"</span>
-<span class="del">-  couple : 240 N·m à 1 750 tr/min</span>     <span class="add">+  couple : 107 N·m à 4 250 tr/min (estimation)</span>
-<span class="del">-  rapports : 7,9 / 14,6 / 22,9 / 31,6 / 40,6</span>
-<span class="add">+  rapports : 7,2 / 13,2 / 19,4 / 24,6 / 30,2   (km/h à 1 000 tr/min, appris ensuite en roulant)</span>
-<span class="del">-  réservoir 60 L, réserve 6 L</span>          <span class="add">+  réservoir 55 L, réserve 7 L</span>
-<span class="del">-  filtre à particules : oui</span>            <span class="add">+  filtre à particules : non</span>
-<span class="del">-  turbo : oui</span>                          <span class="add">+  turbo : non</span>
-<span class="del">-  kilométrage lu au calculateur : oui</span>  <span class="add">+  kilométrage lu au calculateur : non</span></pre></div>
+  <img class="shot" src="images/ag4-message.png" alt="Message prêt à envoyer">
+  <p class="cap">Capture réelle : le message, le modèle « Gemini 4 Argon High » et le bouton d'envoi (entourés).</p>
 
   <div class="step"><div class="num">8</div><div>
-    <b>L'IA vérifie avec les tests</b> (commande <code>gradlew testDebugUnitTest</code>). Résultat réel pour la Clio :
+    <b>L'IA lit ADAPTER.md et t'envoie toutes ses questions d'un coup</b> (24 secondes dans notre essai).
   </div></div>
-  <div class="box ok"><pre>BUILD SUCCESSFUL
-30 tests : 16 réussis, 14 ignorés, 0 en échec</pre>
-  Les 14 tests <b>ignorés</b> vérifient les valeurs de la Peugeot 308 de l'auteur : c'est normal, ils se mettent de
-  côté tout seuls quand la voiture change. Les tests du profil, eux, refusent les valeurs impossibles
-  (un couple négatif, des rapports dans le désordre…).</div>
-
-  <div class="step"><div class="num">9</div><div>
-    <b>L'IA fabrique l'appli</b> (commande <code>gradlew assembleRelease</code>, 1 à 3 minutes). Résultat réel :
-  </div></div>
-  <div class="box ok"><pre>BUILD SUCCESSFUL in 1m 30s
-→ projet/lanceur-308/app/build/outputs/apk/release/app-release.apk</pre></div>
-  <p>C'est ce fichier <b>app-release.apk</b> que tu copieras sur la clé USB. Renomme-le <b>Lanceur308.apk</b> si tu veux.</p>
-  <div class="box warn">Une appli fabriquée par toi ne s'installe pas par-dessus celle de GitHub (signature différente) :
-  si tu avais déjà installé l'autre, désinstalle-la d'abord.</div>
+  <img class="shot" style="max-height:420px" src="images/ag5-questions.png" alt="Les questions de l'IA">
 </section>
 
-<!-- ============ 5. INSTALLER ============ -->
 <section class="page">
-  <h2>5. Installer l'appli sur l'autoradio</h2>
+  <div class="step"><div class="num">9</div><div>
+    <b>Réponds à tout dans un seul message</b>, une ligne par question (« je ne sais pas » est une réponse valable).
+    À la question 13, réponds <b>A</b> pour juste installer l'appli, ou <b>B</b> pour que l'IA l'adapte à ta voiture.
+    Voici les réponses de notre exemple :
+  </div></div>
+  <img class="shot" style="max-height:420px" src="images/ag6-reponses.png" alt="Les réponses">
+  <div class="box warn">L'IA ne te demande <b>jamais</b> ta plaque, ton numéro de série (VIN) ni ton adresse. Ta plaque
+  se tape directement dans l'appli et ne quitte pas l'autoradio.</div>
+  <div class="box">Pour la réponse <b>B</b>, il faut <b>Android Studio</b> sur l'ordinateur (gratuit, sur
+  developer.android.com) : installe-le et ouvre-le une fois <b>avant</b> d'envoyer tes réponses.</div>
+</section>
 
+<!-- ============ 5. FICHE ============ -->
+<section class="page">
+  <h2>5. Ce que l'IA te répond</h2>
   <div class="step"><div class="num">10</div><div>
-    <b>Récupère le fichier de l'appli</b> : celui fabriqué par l'IA (option B), ou, pour l'option A, <b>Lanceur308.apk</b>
-    sur la page des versions du projet. Copie-le sur une <b>clé USB</b>.
+    <b>L'IA te fait une fiche « ce qui marchera chez toi »</b>. Voici la vraie réponse de Gemini 4 Argon High pour la Clio :
   </div></div>
-  <img class="shot" src="images/02-github-version.png" alt="Page de la version sur GitHub" style="max-height:330px; object-fit:cover; object-position:top;">
-  <p class="cap">Option A : page « Releases » du projet, fichier Lanceur308.apk en bas de la page.</p>
+  <img class="shot tall" src="images/ag7-fiche.png" alt="La fiche personnalisée">
+  <p class="cap">Elle prévient aussi de ce qui ne marchera pas : sans boîtier CAN, pas de portes en direct ; un ELM327
+  classique doit être associé (code 1234 ou 0000) ; filtre à particules et turbo sans objet sur ce moteur.</p>
+</section>
 
+<section class="page">
+  <h2>6. Option B : l'IA adapte l'appli</h2>
   <div class="step"><div class="num">11</div><div>
-    <b>Branche la clé sur l'autoradio</b>, ouvre le <b>gestionnaire de fichiers</b> et touche <b>Lanceur308.apk</b>.
+    Avec la réponse <b>B</b>, l'IA modifie <b>un seul fichier</b>, <code>CarProfile.kt</code> (nom, moteur, couple,
+    rapports, réservoir), lance les tests puis fabrique l'appli. Dans notre essai : <b>environ 3 minutes</b>.
   </div></div>
-  <img class="shot half" src="images/e01-fichiers.png" alt="Gestionnaire de fichiers">
-  <img class="shot half" src="images/e02-sources-inconnues.png" alt="Avertissement sources inconnues">
-  <p class="cap">À gauche : le fichier dans le gestionnaire. À droite : Android prévient que l'appli ne vient pas du Play
-  Store ; touche <b>Continuer</b>. Selon l'autoradio, il demande d'abord d'autoriser les « sources inconnues » pour le
-  gestionnaire de fichiers : accepte.</p>
+  <img class="shot tall" src="images/ag8-adapte.png" alt="Ce que l'IA a adapté">
+  <div class="box ok"><b>Vérifié après l'essai</b> : un seul fichier modifié ; tests <b>16 réussis, 14 ignorés, 0 en
+  échec</b> (les 14 tests ignorés concernent la Peugeot 308 de l'auteur : c'est normal) ; appli fabriquée
+  (17 Mo).</div>
 </section>
 
 <section class="page">
   <div class="step"><div class="num">12</div><div>
+    <b>La fin de la réponse</b> dit où se trouve l'appli fabriquée (<code>app-release.apk</code>) et quoi régler ensuite.
+    Si tu as répondu <b>A</b>, télécharge plutôt l'appli toute prête sur GitHub (étape suivante).
+  </div></div>
+  <img class="shot tall" src="images/ag9-fin.png" alt="Fin de la réponse de l'IA">
+  <p class="cap">Le fichier se trouve dans <code>projet/lanceur-308/app/build/outputs/apk/release/</code>.</p>
+</section>
+
+<!-- ============ 7. INSTALLER ============ -->
+<section class="page">
+  <h2>7. Installer l'appli sur l'autoradio</h2>
+  <div class="step"><div class="num">13</div><div>
+    <b>Récupère le fichier de l'appli</b> : celui fabriqué par l'IA (option B), ou <b>Lanceur308.apk</b> sur la page
+    « Releases » du projet (option A). Copie-le sur une <b>clé USB</b>.
+  </div></div>
+  <img class="shot" src="images/02-github-version.png" alt="Page de la version sur GitHub" style="max-height:300px; object-fit:cover; object-position:top;">
+  <p class="cap">Option A : page « Releases » du projet, fichier Lanceur308.apk en bas de la page.</p>
+  <div class="box warn">Une appli fabriquée par toi ne s'installe pas par-dessus celle de GitHub (signature différente) :
+  si l'autre est déjà installée, désinstalle-la d'abord.</div>
+
+  <div class="step"><div class="num">14</div><div>
+    <b>Branche la clé sur l'autoradio</b>, ouvre le <b>gestionnaire de fichiers</b> et touche le fichier.
+  </div></div>
+  <img class="shot half" src="images/e01-fichiers.png" alt="Gestionnaire de fichiers">
+  <img class="shot half" src="images/e02-sources-inconnues.png" alt="Avertissement sources inconnues">
+  <p class="cap">À droite : Android prévient que l'appli ne vient pas du Play Store ; touche <b>Continuer</b>. Selon
+  l'autoradio, il demande d'abord d'autoriser les « sources inconnues » : accepte.</p>
+</section>
+
+<section class="page">
+  <div class="step"><div class="num">15</div><div>
     <b>Touche « Installer »</b>, attends quelques secondes, puis <b>« Ouvrir »</b>.
   </div></div>
   <img class="shot half" src="images/e03-installer.png" alt="Écran Installer">
   <img class="shot half" src="images/e04-installee.png" alt="Application installée">
 
-  <div class="step"><div class="num">13</div><div>
-    <b>L'écran de bienvenue s'affiche une fois.</b> Il indique pour quelle voiture l'appli est réglée : ici
-    « Renault Clio 3 1.2 16V 75 ». Touche <b>« Voir la démo »</b> pour tout voir bouger sans rien brancher,
-    ou <b>« Commencer »</b>.
+  <div class="step"><div class="num">16</div><div>
+    <b>L'écran de bienvenue s'affiche une fois</b>, avec la voiture pour laquelle l'appli est réglée (ici « Renault
+    Clio 3 1.2 16V 75 »). Touche <b>« Voir la démo »</b> pour tout voir bouger sans rien brancher, ou <b>« Commencer »</b>.
   </div></div>
   <img class="shot" src="images/e05-bienvenue.png" alt="Écran de bienvenue">
-  <p class="cap">Android peut aussi demander l'accès à la position (vitesse GPS, heure) et au Bluetooth (boîtier OBD) : accepte.</p>
+  <p class="cap">Android peut aussi demander la position (vitesse GPS, heure) et le Bluetooth (boîtier OBD) : accepte.</p>
 </section>
 
-<!-- ============ 6. REGLAGES ============ -->
+<!-- ============ 8. REGLAGES ============ -->
 <section class="page">
-  <h2>6. Premiers réglages</h2>
-  <div class="step"><div class="num">14</div><div>
-    <b>L'accueil</b> affiche le nom de ta voiture. En mode démo, tout bouge : vitesse, régime, puissance.
-    L'autonomie (540 km ici) est calculée avec le réservoir de 55 L de la Clio.
+  <h2>8. Premiers réglages</h2>
+  <div class="step"><div class="num">17</div><div>
+    <b>L'accueil</b> affiche le nom de ta voiture. En mode démo, tout bouge. L'autonomie (540 km ici) est calculée avec le
+    réservoir de 55 L de la Clio.
   </div></div>
   <img class="shot" src="images/e06-accueil-demo.png" alt="Accueil en mode démo">
 
-  <div class="step"><div class="num">15</div><div>
-    <b>Réglages</b> (en bas du menu de gauche) → <b>Plaque</b> : tape ta plaque, l'aperçu se dessine, puis
-    <b>« Poser »</b>. La voiture 3D se recharge avec ta plaque. Pense aussi au <b>Kilométrage</b> et à couper le
-    <b>Mode démo</b> quand tu as fini de regarder.
+  <div class="step"><div class="num">18</div><div>
+    <b>Réglages</b> (en bas à gauche) → <b>Plaque</b> : tape ta plaque, l'aperçu se dessine, puis <b>« Poser »</b>. Règle
+    aussi le <b>Kilométrage</b> une fois, et coupe le <b>Mode démo</b> quand tu as fini de regarder.
   </div></div>
   <img class="shot" src="images/e09-plaque-posee.png" alt="Réglages, plaque posée">
   <p class="cap">Plaque de démonstration « CLIO-3 » posée.</p>
@@ -283,26 +257,26 @@ Lis le fichier ADAPTER.md de ce projet et suis-le : pose-moi d'abord tes questio
   <h2>Si ça ne marche pas</h2>
   <table>
     <tr><th style="width:38%">Problème</th><th>Quoi faire</th></tr>
+    <tr><td>L'IA répond n'importe quoi, ou explore tout le projet</td><td>Vérifie le modèle : <b>Gemini 4 Argon High</b>. Puis rappelle-lui : « Suis ADAPTER.md : questions en un seul message, un seul fichier à modifier, CarProfile.kt. »</td></tr>
+    <tr><td>Antigravity s'arrête : limite atteinte</td><td>Le forfait gratuit a des limites par semaine (menu du modèle → « View Usage »). Attends qu'elles se renouvellent, rouvre <b>la même conversation</b> et écris « continue ».</td></tr>
+    <tr><td>La fabrication échoue (« SDK location not found », « JAVA_HOME »)</td><td>Android Studio n'est pas installé, ou pas encore ouvert une fois. Ouvre-le une fois, puis dis à l'IA : « Android Studio est installé, réessaie. »</td></tr>
     <tr><td>L'appli ne s'installe pas</td><td>Vérifie la version d'Android (8.0 minimum). Si une autre version de Lanceur 308 est déjà installée avec une autre signature, désinstalle-la d'abord.</td></tr>
     <tr><td>Le boîtier OBD ne se connecte pas</td><td>Contact mis. Bluetooth classique : associe-le dans les réglages Bluetooth de l'autoradio (1234 ou 0000), puis onglet Moteur → Rechercher OBD. Le message de l'onglet Moteur dit où ça bloque.</td></tr>
-    <tr><td>Antigravity s'arrête : limite atteinte</td><td>Le forfait gratuit a des limites par semaine. Attends qu'elles se renouvellent, puis rouvre <b>la même conversation</b> et écris « continue » : l'IA reprend où elle en était.</td></tr>
-    <tr><td>L'IA veut tout lire ou modifier d'autres fichiers</td><td>Rappelle-lui : « Suis ADAPTER.md : un seul fichier à modifier, CarProfile.kt. »</td></tr>
-    <tr><td>La fabrication échoue (« SDK location not found », « JAVA_HOME »)</td><td>Android Studio n'est pas installé, ou pas encore ouvert une première fois. Ouvre-le une fois, puis dis à l'IA : « Android Studio est installé, réessaie. »</td></tr>
     <tr><td>Un problème dans l'appli</td><td>Laisse une clé USB branchée : l'appli y écrit un journal. Ouvre un ticket sur la page « Issues » du projet, sans publier le dossier entier (il contient tes trajets).</td></tr>
   </table>
 
   <h3>Économiser son quota gratuit</h3>
   <ul>
-    <li>Une seule conversation du début à la fin.</li>
+    <li>Une seule conversation du début à la fin, avec <b>Gemini 4 Argon High</b>.</li>
     <li>Réponds à toutes les questions en <b>un seul message</b>.</li>
     <li>Ne demande pas à l'IA d'« analyser le projet » : ADAPTER.md lui dit déjà tout.</li>
-    <li>Choisis l'option A si tu n'as pas besoin des calculs moteur exacts : une seule réponse de l'IA suffit.</li>
+    <li>Option A si tu n'as pas besoin des calculs moteur exacts : une seule réponse de l'IA suffit.</li>
   </ul>
 
   <h3>Crédits</h3>
-  <p class="small">Modèle 3D : « Peugeot 308 5-Door MK1 2007-2021 » par Merc_TV (szymonpasterczyk) sur Sketchfab,
-  licence CC BY 4.0, modifié. Lanceur 308 n'est lié ni à Peugeot, ni à Renault, ni à Google, ni à un fabricant
-  d'autoradio. La Renault Clio sert uniquement d'exemple ; ses caractéristiques moteur sont des estimations.</p>
+  <p class="small">Modèle 3D : « Peugeot 308 5-Door MK1 2007-2021 » par Merc_TV (szymonpasterczyk) sur Sketchfab, licence
+  CC BY 4.0, modifié. Lanceur 308 n'est lié ni à Peugeot, ni à Renault, ni à Google, ni à un fabricant d'autoradio. La
+  Renault Clio sert uniquement d'exemple ; ses caractéristiques moteur sont des estimations de l'IA.</p>
   <p class="small">Projet : github.com/kylianprebost075-maker/lanceur-308</p>
 </section>
 
