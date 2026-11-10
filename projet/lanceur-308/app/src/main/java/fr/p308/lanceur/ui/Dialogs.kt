@@ -235,6 +235,7 @@ fun SettingsDialog(onDismiss: () -> Unit) {
     var backupMessage by remember { mutableStateOf<String?>(null) }
     var optim by remember { mutableStateOf(false) }
     var outsideTemp by remember { mutableStateOf(false) }
+    var devMessage by remember { mutableStateOf<String?>(null) }
     val vs by Vehicle.state.collectAsStateValue()
 
     AlertDialog(
@@ -274,6 +275,11 @@ fun SettingsDialog(onDismiss: () -> Unit) {
                     else "Pas encore trouvée : recopie celle de l'autoradio une fois",
                 ) {
                     TextButton(onClick = { outsideTemp = true }) { Text("Régler") }
+                }
+                // v0.21 : la page développeur d'Android, que les réglages du fabricant ne montrent pas.
+                SettingRow("Options pour les développeurs", devMessage ?: DevOptions.status(ctx)) {
+                    TextButton(onClick = { devMessage = DevOptions.openAndroidSettings(ctx) }) { Text("Réglages Android") }
+                    Button(onClick = { devMessage = DevOptions.open(ctx) }) { Text("Ouvrir") }
                 }
                 SettingRow("Thème", if (Night.active) "Nuit en ce moment" else "Jour en ce moment") {
                     Segmented(NightMode.entries.map { it to it.label }, UiPrefs.nightMode) { UiPrefs.updateNightMode(it) }

@@ -1,7 +1,7 @@
-# Lanceur 308 — dossier de reprise (version 0.20)
+# Lanceur 308 — dossier de reprise (version 0.21)
 
 > **À lire en entier avant de toucher à quoi que ce soit.**
-> Ce dossier permet à une IA (ou à un développeur) de reprendre le projet. Dernière version : **0.20 du 10 novembre
+> Ce dossier permet à une IA (ou à un développeur) de reprendre le projet. Dernière version : **0.21 du 10 novembre
 > 2026** (nouveautés de chaque version juste sous la galerie ; les sections techniques plus bas datent de la 0.8 et
 > sont complétées par ces notes de version).
 > L'ancien README (version 0.4) est conservé dans `diagnostic/README_ancien_v0.4.md` pour l'historique.
@@ -53,6 +53,17 @@ de dessus en 2D, celle que l'appli affiche quand la 3D n'est pas disponible. Sur
 | ![Échéances d'entretien](docs/captures/onglets/09-entretien.png) | ![Consommation et coût des pleins](docs/captures/onglets/10-entretien-pleins.png) |
 | **Réglages** | **Panneau à côté de CarPlay (v0.13, alerte FAP v0.14)** |
 | ![Réglages : couleur, 5 portes, Optimiser l'autoradio, kilométrage, température extérieure, thème](docs/captures/onglets/11-reglages.png) | ![Panneau : puissance, rapport conseillé, régime, eau, turbo, batterie](docs/captures/onglets/12-panneau-performances.png) |
+
+**Nouveau en v0.21 : bouton « Options pour les développeurs » (10/11)**
+- Les réglages de l'autoradio ne montrent pas la page développeur d'Android (essai ADB du 10/11, voir §1). Le Lanceur
+  l'ouvre lui-même : Réglages → « Options pour les développeurs » → **Ouvrir** (`ui/DevOptions.kt`). La ligne affiche
+  l'état (« Débogage USB : activé / coupé »).
+- Tant que les options ne sont pas activées, Android 8 referme la page développeur aussitôt (vu dans l'émulateur) :
+  le bouton ouvre alors « À propos » d'Android, où il faut appuyer 7 fois sur « Numéro de build », puis revenir et
+  rappuyer sur Ouvrir. Le Lanceur sait quelle page s'ouvrira en le demandant à Android (`resolveActivity`).
+- Bouton « Réglages Android » : ouvre les vrais réglages d'Android (pas ceux du fabricant).
+- Le Lanceur ne change aucun réglage lui-même. **Vérifié dans l'émulateur Android 8 (parcours complet) ; pas sur
+  l'autoradio**, où le fabricant a pu retirer ces pages : le bouton le dit alors.
 
 **Nouveau en v0.20 : journal des plantages sur la clé USB (10/11)**
 - **Plantages enregistrés** (`backup/CrashLog.kt`, installé en tout premier dans `App.onCreate`) : si l'appli plante,
@@ -390,7 +401,7 @@ Puis copier l'APK vers `livrables\Lanceur308.apk`, `E:\Lanceur308.apk` et `E:\30
 - AGP 8.7.3, **Kotlin 2.0.21**, Compose BOM 2024.12.01
 - **SceneView 2.2.1** (Filament 1.52) — SceneView 2.3+ exige Kotlin 2.2.
 - minSdk 26, targetSdk 33, compileSdk 35. R8 activé (`proguard-rules.pro` garde `com.google.android.filament.**` et `io.github.sceneview.**`).
-- Version dans `app/build.gradle.kts` : **incrémenter `versionCode` à chaque livraison** (actuellement 26 / "0.20").
+- Version dans `app/build.gradle.kts` : **incrémenter `versionCode` à chaque livraison** (actuellement 27 / "0.21").
 
 ---
 
@@ -503,7 +514,8 @@ Simule ouvrants, phares, marche arrière, batterie faible, accélérations ; les
 | 0.16 – 0.17 | Optimisation de l'autoradio (mémoire, mode CarPlay, réglages guidés) ; température extérieure apprise, chauffe corrigée, panneau CarPlay déplaçable, clé USB mieux détectée. |
 | 0.18 | Mémoire libérée automatiquement ; kilométrage du calculateur demandé dès la connexion (session `81` + `2110`) ; journal moins bavard. |
 | 0.19 | Fiche technique de l'autoradio écrite sur la clé USB à chaque lancement (`DeviceInfo.kt`), pour préparer le débridage. |
-| **0.20** | **Journal des plantages** écrit sur la clé (`CrashLog.kt`). |
+| 0.20 | Journal des plantages écrit sur la clé (`CrashLog.kt`). |
+| **0.21** | **Bouton « Options pour les développeurs »** dans les Réglages (`ui/DevOptions.kt`). |
 
 ---
 
