@@ -9,6 +9,9 @@ import kotlin.math.ln
 
 /** Rapport engagé, conseil de passage et apprentissage de l'étagement : vérifiés sans la voiture. */
 class GearTest {
+    /** Tous ces tests supposent l'étagement de la 308 1.6 HDi 110 (voir Author308.kt). */
+    @org.junit.Before fun seulementPourLa308() = onlyForAuthor308()
+
     /** Même découpage que GearCalib (130 cases entre 5 et 70 km/h pour 1 000 tr/min, échelle logarithmique). */
     private fun bin(ratio: Double): Int = ((ln(ratio) - ln(5.0)) / (ln(70.0) - ln(5.0)) * 130).toInt()
 

@@ -1,10 +1,10 @@
-# Lanceur 308 — dossier de reprise (version 0.24)
+# Lanceur 308 — dossier de reprise (version 0.25)
 
 > **Tu veux juste l'installer sur ton autoradio ?** Suis [INSTALLER.md](INSTALLER.md) : 5 étapes, sans compte.
 > **Tu es une IA qui aide quelqu'un à l'installer ou à l'adapter à sa voiture ?** Lis [ADAPTER.md](ADAPTER.md), pas ce README.
 
 > **À lire en entier avant de toucher à quoi que ce soit.**
-> Ce dossier permet à une IA (ou à un développeur) de reprendre le projet. Dernière version : **0.24 du 10 novembre
+> Ce dossier permet à une IA (ou à un développeur) de reprendre le projet. Dernière version : **0.25 du 10 novembre
 > 2026** (nouveautés de chaque version juste sous la galerie ; les sections techniques plus bas datent de la 0.8 et
 > sont complétées par ces notes de version).
 > L'ancien README (version 0.4) est conservé dans `diagnostic/README_ancien_v0.4.md` pour l'historique.
@@ -56,6 +56,19 @@ de dessus en 2D, celle que l'appli affiche quand la 3D n'est pas disponible. Sur
 | ![Échéances d'entretien](docs/captures/onglets/09-entretien.png) | ![Consommation et coût des pleins](docs/captures/onglets/10-entretien-pleins.png) |
 | **Réglages** | **Panneau à côté de CarPlay (v0.13, alerte FAP v0.14)** |
 | ![Réglages : couleur, 5 portes, Optimiser l'autoradio, kilométrage, température extérieure, thème](docs/captures/onglets/11-reglages.png) | ![Panneau : puissance, rapport conseillé, régime, eau, turbo, batterie](docs/captures/onglets/12-panneau-performances.png) |
+
+**Nouveau en v0.25 : guide PDF Antigravity, corrections trouvées par la démonstration sur une Clio (10/11, nuit)**
+- **Démonstration réelle** : dépôt cloné depuis GitHub comme un inconnu, `ADAPTER.md` suivi pour une Renault Clio 3 1.2 16V
+  essence (seul `CarProfile.kt` modifié), tests, construction, installation dans l'émulateur. Elle a trouvé deux défauts :
+  - **9 tests en échec** dès qu'on change de voiture (ils vérifiaient le couple et l'étagement de la 308) : une IA
+    suivant ADAPTER.md restait bloquée. Ils sont maintenant **ignorés** hors de la 308 (`Author308.kt`, `onlyForAuthor308()`) ;
+    `CarProfileTest` reste actif. ADAPTER.md précise que ~14 tests ignorés, c'est normal.
+  - **Saisie de la plaque** : la mise en majuscules pendant la frappe faisait doubler les mots par le clavier Android
+    (« clio-3 » → « CLIO-CLIO- »). Le clavier met maintenant les majuscules lui-même ; le texte est normalisé à « Poser ».
+- Libellé « Décoche pour une 308 3 portes » → « … une voiture 3 portes ».
+- **`docs/guide-antigravity/`** : guide PDF de 10 pages (installation d'Antigravity, questions de l'IA, fiche, adaptation,
+  installation sur l'autoradio écran par écran) + `guide.html` (source) + captures. Les écrans internes d'Antigravity ne
+  sont pas capturés (connexion Google nécessaire) : décrits d'après sa documentation officielle du 10/11/2026.
 
 **Nouveau en v0.24 : adaptation à d'autres voitures par une IA, modèle 3D public publié (10/11, nuit)**
 - **`vehicle/CarProfile.kt`** : tout ce qui dépend de la voiture est regroupé dans ce seul fichier (nom affiché, moteur,
@@ -458,7 +471,7 @@ Puis copier l'APK vers `livrables\Lanceur308.apk`, `E:\Lanceur308.apk` et `E:\30
 - AGP 8.7.3, **Kotlin 2.0.21**, Compose BOM 2024.12.01
 - **SceneView 2.2.1** (Filament 1.52) — SceneView 2.3+ exige Kotlin 2.2.
 - minSdk 26, targetSdk 33, compileSdk 35. R8 activé (`proguard-rules.pro` garde `com.google.android.filament.**` et `io.github.sceneview.**`).
-- Version dans `app/build.gradle.kts` : **incrémenter `versionCode` à chaque livraison** (actuellement 30 / "0.24").
+- Version dans `app/build.gradle.kts` : **incrémenter `versionCode` à chaque livraison** (actuellement 31 / "0.25").
 
 ---
 
@@ -576,6 +589,7 @@ Simule ouvrants, phares, marche arrière, batterie faible, accélérations ; les
 | **0.22** | **ADB par le Wi-Fi** activable depuis les Réglages ; sauvegarde automatique qui ne se relance plus à chaque kilomètre. |
 | **0.23** | **Plaque personnalisée** tapée dans les Réglages (`ui/Plate.kt`), modèle 3D public à plaque d'exemple, écran de bienvenue, `INSTALLER.md`. |
 | **0.24** | **Profil de voiture** (`vehicle/CarProfile.kt`) + `ADAPTER.md` pour l'IA de chacun ; modèle 3D public publié sur GitHub. |
+| **0.25** | Tests propres à la 308 ignorés pour une autre voiture ; saisie de plaque corrigée ; guide PDF Antigravity (`docs/guide-antigravity/`). |
 
 ---
 

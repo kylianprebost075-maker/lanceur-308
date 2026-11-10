@@ -44,6 +44,7 @@ class DtcAndPowerTest {
 
     @Test
     fun `couple maxi du DV6 selon le regime`() {
+        onlyForAuthor308()
         assertEquals(240f, maxTorqueNm(1750), 0.01f)
         assertEquals(240f, maxTorqueNm(2000), 0.01f)
         assertEquals(120f, maxTorqueNm(500), 0.01f)
@@ -53,6 +54,7 @@ class DtcAndPowerTest {
 
     @Test
     fun `110 ch a 4000 tours pleine charge`() {
+        onlyForAuthor308()
         val (torque, ch) = estimate(4000, 100)
         assertEquals(191, torque)
         assertEquals(109, ch)

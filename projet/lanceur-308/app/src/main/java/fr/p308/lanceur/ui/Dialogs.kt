@@ -277,7 +277,7 @@ fun SettingsDialog(onDismiss: () -> Unit) {
     var plateText by remember { mutableStateOf(UiPrefs.plate) }
     var plateMessage by remember { mutableStateOf<String?>(null) }
     var plateBusy by remember { mutableStateOf(false) }
-    val plateImage = remember(plateText) { PlateModel.bitmap(plateText.ifEmpty { PlateModel.EXAMPLE }).asImageBitmap() }
+    val plateImage = remember(plateText) { PlateModel.bitmap(PlateModel.normalize(plateText).ifEmpty { PlateModel.EXAMPLE }).asImageBitmap() }
     val vs by Vehicle.state.collectAsStateValue()
 
     AlertDialog(
@@ -298,13 +298,18 @@ fun SettingsDialog(onDismiss: () -> Unit) {
                         )
                     }
                 }
-                SettingRow("5 portes", "Décoche pour une 308 3 portes") {
+                SettingRow("5 portes", "Décoche pour une voiture 3 portes") {
                     Switch(UiPrefs.fiveDoors, UiPrefs::updateFiveDoors)
                 }
                 // v0.23 : chacun tape sa plaque ; elle est dessinée ici puis posée sur la voiture 3D.
                 SettingRow("Plaque", plateMessage ?: "Affichée sur la voiture ; ne quitte pas l'autoradio") {
                     androidx.compose.foundation.Image(plateImage, null, Modifier.height(30.dp).padding(end = 8.dp))
-                    Field(plateText, { plateText = PlateModel.normalize(it) }, "Plaque", Modifier.width(170.dp), placeholder = PlateModel.EXAMPLE)
+                    // Le texte tapé n'est PAS réécrit pendant la frappe (le passer en majuscules ici faisait doubler les mots par le
+                    // clavier Android : « clio-3 » devenait « CLIO-CLIO- ») : c'est le clavier qui met les majuscules.
+                    OutlinedTextField(plateText, { plateText = it.take(12) }, Modifier.width(170.dp), singleLine = true,
+                        label = { Text("Plaque") }, placeholder = { Text(PlateModel.EXAMPLE) },
+                        keyboardOptions = KeyboardOptions(capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Characters,
+                            autoCorrect = false, keyboardType = KeyboardType.Ascii))
                     Button(enabled = !plateBusy, modifier = Modifier.padding(start = 8.dp), onClick = {
                         plateBusy = true
                         val wanted = plateText

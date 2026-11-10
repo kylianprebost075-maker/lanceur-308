@@ -94,7 +94,9 @@ copie sur une clé USB, installation depuis le gestionnaire de fichiers de l'aut
      ensuite le vrai étagement en roulant. Autant de valeurs que de rapports.
    - `TANK_L`, `RESERVE_L`, `HAS_DPF`, `HAS_TURBO`, `PSA_ECU_ODOMETER` : d'après les réponses et le tableau ci-dessus.
 2. Vérifie avec les tests (ils refusent les valeurs impossibles), depuis `projet/lanceur-308` :
-   `gradlew testDebugUnitTest` (Windows : `.\gradlew.bat testDebugUnitTest`).
+   `gradlew testDebugUnitTest` (Windows : `.\gradlew.bat testDebugUnitTest`). Pour une autre voiture que la 308,
+   **environ 14 tests sont « ignorés » (skipped) : c'est normal**, ils vérifient les valeurs de la 308 de l'auteur.
+   Seul un test **en échec** (failed) demande de corriger `CarProfile.kt`. Ne modifie jamais les tests.
 3. Construis l'appli : `gradlew assembleRelease`. L'APK sort dans `app/build/outputs/apk/release/app-release.apk`.
    Prérequis : Java 17 (`JAVA_HOME`) et le SDK Android (`ANDROID_HOME` ou `local.properties` avec `sdk.dir=…`).
    La signature utilise la clé de test d'Android, créée automatiquement sur l'ordinateur : rien à fournir.

@@ -8,6 +8,9 @@ les données du moteur, l'entretien. Il est gratuit, sans compte et sans publici
 > partie marche, une partie non (tableau plus bas). Tu l'installes à tes risques : elle ne modifie rien dans la
 > voiture, mais personne ne l'a testée sur la tienne.
 
+> **Guide illustré en PDF (Antigravity, démonstration complète sur une Renault Clio)** :
+> [Guide-installation-Lanceur308-Antigravity.pdf](https://github.com/kylianprebost075-maker/lanceur-308/raw/main/docs/guide-antigravity/Guide-installation-Lanceur308-Antigravity.pdf)
+
 ## Le plus simple : demande à ton IA
 
 Tu utilises Claude, Gemini (Antigravity, même gratuit), ChatGPT ou une autre IA ? Donne-lui ce projet et copie-lui ce
