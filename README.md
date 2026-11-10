@@ -278,7 +278,11 @@ sur le bouton CarPlay pour montrer le panneau. Le bandeau rouge est une alerte d
 - Testé OK avant : un boîtier Vgate **iCar Pro** ( BLE `IOS-Vlink`, service `18F0` / `2AF0` notify / `2AF1` write). Le code reste compatible avec les deux.
 
 ### Accès à l'autoradio
-- **Pas d'ADB** (pas de débogage sans fil sous Android 8, port 5555 fermé).
+- **Pas d'ADB** (pas de débogage sans fil sous Android 8, port 5555 fermé). Le « débridage » (mode développeur,
+  `adb root`, éventuellement root) n'est pas fait : la v0.19 écrit d'abord une **fiche technique** sur la clé
+  (`infos-autoradio.txt`, voir `backup/DeviceInfo.kt`) pour savoir ce que le système permet. Piste la moins risquée :
+  code d'usine du menu développeur puis ADB, sans root (codes à vérifier pour ce modèle, non confirmés). Root (Magisk)
+  déconseillé : risque de briquer l'autoradio.
 - Installation **uniquement par fichier APK** : clé USB (`E:\` sur le PC) → gestionnaire de fichiers de l'autoradio → installer **par-dessus** l'ancienne version.
 - Sur la clé, l'APK est copiée à **deux endroits** : `E:\Lanceur308.apk` et `E:\308-2\Lanceur308.apk`.
 
@@ -369,6 +373,8 @@ Puis copier l'APK vers `livrables\Lanceur308.apk`, `E:\Lanceur308.apk` et `E:\30
 | `drive/Drive.kt` | Vitesse (OBD prioritaire, sinon GPS), trajet, `Speed.decayIfStale()` |
 | `maintenance/` | Entretien DV6 + carnet de pleins |
 | `service/VehicleWatchService.kt` | Service permanent : CAN, OBD, GPS, alertes, bandeau porte par-dessus CarPlay |
+| `backup/` | `Backup.kt` / `AutoBackup.kt` (sauvegarde auto interne + clé USB), `UsbStorage.kt` (détection des clés, écriture sûre), **`DeviceInfo.kt` (v0.19 : fiche technique `infos-autoradio.txt`, lecture seule, sans identifiants)** |
+| `optim/Optim.kt`, `ui/OptimDialog.kt` | Optimisation de l'autoradio : libération de la mémoire (manuelle et automatique sous 25 % libre, v0.18), mode CarPlay, réglages guidés |
 
 ### 4.1 CAN FYT (portes : ✅ fonctionne)
 - Service `com.syu.ms` : `bindService(Intent("com.syu.ms.toolkit").setPackage("com.syu.ms"))` → `IRemoteToolkit.getRemoteModule(n)` → `IRemoteModule.register(callback, code, 1)`.
@@ -451,6 +457,10 @@ Simule ouvrants, phares, marche arrière, batterie faible, accélérations ; les
 | 0.7 | **Fluidité** : rendu à la demande 0 FPS, plus de rotation automatique, résolution dynamique, CSV GPS hors fil UI, horloge 1×/min, CAN réduit à 9 canaux. **Animation de roulage** (roues + route). Volant et aiguilles redressés. |
 | 0.7-bis | Plans de coupe caméra (scintillement) + **suppression des blocs gris** (soubassement orphelin). |
 | **0.8** | **Moins pixelisé** (FXAA + 100 % de définition au repos). **OBD adapté au Vgate vLinker MC+** (service E7810A71, ATSP6 direct, oubli de l'ancien boîtier mémorisé). Ce README + dossier de reprise. |
+| 0.9 – 0.15 | Panneau performances à côté de CarPlay, onglet Moteur (diagnostic, batterie, trajets, chauffe, bilan, FAP), sauvegarde automatique sur la clé, style Verre, onglet Son (alignement, tests, mesure au micro du PC). Détail dans les « Nouveau en v0.x » plus haut. |
+| 0.16 – 0.17 | Optimisation de l'autoradio (mémoire, mode CarPlay, réglages guidés) ; température extérieure apprise, chauffe corrigée, panneau CarPlay déplaçable, clé USB mieux détectée. |
+| 0.18 | Mémoire libérée automatiquement ; kilométrage du calculateur demandé dès la connexion (session `81` + `2110`) ; journal moins bavard. |
+| **0.19** | **Fiche technique de l'autoradio** écrite sur la clé USB à chaque lancement (`DeviceInfo.kt`), pour préparer le débridage. |
 
 ---
 
@@ -466,7 +476,9 @@ Simule ouvrants, phares, marche arrière, batterie faible, accélérations ; les
    régénération. CarPlay : mesurer l'effet du mode CarPlay (v0.16) sur le lag, boîtier OBD branché / débranché.
 9. À confirmer dans la voiture : canal CAN de la température extérieure trouvé (v0.17), chauffe normale ou eau
    qui plafonne (thermostat), export sur la clé ; v0.18 : kilométrage lu avec `81` (lignes `[KM]` du journal :
-   « lu : … km » ou les réponses brutes), nettoyages automatiques de la mémoire (lignes `[OPTIM]`).
+   « lu : … km » ou les réponses brutes), nettoyages automatiques de la mémoire (lignes `[OPTIM]`) ;
+   v0.19 : lire `infos-autoradio.txt` sur la clé (jamais le publier) pour choisir la voie de débridage
+   (`ro.debuggable`, `ro.secure`, `su`, SELinux), vérifier que les lignes ne sont pas toutes « illisible ».
 6. Codes défaut OBD (mode 03 / effacement 04) : faciles à ajouter dans `Engine.kt` maintenant que le boîtier est là.
 7. **Onglet Diagnostic (v0.9)** : d'abord une séance d'exploration dans la voiture avec un PC et le vLinker
    (`outils/obd/obd_explorer.py`, lecture seule garantie, fiche `outils/obd/SEANCE_OBD.md`) pour savoir ce que
