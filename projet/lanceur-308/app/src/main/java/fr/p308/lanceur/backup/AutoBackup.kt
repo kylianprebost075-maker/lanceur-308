@@ -41,8 +41,10 @@ object AutoBackup {
         // Ce qui change quand quelque chose de nouveau est enregistré.
         val key = listOf(
             TripLog.history.value.firstOrNull()?.startMs, CrankWatch.history.value.firstOrNull()?.atMs,
-            Warmup.history.value.firstOrNull()?.startMs, Vehicle.state.value.odometerKm,
+            Warmup.history.value.firstOrNull()?.startMs,
         ).joinToString("|")
+        // v0.22 : le kilométrage n'est plus dans cette liste. En roulant, il change à chaque kilomètre : la clé du
+        // 10/11 montrait une sauvegarde complète par minute (dont 2 Mo de traces GPS réécrits), pour rien.
         val usb = Backup.usbCount(ctx)
         // Fiche technique de l'autoradio (v0.19) : écrite sur la clé une fois par lancement, dès qu'une clé est là.
         if (usb > 0 && !infoWritten) {

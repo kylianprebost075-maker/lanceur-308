@@ -61,6 +61,58 @@ object DevOptions {
         else "Cet autoradio n'a pas cette page. Essaie « Réglages Android »."
     }
 
+    // --- ADB par le Wi-Fi (v0.22) ---
+    // La fiche technique du 10/11/2026 montre : débogage activé, service adbd en marche, mais aucun port réseau
+    // (service.adb.tcp.port vide) et une prise USB qui reste « hôte ». Elle montre aussi SELinux en mode « Permissive » :
+    // sur cet autoradio, une appli ordinaire a donc une chance de pouvoir régler ce port elle-même. On essaie, on
+    // relit, et on dit honnêtement si l'autoradio a accepté. Le réglage disparaît au redémarrage de l'autoradio.
+
+    private const val ADB_PORT = "5555"
+
+    private fun sh(cmd: String): String = runCatching {
+        val p = ProcessBuilder("sh", "-c", cmd).redirectErrorStream(true).start()
+        val out = p.inputStream.bufferedReader().readText()
+        if (!p.waitFor(4, java.util.concurrent.TimeUnit.SECONDS)) p.destroy()
+        out.trim()
+    }.getOrDefault("")
+
+    /** Port ADB réseau en service, ou null. */
+    fun wifiAdbPort(): String? = sh("getprop service.adb.tcp.port").takeIf { it.isNotEmpty() && it != "-1" && it != "0" }
+
+    /** Adresse de l'autoradio sur le Wi-Fi, ou null. */
+    fun wifiAddress(): String? = runCatching {
+        java.net.NetworkInterface.getNetworkInterfaces().toList()
+            .filter { it.isUp && !it.isLoopback && it.name.startsWith("wlan") }
+            .flatMap { it.inetAddresses.toList() }
+            .firstOrNull { it is java.net.Inet4Address }?.hostAddress
+    }.getOrNull() ?: sh("getprop dhcp.wlan0.ipaddress").takeIf { it.isNotEmpty() }
+
+    fun wifiAdbStatus(): String {
+        val port = wifiAdbPort() ?: return "Coupé"
+        val ip = wifiAddress()
+        return if (ip != null) "Activé : sur le PC, adb connect $ip:$port" else "Activé (port $port), mais l'autoradio n'est pas sur un Wi-Fi"
+    }
+
+    /** Essaie d'ouvrir (ou de fermer) ADB par le Wi-Fi. À appeler hors du fil de l'écran. Renvoie la phrase à afficher. */
+    fun setWifiAdb(on: Boolean): String {
+        val before = sh("getprop service.adb.tcp.port")
+        sh("setprop service.adb.tcp.port ${if (on) ADB_PORT else "-1"}")
+        val after = sh("getprop service.adb.tcp.port")
+        val accepted = after == (if (on) ADB_PORT else "-1")
+        if (accepted) {
+            sh("setprop ctl.restart adbd")
+            Thread.sleep(1500)
+        }
+        val adbd = sh("getprop init.svc.adbd")
+        ObdLog.log("DEV", "ADB Wi-Fi ${if (on) "demandé" else "coupé"} : port « $before » → « $after », adbd « $adbd »")
+        return when {
+            !accepted -> "Refusé par l'autoradio (le port est resté « ${after.ifEmpty { "vide" } } »). Rien n'a changé."
+            !on -> "ADB par le Wi-Fi coupé."
+            adbd != "running" -> "Port réglé, mais le service ADB n'a pas redémarré (état « $adbd ») : redémarre l'autoradio et réessaie."
+            else -> wifiAdbStatus() + ". Une demande d'autorisation s'affichera ici à la première connexion."
+        }
+    }
+
     /** Ouvre les vrais réglages d'Android (pas ceux du fabricant), où se trouve « À propos → Numéro de build ». */
     fun openAndroidSettings(ctx: Context): String {
         val ok = listOf(

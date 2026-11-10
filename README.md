@@ -1,7 +1,7 @@
-# Lanceur 308 — dossier de reprise (version 0.21)
+# Lanceur 308 — dossier de reprise (version 0.22)
 
 > **À lire en entier avant de toucher à quoi que ce soit.**
-> Ce dossier permet à une IA (ou à un développeur) de reprendre le projet. Dernière version : **0.21 du 10 novembre
+> Ce dossier permet à une IA (ou à un développeur) de reprendre le projet. Dernière version : **0.22 du 10 novembre
 > 2026** (nouveautés de chaque version juste sous la galerie ; les sections techniques plus bas datent de la 0.8 et
 > sont complétées par ces notes de version).
 > L'ancien README (version 0.4) est conservé dans `diagnostic/README_ancien_v0.4.md` pour l'historique.
@@ -53,6 +53,23 @@ de dessus en 2D, celle que l'appli affiche quand la 3D n'est pas disponible. Sur
 | ![Échéances d'entretien](docs/captures/onglets/09-entretien.png) | ![Consommation et coût des pleins](docs/captures/onglets/10-entretien-pleins.png) |
 | **Réglages** | **Panneau à côté de CarPlay (v0.13, alerte FAP v0.14)** |
 | ![Réglages : couleur, 5 portes, Optimiser l'autoradio, kilométrage, température extérieure, thème](docs/captures/onglets/11-reglages.png) | ![Panneau : puissance, rapport conseillé, régime, eau, turbo, batterie](docs/captures/onglets/12-panneau-performances.png) |
+
+**Nouveau en v0.22 : ADB par le Wi-Fi depuis les Réglages, sauvegarde moins fréquente (10/11 au soir)**
+- **Ce que la clé du 10/11 a appris** (fiche `infos-autoradio.txt` de la v0.19, voir le tableau du §1) : le vrai
+  processeur est un Spreadtrum SC7731E 32 bits sous Android 8.1 ; le débogage est bien activé et `adbd` tourne, mais
+  sans port réseau ; système `user` (pas d'`adb root`, pas de `su`) ; **SELinux en mode « Permissive »**.
+- **ADB par le Wi-Fi** (Réglages → « ADB par le Wi-Fi (pour le PC) » → Activer, `ui/DevOptions.kt` → `setWifiAdb`) :
+  le Lanceur lance `setprop service.adb.tcp.port 5555` puis `setprop ctl.restart adbd`, relit la valeur et dit si
+  l'autoradio a accepté. Avec SELinux « Permissive », une appli ordinaire y arrive (vérifié dans l'émulateur Android 8 :
+  refusé en « Enforcing », accepté en « Permissive », `adbd` relancé, adresse affichée). Le réglage disparaît au
+  redémarrage. Sur le PC : `adb connect <adresse>:5555`, puis accepter la demande sur l'écran de l'autoradio
+  (`ro.adb.secure = 1`). **Pas encore essayé sur l'autoradio.**
+- **Sauvegarde automatique** : le kilométrage n'en est plus un déclencheur (`AutoBackup.kt`). En roulant, il
+  changeait à chaque kilomètre : la clé montrait une sauvegarde complète par minute (traces GPS réécrites), ce qui
+  chargeait l'autoradio pour rien. Restent : fin de trajet, démarrage ou chauffe enregistrés, clé branchée, 6 h.
+- **Vu dans le journal du 10/11** : kilométrage du calculateur lu (140 832 km, correctif v0.18 confirmé) ; **l'eau
+  plafonne à 73-75 °C** sur deux trajets de 40 min (thermostat à faire vérifier) ; à cause de cela l'apprentissage du
+  FAP avance très lentement (il exige 75 °C) ; nettoyage automatique de la mémoire : gain faible (+12 Mo).
 
 **Nouveau en v0.21 : bouton « Options pour les développeurs » (10/11)**
 - Les réglages de l'autoradio ne montrent pas la page développeur d'Android (essai ADB du 10/11, voir §1). Le Lanceur
@@ -282,8 +299,11 @@ sur le bouton CarPlay pour montrer le panneau. Le bandeau rouge est une alerte d
 | Élément | Valeur |
 |---|---|
 | Plateforme | **FYT** (applis système `com.syu.*`, `com.fyt.*`) |
-| Android | **8.0 (API 26)** même si l'écran affiche « Android 16 » |
-| CPU | `UIS8141E Four-core 1.3GHz @ 4.0GB (Memory) + 32GB (Storage)` |
+| Android | **8.1.0 (API 27)**, correctif de sécurité 2018-10-05, même si l'écran affiche « Android 16 » (fiche du 10/11/2026) |
+| CPU affiché | `UIS8141E Four-core 1.3GHz @ 4.0GB (Memory) + 32GB (Storage)` : **faux** |
+| **CPU réel** | **Spreadtrum SC7731E** (`ro.board.platform = sp7731e`, carte `sp7731e_1h10`) : 4 cœurs **Cortex-A7, 32 bits seulement** (`armeabi-v7a`), **1536 Mo** de mémoire, 27 Go de stockage. `ro.fyt.platform = 813` |
+| Système | `user` / `release-keys`, `ro.debuggable = 0` (**pas d'`adb root`**), aucune commande `su`, **SELinux « Permissive »**, système construit le 30/04/2025, fuseau horaire réglé sur `Africa/Cairo` (d'où l'heure en avance d'une heure) |
+| Débogage | options développeur et débogage USB **activés**, service `adbd` en marche, `sys.usb.config = ptp,adb`, mais aucun port réseau (`service.adb.tcp.port` vide) et `persist.fyt.developmentenable = false` |
 | GPU | **Mali-T820 MP1** (un seul cœur : très faible → tout le rendu 3D est optimisé pour lui) |
 | MCU | `2024.02.23 NOR_812L_F2L_CMS32P32F32_Ver: 1.0(FYT)` |
 | Bluetooth | `8.1.0-27_Built-in` |
@@ -401,7 +421,7 @@ Puis copier l'APK vers `livrables\Lanceur308.apk`, `E:\Lanceur308.apk` et `E:\30
 - AGP 8.7.3, **Kotlin 2.0.21**, Compose BOM 2024.12.01
 - **SceneView 2.2.1** (Filament 1.52) — SceneView 2.3+ exige Kotlin 2.2.
 - minSdk 26, targetSdk 33, compileSdk 35. R8 activé (`proguard-rules.pro` garde `com.google.android.filament.**` et `io.github.sceneview.**`).
-- Version dans `app/build.gradle.kts` : **incrémenter `versionCode` à chaque livraison** (actuellement 27 / "0.21").
+- Version dans `app/build.gradle.kts` : **incrémenter `versionCode` à chaque livraison** (actuellement 28 / "0.22").
 
 ---
 
@@ -515,7 +535,8 @@ Simule ouvrants, phares, marche arrière, batterie faible, accélérations ; les
 | 0.18 | Mémoire libérée automatiquement ; kilométrage du calculateur demandé dès la connexion (session `81` + `2110`) ; journal moins bavard. |
 | 0.19 | Fiche technique de l'autoradio écrite sur la clé USB à chaque lancement (`DeviceInfo.kt`), pour préparer le débridage. |
 | 0.20 | Journal des plantages écrit sur la clé (`CrashLog.kt`). |
-| **0.21** | **Bouton « Options pour les développeurs »** dans les Réglages (`ui/DevOptions.kt`). |
+| 0.21 | Bouton « Options pour les développeurs » dans les Réglages (`ui/DevOptions.kt`). |
+| **0.22** | **ADB par le Wi-Fi** activable depuis les Réglages ; sauvegarde automatique qui ne se relance plus à chaque kilomètre. |
 
 ---
 

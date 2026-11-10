@@ -236,6 +236,10 @@ fun SettingsDialog(onDismiss: () -> Unit) {
     var optim by remember { mutableStateOf(false) }
     var outsideTemp by remember { mutableStateOf(false) }
     var devMessage by remember { mutableStateOf<String?>(null) }
+    // Lus une seule fois à l'ouverture (ce sont des commandes : pas à chaque rafraîchissement de l'écran).
+    var wifiAdbOn by remember { mutableStateOf(DevOptions.wifiAdbPort() != null) }
+    var wifiAdbMessage by remember { mutableStateOf(DevOptions.wifiAdbStatus()) }
+    var wifiAdbBusy by remember { mutableStateOf(false) }
     val vs by Vehicle.state.collectAsStateValue()
 
     AlertDialog(
@@ -280,6 +284,18 @@ fun SettingsDialog(onDismiss: () -> Unit) {
                 SettingRow("Options pour les développeurs", devMessage ?: DevOptions.status(ctx)) {
                     TextButton(onClick = { devMessage = DevOptions.openAndroidSettings(ctx) }) { Text("Réglages Android") }
                     Button(onClick = { devMessage = DevOptions.open(ctx) }) { Text("Ouvrir") }
+                }
+                // v0.22 : ADB par le Wi-Fi, réglé par le Lanceur si l'autoradio l'accepte (jusqu'au prochain redémarrage).
+                SettingRow("ADB par le Wi-Fi (pour le PC)", wifiAdbMessage) {
+                    Button(enabled = !wifiAdbBusy, onClick = {
+                        wifiAdbBusy = true
+                        val wanted = !wifiAdbOn
+                        Thread {
+                            wifiAdbMessage = runCatching { DevOptions.setWifiAdb(wanted) }.getOrElse { "Échec : ${it.message}" }
+                            wifiAdbOn = DevOptions.wifiAdbPort() != null
+                            wifiAdbBusy = false
+                        }.start()
+                    }) { Text(if (wifiAdbBusy) "…" else if (wifiAdbOn) "Couper" else "Activer") }
                 }
                 SettingRow("Thème", if (Night.active) "Nuit en ce moment" else "Jour en ce moment") {
                     Segmented(NightMode.entries.map { it to it.label }, UiPrefs.nightMode) { UiPrefs.updateNightMode(it) }
