@@ -296,6 +296,23 @@ sur le bouton CarPlay pour montrer le panneau. Le bandeau rouge est une alerte d
   modèle de voiture, l'écran ou le logo se règlent au même endroit et un mauvais choix coupe les portes, la caméra ou
   l'affichage (photographier chaque page avant de toucher). Le code `adbon`, cité pour d'autres FYT, n'est pas
   confirmé ici. Root (Magisk) déconseillé : risque de briquer l'autoradio.
+- **Essai ADB du 10/11/2026 depuis un Mac : aucune liaison** (rien n'a été modifié sur l'autoradio ; compte rendu
+  et photos gardés hors dépôt dans `outils/adb/journaux/`). Constats :
+  - par câble USB, le Mac ne voit **aucun appareil** (pas même sans ADB) : la prise essayée reste en mode « hôte » ;
+    câble et prise utilisés non précisés, une seule prise essayée ;
+  - menu « Réglage en usine » et réglages photographiés (11 pages) : **aucune ligne « USB mode », « Host/Device »
+    ni « ADB »**. Lignes liées à l'USB : « USB Device Start » (choix « None » / « Carlink » seulement : appli lancée
+    au branchement, pas le sens de la prise), « Sélection du protocole USB » (2.0), « Interrupteur de détection
+    d'anomalie USB », « DVR Default USB Port : USB2 ». Les listes défilent : il n'est pas certain que tout soit vu ;
+  - par le Wi-Fi : l'autoradio répond au ping mais le **port 5555 refuse la connexion** ;
+  - le clavier du code d'usine n'a **que des chiffres** : `adbon` est impossible à saisir ;
+  - les réglages Android de l'autoradio ne montrent pas de page « Options pour les développeurs » (« Paramètres
+    système » : Date et heure, Accessible, À propos). Le débogage est « activé » d'après le propriétaire, non vérifié ;
+  - « Sélection du modèle » affiche « …geot/Citroen307 » (la voiture est une 308) : à ne pas toucher, les portes marchent.
+  Pistes restantes : lire `infos-autoradio.txt` (v0.19) pour savoir si le débogage est réellement activé et si une
+  commande `su` existe ; ouvrir la page développeur d'Android **depuis le Lanceur**
+  (`Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS`), que le fabricant a cachée ; autre prise USB ; câble
+  USB-A ↔ USB-A.
 - Installation **uniquement par fichier APK** : clé USB (`E:\` sur le PC) → gestionnaire de fichiers de l'autoradio → installer **par-dessus** l'ancienne version.
 - Sur la clé, l'APK est copiée à **deux endroits** : `E:\Lanceur308.apk` et `E:\308-2\Lanceur308.apk`.
 
