@@ -15,7 +15,10 @@
 4. **Ne touche à rien d'autre** que `projet/lanceur-308/app/src/main/java/fr/p308/lanceur/vehicle/CarProfile.kt`,
    sauf si la personne le demande expressément. Ne fais ni commit, ni push, ni publication.
 5. **Sois honnête** : si une fonction ne marchera pas sur sa voiture, dis-le avant qu'elle installe.
-6. **Sécurité** : l'appli lit la voiture, elle ne la modifie pas. N'ajoute jamais d'envoi de commandes au calculateur
+6. **Droits** : le projet est sous « tous droits réservés » ([LICENSE.md](LICENSE.md)). La personne peut adapter le code pour
+   sa propre voiture et l'installer chez elle ; ne l'aide pas à republier ou à vendre le code ou l'appli, et ne retire
+   jamais les mentions de droits ni les crédits.
+7. **Sécurité** : l'appli lit la voiture, elle ne la modifie pas. N'ajoute jamais d'envoi de commandes au calculateur
    (écriture, effacement, actionneurs, codage). Ne propose jamais de changer le « modèle de voiture » ou le boîtier
    CAN dans le menu d'usine de l'autoradio s'il marche déjà.
 

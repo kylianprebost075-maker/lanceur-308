@@ -105,7 +105,12 @@ publie pas en entier.
 **Je veux l'adapter à ma voiture.** Le code est dans ce dépôt et le [README](README.md) explique tout, y compris
 comment fabriquer le modèle 3D.
 
-## Crédits
+## Droits et crédits
+
+© 2026 kylianprebost075-maker, tous droits réservés. L'appli est gratuite pour ton usage personnel ; tu peux l'adapter à
+ta voiture, mais pas la republier ni la vendre sans accord : voir [LICENSE.md](LICENSE.md). Crédits complets :
+[CREDITS.md](CREDITS.md).
+
 
 Modèle 3D : « Peugeot 308 5-Door MK1 2007-2021 » par Merc_TV (szymonpasterczyk) sur Sketchfab, licence
 [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), modifié (pièces choisies, roues, couleurs, allègement).

@@ -4,6 +4,12 @@ Les versions publiées se téléchargent sur la page
 [Releases](https://github.com/kylianprebost075-maker/lanceur-308/releases). Une mise à jour s'installe par-dessus
 l'ancienne version et garde les réglages. Le détail technique de chaque version est dans le [README](README.md).
 
+## À venir
+- Mention des droits d'auteur et des crédits dans les Réglages de l'appli.
+
+## 11 novembre 2026 (documents)
+- [LICENSE.md](LICENSE.md) : tous droits réservés, usage personnel gratuit. [CREDITS.md](CREDITS.md) : crédits complets.
+
 ## 0.26 — 11 novembre 2026
 - **Bilan « Prêt à partir »** au démarrage : risque de verglas, batterie, carburant, entretien. Il se ferme tout seul,
   ne s'affiche que s'il a quelque chose à dire, et se coupe dans les Réglages.

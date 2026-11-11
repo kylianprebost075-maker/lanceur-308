@@ -40,6 +40,6 @@ Règles du projet, non négociables :
 
 ## Licence
 
-Le code n'a pas encore de licence : en attendant, tous les droits sont réservés à l'auteur. En proposant une
-modification, tu acceptes qu'elle soit publiée sous la licence que le projet choisira. Le modèle 3D est sous
-CC BY 4.0 (voir `assets/models/CREDITS.txt`).
+Tous les droits sont réservés à l'auteur : voir [LICENSE.md](LICENSE.md). En proposant une modification, tu acceptes
+qu'elle soit intégrée au projet et publiée aux mêmes conditions. Les crédits sont dans [CREDITS.md](CREDITS.md) ; le
+modèle 3D est sous CC BY 4.0.

@@ -657,6 +657,8 @@ Simule ouvrants, phares, marche arrière, batterie faible, accélérations ; les
 
 ## Licence et crédits
 
-- Code : à toi de choisir une licence (aucune pour l'instant : tous droits réservés par défaut).
-- Modèle 3D (non inclus) : « Peugeot 308 5-Door MK1 2007-2021 » par Merc_TV (szymonpasterczyk) sur Sketchfab, CC BY 4.0.
+- **© 2026 kylianprebost075-maker. Tous droits réservés** : voir [LICENSE.md](LICENSE.md). En bref : usage personnel gratuit,
+  adaptation à sa propre voiture permise, pas de republication ni de vente sans accord écrit, aucune garantie.
+- Crédits complets (modèle 3D, bibliothèques, outils, projets qui ont donné des idées) : [CREDITS.md](CREDITS.md).
+- Modèle 3D : « Peugeot 308 5-Door MK1 2007-2021 » par Merc_TV (szymonpasterczyk) sur Sketchfab, CC BY 4.0, modifié.
 - Projet personnel, non affilié à Peugeot / Stellantis ni à FYT. Le CAN de l'autoradio n'est lu qu'en écoute.

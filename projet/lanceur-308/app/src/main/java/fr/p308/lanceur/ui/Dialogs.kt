@@ -442,6 +442,11 @@ fun SettingsDialog(onDismiss: () -> Unit) {
                     "Modèle 3D",
                     "« Peugeot 308 5-Door MK1 2007-2021 » par Merc_TV (Sketchfab), licence CC BY 4.0 — modifié : assemblage, peinture noire",
                 ) {}
+                SettingRow(
+                    "Lanceur 308",
+                    "© 2026 kylianprebost075-maker · tous droits réservés · gratuit pour un usage personnel, sans garantie. " +
+                        "Affichage 3D : SceneView et Filament (Apache 2.0). Détail : LICENSE.md et CREDITS.md sur la page GitHub du projet.",
+                ) {}
             }
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text("Fermer") } },
