@@ -29,7 +29,7 @@ autoradio FYT, adaptable à une autre voiture ([ADAPTER.md](ADAPTER.md)). Gratui
 
 **Ce que donne l'autoradio FYT** (boîtier CAN Raise `PSA-RZ-15-0127-B1` chez l'auteur) : ouvrants, marche arrière,
 autonomie, température extérieure, tension de la batterie, volume. **Pas** les feux (phares gérés par l'heure du coucher
-du soleil) ; ceintures en cours de test. **Outils du PC** : `outils/adb/` (séances par ADB Wi-Fi, test des ceintures),
+du soleil), ni les ceintures (essai du 11/11). **Outils du PC** : `outils/adb/` (séances par ADB Wi-Fi, test des ceintures),
 `outils/son/` (réglage du son au micro), `outils/obd/` (exploration OBD en lecture seule).
 
 ## Aperçu
@@ -94,7 +94,7 @@ de dessus en 2D, celle que l'appli affiche quand la 3D n'est pas disponible. Sur
   (ou par `outils/adb/voiture_rapide.ps1`). Un appui ouvre l'égaliseur FYT, touche onglet « Champ », « Tous », puis les
   flèches (`ChampTaps`, positions relevées en 1280 × 720, mises à l'échelle ; ← et ↓ déduites par symétrie, vérifiées par
   le script des ceintures), puis revient. Seul = position trouvée au micro (`champSeul` dans `reglage-son.json`, sinon
-  d'après les distances), Passagers = centre. 4 tests `ChampTapsTest`. Le passage automatique attend le test des ceintures.
+  d'après les distances), Passagers = centre. 4 tests `ChampTapsTest`. Pas de passage automatique : les ceintures ne sont pas transmises (essai du 11/11).
 - **Véhicule → Mon autoradio** (`vehicle/CarFeatures.kt`, `ui/FeaturesPanel.kt`) : chaque information FYT est notée à
   sa première arrivée (service, boîtier CAN 7/1005, température, tension, volume, portes, marche arrière, autonomie),
   plus OBD, GPS, basses automatiques, égaliseur FYT. Gris = pas encore vu, avec le geste pour le tester.
@@ -443,7 +443,7 @@ sur le bouton CarPlay pour montrer le panneau. Le bandeau rouge est une alerte d
 | **Quoi** | Appli Android « Lanceur 308 » (`fr.p308.lanceur`) : tableau de bord façon Tesla pour autoradio chinois FYT, avec la 308 en 3D, les ouvrants, les phares, l'OBD, le GPS, l'entretien, le son. |
 | **Où en est-on** | Version **0.31** (`versionCode = 37`), publiée sur GitHub (Releases, `Lanceur308.apk`). Installée sur l'autoradio : 0.30 (la 0.31 sera posée à la prochaine séance par `outils/adb/voiture_rapide.ps1`). |
 | **Ce qui marche dans la voiture** | 3D (plaque tapée, cadrage 1280 × 720), ouvrants et marche arrière par le CAN FYT, température extérieure FYT, phares par l'heure du coucher du soleil, OBD avec le vLinker MC+ (régime, eau, turbo, tension, codes défaut, kilométrage du calculateur), basses automatiques, égaliseur 15 bandes réglé au micro du PC, ADB par le Wi-Fi. |
-| **À vérifier au prochain essai** | Version 0.31 : tension de la batterie lue par le CAN (codage à confirmer moteur coupé), balance Seul / Passagers (flèches ← ↓ jamais essayées), page Mon autoradio ; ceintures transmises ou non (`outils/adb/test_ceintures.ps1`). |
+| **Vérifié le 11/11 au soir (0.31 sur l'autoradio)** | Page Mon autoradio (boîtier, 17 °C, 12,9 V, volume 18, OBD, égaliseur) ; tension moteur coupé 12,8-12,9 V (codage confirmé) ; flèches ← ↓ de la balance justes ; ceintures **non transmises**. Reste à essayer : un appui sur Seul / Passagers depuis le Lanceur. |
 | **Comment on travaille** | Une séance dans la voiture doit être courte (batterie) : tout se prépare sur le PC, puis un seul script par ADB Wi-Fi (`outils/adb/`). |
 
 ---
@@ -756,12 +756,19 @@ Simule ouvrants, phares, marche arrière, batterie faible, accélérations ; les
 
 ## 7. Points ouverts / idées
 
-**À faire en premier (prochaine séance voiture, ≈ 4 min, PC et autoradio sur le partage de l'iPhone, ADB Wi-Fi activé)** :
-`outils/adb/voiture_rapide.ps1` (pose la 0.31, remet l'accueil, active l'accessibilité, envoie Seul = 1 → et 3 ↑), puis
-`outils/adb/test_ceintures.ps1` (ceintures, tension moteur coupé, flèches ← ↓). Selon le résultat :
-- un canal suit les ceintures → passage automatique Seul / Passagers (à proposer à l'auteur, pas encore codé) ;
-- la tension lue n'est pas entre 12 et 13 V moteur coupé → corriger `BatteryWatch.decodeFyt` ;
-- les flèches ← ↓ ne donnent pas −2, −2 → corriger `ChampTaps.LEFT` / `DOWN`.
+**Séance du 11/11 au soir (0.31 posée par `outils/adb/voiture_rapide.ps1`, puis `outils/adb/test_ceintures.ps1`)** :
+- **Ceintures : non transmises** par le boîtier Raise PSA (8 gestes, aucun canal ne suit). Pas de détection
+  automatique des passagers par les ceintures ; reste une piste partielle : une porte passager ouverte alors que
+  l'autoradio est déjà allumé (canaux 7/2 à 7/4), à proposer à l'auteur.
+- **Tension** 0/114 moteur coupé : brut 124-125 → 12,8-12,9 V, codage `(brut + 4) × 0,1` confirmé.
+- **Balance** : Tous, ← ×2, ↓ ×2 → −2, −2 (positions ← ↓ justes), puis remise à 1 →, 3 ↑. Découverte : l'égaliseur
+  publie la croix sur le service FYT, **module 4 code 8 = [8 + crans →, 8 − crans ↑]** (lecture seule).
+- Autres canaux reconnus : 0/101 = appui sur l'écran, 0/151 = animation (cycle 0 à 5) quand une porte s'ouvre ou se
+  ferme, 0/138 = appli au premier plan (texte), 0/162 bascule inconnue.
+- Leçons : un bip toutes les 10 s est **beaucoup trop rapide** pour l'utilisateur (le script attend maintenant Entrée
+  après chaque geste) ; `uiautomator dump` échoue (« null root node ») juste après une installation : positions de
+  secours dans le script.
+- Pas encore essayé : un appui sur « Seul » / « Passagers » dans le Lanceur (service d'accessibilité actif).
 
 1. 3D : propre et nette sur l'autoradio depuis la 0.28 (cadrage corrigé). Si elle rame en roulant : passer
    `lowResOptions()` à 0.65 ou limiter à 24 FPS dans `LightScene.kt`.
@@ -769,8 +776,7 @@ Simule ouvrants, phares, marche arrière, batterie faible, accélérations ; les
 4. Feux et antibrouillards : **non transmis** par ce boîtier CAN (essai du 11/11, aucun canal ne bouge). Seule piste
    restante : le BSI par la prise OBD (`outils/obd/`), en lecture seule.
 5. Son / DSP : alignement par la croix Champ (v0.29), égaliseur 15 bandes réglé au micro (v0.30), basses selon le volume
-   (v0.30), Seul / Passagers (v0.31). Reste : commander `com.syu.eq` sans toucher l'écran (le test des ceintures relève
-   les canaux du module son 4 qui bougent avec la balance), basses automatiques sur la radio FM (sans intérêt pour
+   (v0.30), Seul / Passagers (v0.31). Reste : commander `com.syu.eq` sans toucher l'écran (la balance se lit sur 4/8 ; l'écrire serait une commande, non faite), basses automatiques sur la radio FM (sans intérêt pour
    l'auteur : la FM ne sert pas).
 8. FAP : seuil de détection des régénérations (débit d'air +25 %) à confirmer avec le journal OBD d'une vraie
    régénération. CarPlay : mesurer l'effet du mode CarPlay (v0.16) sur le lag, boîtier OBD branché / débranché.

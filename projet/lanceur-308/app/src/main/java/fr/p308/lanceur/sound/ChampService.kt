@@ -21,9 +21,11 @@ enum class SeatMode(val label: String) { SOLO("Seul"), PASSENGERS("Passagers") }
 /**
  * Touches à faire dans l'onglet « Champ » de l'égaliseur FYT (com.syu.eq) pour placer le point de la croix balance /
  * fader : onglet Champ, « Tous » (centre), puis les flèches. Positions relevées sur l'autoradio de l'auteur
- * (1280 × 720, 11/11) : onglet (1100, 680), Tous (335, 498), → (1150, 356), ↑ (941, 168). ← et ↓ sont déduits par
- * symétrie autour du centre (940, 356) : à vérifier (outils/adb/test_ceintures.ps1 le contrôle). Sur un autre écran, les
- * positions sont mises à l'échelle. Calcul pur, vérifié par ChampTapsTest.
+ * (1280 × 720, 11/11) : onglet (1100, 680), Tous (335, 498), → (1150, 356), ↑ (941, 168), ← (730, 356), ↓ (941, 544)
+ * (← et ↓ vérifiés sur l'autoradio le 11/11 : Tous, ← ×2, ↓ ×2 donne bien −2, −2). Sur un autre écran, les positions
+ * sont mises à l'échelle. Calcul pur, vérifié par ChampTapsTest.
+ * Relevé du même jour : l'égaliseur publie la position sur le service FYT, module 4 code 8 = [8 + crans →, 8 − crans ↑]
+ * (centre [8, 8]). Lecture seulement : aucune commande n'est envoyée au service.
  */
 object ChampTaps {
     const val REF_W = 1280

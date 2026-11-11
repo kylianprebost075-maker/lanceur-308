@@ -74,7 +74,7 @@ fun FeaturesPanel() {
                     else -> "coupées (Son → Options pour essayer)"
                 }, bass == fr.p308.lanceur.sound.BassAuto.Status.ON)
                 FeatureRow("Égaliseur FYT (balance Seul / Passagers)", if (eqApp) "présent" else "absent : balance à régler à la main", eqApp)
-                FeatureRow("Feux et ceintures", "feux non transmis par le boîtier de l'auteur (Raise PSA) ; ceintures pas encore testées", false)
+                FeatureRow("Feux et ceintures", "non transmis par le boîtier de l'auteur (Raise PSA, essais du 11/11)", false)
                 Spacer(Modifier.weight(1f))
                 Text(
                     "Une ligne grise n'est pas forcément absente : certaines informations n'arrivent qu'avec un geste. " +

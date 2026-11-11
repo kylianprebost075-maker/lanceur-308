@@ -4,7 +4,8 @@ Test des ceintures (≈ 2 min) : l'autoradio transmet-il l'état des ceintures d
 À lancer contact mis (moteur coupé), PC et autoradio sur le même partage de connexion, « ADB par le Wi-Fi » activé.
 Le script :
   1. lance l'écoute « Diagnostic CAN » du Lanceur sur l'autoradio (lecture seule, rien n'est envoyé à la voiture) ;
-  2. annonce chaque geste à faire (texte + bip du PC), toutes les 10 s : boucler / déboucler les ceintures ;
+  2. annonce chaque geste à faire (boucler / déboucler les ceintures) ; on le fait à son rythme puis on appuie sur
+     Entrée (11/11 : la version avec un bip toutes les 10 s allait beaucoup trop vite) ;
   3. vérifie tout seul les flèches ← et ↓ de la balance (égaliseur FYT) puis remet la balance comme avant ;
   4. arrête l'écoute, récupère le rapport et cherche les canaux qui changent en même temps que les gestes ;
      affiche aussi la tension de la batterie lue par l'autoradio (pour vérifier son codage moteur coupé).
@@ -18,8 +19,9 @@ $ErrorActionPreference = 'Continue'
 $adb = "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe"
 $out = Join-Path $PSScriptRoot "journaux\ceintures-$(Get-Date -Format 'yyyyMMdd-HHmm')"
 
-# Canaux qui bougent tout seuls (relevés du 11/11 : tension, deux valeurs inconnues, coordonnées du toucher).
-$bruit = @('0:114', '0:115', '0:146', '0:77')
+# Canaux qui bougent tout seuls (relevés du 11/11 : tension, deux valeurs inconnues, coordonnées du toucher,
+# 0/101 = appui sur l'écran, 0/151 = animation de porte ouverte, 4/8 = balance).
+$bruit = @('0:114', '0:115', '0:146', '0:77', '0:101', '0:151', '4:8')
 
 function Analyser([string]$fichier, [datetime[]]$instants) {
     $lignes = Get-Content $fichier -Encoding UTF8
@@ -34,7 +36,7 @@ function Analyser([string]$fichier, [datetime[]]$instants) {
     "Changements hors canaux bruyants : $($chg.Count)"
     if ($chg.Count -eq 0) { "=> AUCUN canal n'a bougé : le boîtier CAN ne transmet pas les ceintures."; return }
     $res = $chg | Group-Object Cle | ForEach-Object {
-        $dans = @($_.Group | Where-Object { $t = $_.T; @($instants | Where-Object { [math]::Abs(($t - $_).TotalSeconds) -le 4 }).Count -gt 0 }).Count
+        $dans = @($_.Group | Where-Object { $t = $_.T; @($instants | Where-Object { $d = ($t - $_).TotalSeconds; $d -ge -10 -and $d -le 3 }).Count -gt 0 }).Count  # geste fait dans les 10 s avant l'appui sur Entrée
         [pscustomobject]@{ Canal = "module $($_.Name.Split(':')[0]) code $($_.Name.Split(':')[1])"; Changements = $_.Count
             AuBonMoment = $dans; Valeurs = (($_.Group | ForEach-Object { $_.Vers }) | Select-Object -Unique) -join ' / ' }
     } | Sort-Object AuBonMoment, Changements -Descending
@@ -61,9 +63,12 @@ if (-not $ip) { 'Autoradio introuvable : ADB par le Wi-Fi activé ? même partag
 $dev = "${ip}:5555"; & $adb connect $dev | Out-Null
 "Autoradio : $dev"
 
+# Positions relevées le 11/11 sur l'écran 1280 × 720 : utilisées si la lecture de l'écran échoue
+# (« null root node » juste après une installation ou pendant l'animation 3D).
+$secours = @{ 'Véhicule' = @(46, 165); 'Diagnostic CAN' = @(470, 92); 'Démarrer' = @(327, 674); 'Terminer' = @(327, 674) }
 function Toucher([string]$texte) {
     for ($i = 0; $i -lt 3; $i++) {
-        & $adb -s $dev shell uiautomator dump /sdcard/ui.xml | Out-Null
+        & $adb -s $dev shell uiautomator dump /sdcard/ui.xml 2>$null | Out-Null
         $x = [Text.Encoding]::UTF8.GetString([Text.Encoding]::Default.GetBytes(((& $adb -s $dev exec-out cat /sdcard/ui.xml) -join "`n")))
         $m = [regex]::Match($x, 'text="' + [regex]::Escape($texte) + '[^"]*"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"')
         if ($m.Success) {
@@ -71,6 +76,9 @@ function Toucher([string]$texte) {
             Start-Sleep 2; return $true
         }
         Start-Sleep 1
+    }
+    if ($secours.ContainsKey($texte)) {
+        & $adb -s $dev shell input tap $secours[$texte][0] $secours[$texte][1]; Start-Sleep 2; return $true
     }
     return $false
 }
@@ -89,18 +97,15 @@ $etapes = @(
     'BOUCLE la ceinture du passager avant', 'DÉBOUCLE la ceinture du passager avant',
     'BOUCLE une ceinture ARRIÈRE (derrière toi)', 'DÉBOUCLE cette ceinture arrière',
     'BOUCLE ta PROPRE ceinture (conducteur)', 'DÉBOUCLE ta ceinture')
-"`nÉcoute lancée. Un geste toutes les $Pas s, au bip. Reste immobile entre deux gestes.`n"
-Start-Sleep 5
+"`nÉcoute lancée. À TON RYTHME : fais le geste, puis appuie sur Entrée (le moment de l'appui est noté).`n"
+Start-Sleep 4
 $instants = @()
 $n = 0
 foreach ($e in $etapes) {
     $n++
-    "[$n/$($etapes.Count)] $e  (dans 3 s)"
-    Start-Sleep 3
-    [console]::Beep(1200, 250)
-    "     >>> MAINTENANT"
+    $null = Read-Host "[$n/$($etapes.Count)] $e, puis Entrée"
     $instants += (Get-Date).Add($decalage)
-    Start-Sleep ($Pas - 3)
+    Start-Sleep 2   # laisse passer le message de l'autoradio avant le geste suivant
 }
 "`nFin des gestes. Ne touche plus à rien : vérification de la balance (30 s, automatique)…"
 

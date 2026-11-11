@@ -14,7 +14,7 @@ l'ancienne version et garde les réglages. Le détail technique de chaque versio
   arrière, autonomie, boîtier CAN), plus OBD, GPS et égaliseur. Pratique pour savoir ce qui marche sur une autre voiture.
 - **Réglage du son pour deux places** (`reglage_auto.py --deux-places`) : mesure aussi à la place passager et règle
   l'égaliseur pour le meilleur compromis (60 % conducteur, 40 % passager).
-- Outils : test des ceintures par le CAN (`outils/adb/test_ceintures.ps1`, 2 min dans la voiture).
+- Outils : test des ceintures par le CAN (`outils/adb/test_ceintures.ps1`). Résultat du 11/11 : le boîtier de l'auteur ne transmet pas les ceintures ; tension et balance vérifiées sur l'autoradio.
 
 ## 0.30 — 11 novembre 2026
 - **Basses automatiques** (Son → Options) : plus de basses quand le volume est bas, et à volume fort la fréquence qui
