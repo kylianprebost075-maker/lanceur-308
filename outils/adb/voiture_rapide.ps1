@@ -1,4 +1,4 @@
-# Séance éclair dans la voiture (≈ 2 min) : à lancer quand le PC et l'autoradio sont sur le même partage de connexion
+﻿# Séance éclair dans la voiture (≈ 2 min) : à lancer quand le PC et l'autoradio sont sur le même partage de connexion
 # et que « ADB par le Wi-Fi » est activé dans les Réglages du Lanceur.
 #   1. trouve l'autoradio (port 5555) sur le réseau du PC
 #   2. installe l'APK release du projet (vérifie d'abord que ce n'est pas la variante émulateur)
