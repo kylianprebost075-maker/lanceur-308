@@ -353,11 +353,12 @@ private fun ClockTile(modifier: Modifier) {
 fun VehicleScreen(vs: VehicleState) {
     var tab by rememberSaveable { mutableStateOf(0) }
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Segmented(listOf(0 to "État", 1 to "GPS", 2 to "Diagnostic CAN"), tab) { tab = it }
+        Segmented(listOf(0 to "État", 1 to "GPS", 3 to "Mon autoradio", 2 to "Diagnostic CAN"), tab) { tab = it }
         Box(Modifier.weight(1f)) {
             when (tab) {
                 1 -> GpsPanel()
                 2 -> CanProbePanel()
+                3 -> FeaturesPanel()
                 else -> VehicleStatePanel(vs)
             }
         }

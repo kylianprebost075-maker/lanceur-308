@@ -2,8 +2,10 @@
 # et que « ADB par le Wi-Fi » est activé dans les Réglages du Lanceur.
 #   1. trouve l'autoradio (port 5555) sur le réseau du PC
 #   2. installe l'APK release du projet (vérifie d'abord que ce n'est pas la variante émulateur)
-#   3. ouvre l'accueil et capture la vraie 3D sous 3 angles, recadrée sur le panneau voiture (sans kilométrage)
-# Lecture seule sur la voiture ; rien n'est modifié dans les réglages de l'autoradio.
+#   3. remet le Lanceur en écran d'accueil, active la balance Seul / Passagers (accessibilité, v0.31)
+#   4. avec -Captures : ouvre l'accueil et capture la vraie 3D sous 3 angles, recadrée (sans kilométrage)
+# Rien n'est envoyé à la voiture elle-même ; seuls le Lanceur et ses autorisations sur l'autoradio sont réglés.
+param([switch]$Captures)
 $ErrorActionPreference = 'Continue'
 $adb = "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe"
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
@@ -39,7 +41,24 @@ $accueil = (& $adb -s $dev shell cmd package resolve-activity --brief -a android
 "Écran d'accueil : $accueil"
 if ($accueil -notmatch 'fr.p308.lanceur') { "=> Activer Réglages → « Utiliser comme écran d'accueil » dans le Lanceur, puis relancer." }
 
-# 3. Captures de la 3D
+# 2 ter (v0.31). Balance « Seul / Passagers » : active le service d'accessibilité du Lanceur (il ne touche que
+# l'égaliseur FYT, quand on appuie sur Seul ou Passagers ; se coupe dans Android → Accessibilité). Les services déjà
+# actifs sont gardés. Puis la position « Seul » trouvée au micro le 11/11 (1 → et 3 ↑) est envoyée au Lanceur.
+$svc = 'fr.p308.lanceur/fr.p308.lanceur.sound.ChampService'
+$actifs = ((& $adb -s $dev shell settings get secure enabled_accessibility_services) | Select-Object -Last 1).Trim()
+if ($actifs -notmatch [regex]::Escape($svc)) {
+    $liste = if ($actifs -and $actifs -ne 'null') { "${actifs}:$svc" } else { $svc }
+    & $adb -s $dev shell settings put secure enabled_accessibility_services $liste
+    & $adb -s $dev shell settings put secure accessibility_enabled 1
+}
+"Balance Seul / Passagers : $((& $adb -s $dev shell settings get secure enabled_accessibility_services) | Select-Object -Last 1)"
+$json = Join-Path $env:TEMP 'reglage-son.json'
+[IO.File]::WriteAllText($json, '{"champSeul":[1,3]}')
+& $adb -s $dev push $json /sdcard/Android/data/fr.p308.lanceur/files/reglage-son.json | Out-Null
+'Position « Seul » envoyée (1 →, 3 ↑).'
+if (-not $Captures) { "Fini en $([math]::Round(((Get-Date) - $t0).TotalSeconds)) s"; exit 0 }
+
+# 3. Captures de la 3D (seulement avec -Captures)
 New-Item -ItemType Directory -Force $out | Out-Null
 Add-Type -AssemblyName System.Drawing
 function Shot($name) {

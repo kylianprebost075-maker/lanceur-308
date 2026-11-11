@@ -4,6 +4,18 @@ Les versions publiées se téléchargent sur la page
 [Releases](https://github.com/kylianprebost075-maker/lanceur-308/releases). Une mise à jour s'installe par-dessus
 l'ancienne version et garde les réglages. Le détail technique de chaque version est dans le [README](README.md).
 
+## 0.31 — 11 novembre 2026 (pas encore essayée sur l'autoradio)
+- **Batterie sans boîtier OBD** : la tension est lue par le boîtier CAN de l'autoradio (FYT). Moteur coupé et autoradio
+  allumé, un rappel toutes les 20 min (« la batterie se vide »), avec le temps écoulé dans Moteur → Batterie.
+- **Son « Seul / Passagers »** (Son → Alignement) : un appui règle la balance de l'égaliseur FYT, centrée sur le
+  conducteur ou au centre pour tout le monde. Le Lanceur touche l'égaliseur à ta place grâce à un service
+  d'accessibilité, à activer une fois (Android → Accessibilité) ; il n'agit que dans l'égaliseur.
+- **Véhicule → Mon autoradio** : ce que l'autoradio transmet vraiment (température, batterie, volume, portes, marche
+  arrière, autonomie, boîtier CAN), plus OBD, GPS et égaliseur. Pratique pour savoir ce qui marche sur une autre voiture.
+- **Réglage du son pour deux places** (`reglage_auto.py --deux-places`) : mesure aussi à la place passager et règle
+  l'égaliseur pour le meilleur compromis (60 % conducteur, 40 % passager).
+- Outils : test des ceintures par le CAN (`outils/adb/test_ceintures.ps1`, 2 min dans la voiture).
+
 ## 0.30 — 11 novembre 2026
 - **Basses automatiques** (Son → Options) : plus de basses quand le volume est bas, et à volume fort la fréquence qui
   fait vibrer les portes est baissée. Une montée lente des basses (30 → 150 Hz) et un bouton « Ça vibre » trouvent cette

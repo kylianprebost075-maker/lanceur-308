@@ -46,6 +46,12 @@ basses (le micro entend le grésillement des portes et en déduit la fréquence)
 (`reglage-son.json`, basses automatiques activées), puis nouvelle courbe pour comparer. Rapport et graphique avant / après
 dans `mesures/` (jamais publié). Options : `--sans-eq`, `--sans-vibration`, `--micro N`, `--appareil IP:5555`, `--monter N`, `--oui`.
 
+**Pour deux places (v0.31)** : `--deux-places` mesure à ta place, puis te demande de poser le PC sur le siège passager
+avant et mesure encore. L'égaliseur de l'autoradio est le même pour tout le monde : il est réglé sur le meilleur
+compromis (60 % conducteur, 40 % passager), puis vérifié aux deux places. La balance, elle, se change d'un appui dans
+le Lanceur (Son → Alignement → « Seul » ou « Passagers ») ; `--champ-seul 1,3` envoie au Lanceur la position « Seul »
+trouvée à l'oreille ou au micro (crans vers la droite, crans vers l'avant).
+
 **Choix du micro** : un micro de PC portable avec réduction de bruit (« Microphone Array », mode partagé) efface le
 bruit rose et donne une mesure fausse (basses −20 dB, aigus +15 dB : le script ne règle alors rien). Prendre le micro
 brut (essai du 11/11 : n° 19 « Microphone Array 1 (… SST) », voir `python mesure_son.py micros`).

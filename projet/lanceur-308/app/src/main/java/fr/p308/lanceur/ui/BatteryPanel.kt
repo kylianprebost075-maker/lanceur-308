@@ -49,6 +49,7 @@ private fun verdictColor(v: CrankVerdict): Color = when (v) {
 fun BatteryPanel() {
     val e by Engine.state.collectAsStateWithLifecycle()
     val b by BatteryWatch.state.collectAsStateWithLifecycle()
+    val vs by Vehicle.state.collectAsStateWithLifecycle()
     val stored by CrankWatch.history.collectAsStateWithLifecycle()
     val demo = Vehicle.demo
     val list = if (demo && stored.isEmpty()) CrankWatch.demoHistory() else stored
@@ -58,12 +59,18 @@ fun BatteryPanel() {
     Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Tile(Modifier.weight(1f).fillMaxHeight()) {
             Text("Batterie", fontSize = 22.sp, fontWeight = FontWeight.Bold)
-            Text(if (demo) "Démo : exemple de démarrages" else if (e.connected) "Boîtier OBD connecté" else e.status,
+            Text(if (demo) "Démo : exemple de démarrages" else if (e.connected) "Boîtier OBD connecté"
+                else if (vs.batteryV != null) "Tension lue par l'autoradio" else e.status,
                 fontSize = 13.sp, color = if (e.connected) C.Green else C.Sub, maxLines = 1)
             Spacer(Modifier.height(10.dp))
             Text("Tension maintenant", fontSize = 12.sp, color = C.Sub)
             Text((b.volts ?: e.voltage)?.let(::volts) ?: "—", fontSize = 30.sp, fontWeight = FontWeight.SemiBold)
+            if (vs.batteryV != null && !demo) Text("Lue sur l'autoradio (boîtier CAN), sans boîtier OBD", fontSize = 11.sp, color = C.Sub)
             b.message?.let { Text(it, fontSize = 13.sp, color = C.Orange) }
+            b.engineOffMin?.takeIf { it >= 1 && !demo }?.let { min ->
+                Text("Moteur coupé depuis $min min, autoradio allumé" + if (min >= BatteryWatch.DRAIN_STEP_MIN) " : la batterie se vide" else "",
+                    fontSize = 13.sp, color = if (min >= BatteryWatch.DRAIN_STEP_MIN) C.Orange else C.Sub)
+            }
             Spacer(Modifier.height(10.dp))
             // Moteur coupé et boîtier prêt : on le dit, pour que l'utilisateur sache qu'il peut démarrer.
             if (!demo && e.connected && (e.rpm ?: 0) <= 400) {

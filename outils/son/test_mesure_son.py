@@ -151,6 +151,18 @@ class EqFyt(unittest.TestCase):
         self.assertAlmostEqual(f.db_vers_y(12), f.Y_HAUT, delta=1)
         self.assertAlmostEqual(f.db_vers_y(-30), f.Y_BAS, delta=1)
 
+class DeuxPlaces(unittest.TestCase):
+    def test_moyenne_ponderee_et_fiabilite(self):
+        import reglage_auto as r
+        cond = ({100: 6.0, 1000: 0.0, 8000: -4.0}, {100: True, 1000: True, 8000: False}, 0.6)
+        pas = ({100: -4.0, 1000: 2.0, 8000: -6.0}, {100: True, 1000: False, 8000: True}, 0.4)
+        ec, fi = r.combiner([cond, pas])
+        self.assertAlmostEqual(ec[100], 2.0)   # 0,6 x 6 + 0,4 x -4
+        self.assertAlmostEqual(ec[1000], 0.0)  # seule la place conducteur est fiable
+        self.assertAlmostEqual(ec[8000], -6.0)  # seule la place passager est fiable
+        self.assertTrue(all(fi.values()))
+        ec, fi = r.combiner([({50: 3.0}, {50: False}, 0.6), ({50: 1.0}, {50: False}, 0.4)])
+        self.assertFalse(fi[50])
 
 if __name__ == "__main__":
     unittest.main()

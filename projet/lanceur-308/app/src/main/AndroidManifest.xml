@@ -28,6 +28,7 @@
 
     <queries>
         <package android:name="com.syu.ms" />
+        <package android:name="com.syu.eq" />
         <intent>
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
@@ -78,5 +79,20 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
+
+        <!-- v0.31 : balance « Seul / Passagers ». Touche l'égaliseur FYT (com.syu.eq) à la place du doigt, seulement
+             quand on le demande. Inactif tant qu'il n'est pas activé à la main dans Android, Accessibilité. -->
+        <service
+            android:name=".sound.ChampService"
+            android:exported="true"
+            android:label="Lanceur 308 : balance Seul / Passagers"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/champ_service" />
+        </service>
     </application>
 </manifest>

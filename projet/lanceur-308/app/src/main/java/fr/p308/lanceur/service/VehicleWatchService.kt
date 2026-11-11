@@ -57,6 +57,7 @@ class VehicleWatchService : Service(), LocationListener {
     private lateinit var banner: AlertBanner
     private lateinit var perf: PerfOverlay
     private var lastBatteryLevel = BatteryLevel.UNKNOWN
+    private var lastDrainStep = 0
     private val gnss = object : GnssStatus.Callback() {
         override fun onSatelliteStatusChanged(status: GnssStatus) = GpsMonitor.onGnss(status)
     }
@@ -351,6 +352,20 @@ class VehicleWatchService : Service(), LocationListener {
     private fun checkBattery() {
         val engine = Engine.state.value
         val b = BatteryWatch.update(Vehicle.state.value.batteryV ?: engine.voltage, engine.rpm)
+        // v0.31 : rappel toutes les 20 min quand le moteur est coupé et l'autoradio allumé (la batterie se vide).
+        val step = BatteryWatch.drainStep(b.engineOffMin)
+        if (step > lastDrainStep && !Vehicle.demo) BatteryWatch.drainMessage(b)?.let { msg ->
+            if (step == 1) fr.p308.lanceur.sound.Voice.say("Moteur coupé depuis ${b.engineOffMin} minutes : la batterie se vide.")
+            getSystemService(NotificationManager::class.java).notify(BATTERY_NOTIF + 1, NotificationCompat.Builder(this, CH_ALERT)
+                .setSmallIcon(R.drawable.ic_car)
+                .setContentTitle("Batterie")
+                .setContentText(msg)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(msg))
+                .setAutoCancel(true)
+                .build())
+            banner.show("🔋  $msg", 0xE6C77700.toInt(), 15_000)
+        }
+        lastDrainStep = step
         if (b.level == lastBatteryLevel) return
         lastBatteryLevel = b.level
         val msg = b.message ?: return

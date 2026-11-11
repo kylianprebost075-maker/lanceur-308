@@ -5,7 +5,9 @@ Test des ceintures (≈ 2 min) : l'autoradio transmet-il l'état des ceintures d
 Le script :
   1. lance l'écoute « Diagnostic CAN » du Lanceur sur l'autoradio (lecture seule, rien n'est envoyé à la voiture) ;
   2. annonce chaque geste à faire (texte + bip du PC), toutes les 10 s : boucler / déboucler les ceintures ;
-  3. arrête l'écoute, récupère le rapport et cherche les canaux qui changent en même temps que les gestes.
+  3. vérifie tout seul les flèches ← et ↓ de la balance (égaliseur FYT) puis remet la balance comme avant ;
+  4. arrête l'écoute, récupère le rapport et cherche les canaux qui changent en même temps que les gestes ;
+     affiche aussi la tension de la batterie lue par l'autoradio (pour vérifier son codage moteur coupé).
 
 Usage : .\test_ceintures.ps1                    (séance dans la voiture)
         .\test_ceintures.ps1 -Rapport x.txt -Gestes "14:13:50,14:14:00"   (analyse seule d'un rapport existant)
@@ -100,13 +102,65 @@ foreach ($e in $etapes) {
     $instants += (Get-Date).Add($decalage)
     Start-Sleep ($Pas - 3)
 }
-"`nFin des gestes. Arrêt de l'écoute…"
+"`nFin des gestes. Ne touche plus à rien : vérification de la balance (30 s, automatique)…"
+
+# --- Balance : les flèches ← et ↓ de l'égaliseur (positions déduites, à vérifier) et les canaux FYT qui bougent. ---
+Add-Type -AssemblyName System.Drawing
+$png = Join-Path $env:TEMP 'champ-test.png'
+function Tap($x, $y) { & $adb -s $dev shell input tap $x $y; Start-Sleep -Milliseconds 700 }
+function Point {
+    cmd /c "`"$adb`" -s $dev exec-out screencap -p > `"$png`""
+    $b = [System.Drawing.Bitmap]::FromFile($png); $sx = 0; $sy = 0; $k = 0
+    for ($x = 810; $x -lt 1070; $x += 2) { for ($y = 226; $y -lt 486; $y += 2) {
+        $c = $b.GetPixel($x, $y)
+        if ($c.R -gt 230 -and $c.G -gt 230 -and $c.B -gt 230) {
+            $w = 0; foreach ($d in -6, 6) { if ($b.GetPixel($x + $d, $y).R -gt 200 -and $b.GetPixel($x, $y + $d).R -gt 200) { $w++ } }
+            if ($w -eq 2) { $sx += $x; $sy += $y; $k++ }
+        } } }
+    $b.Dispose(); if ($k -eq 0) { return $null }
+    return @([math]::Round(($sx / $k - 940) / 13.4), [math]::Round((356 - $sy / $k) / 13.4))
+}
+$champ = @()
+& $adb -s $dev shell monkey -p com.syu.eq -c android.intent.category.LAUNCHER 1 | Out-Null; Start-Sleep 3
+Tap 1100 680; Start-Sleep 1
+$avant = Point
+Tap 335 498; $champ += (Get-Date).Add($decalage)                 # Tous = centre
+Tap 730 356; Tap 730 356; $champ += (Get-Date).Add($decalage)    # ← ×2
+Tap 941 544; Tap 941 544; $champ += (Get-Date).Add($decalage)    # ↓ ×2
+Start-Sleep 1; $essai = Point
+# Remise du réglage d'avant (relevé du 11/11 : 1 → et 3 ↑ ; sinon celui lu à l'écran).
+$r = 1; $f = 3; if ($avant) { $r = $avant[0]; $f = $avant[1] }
+Tap 335 498
+for ($i = 0; $i -lt [math]::Abs($r); $i++) { if ($r -gt 0) { Tap 1150 356 } else { Tap 730 356 } }
+for ($i = 0; $i -lt [math]::Abs($f); $i++) { if ($f -gt 0) { Tap 941 168 } else { Tap 941 544 } }
+$champ += (Get-Date).Add($decalage)
+Start-Sleep 1; $apres = Point
+& $adb -s $dev shell am start -n fr.p308.lanceur/.MainActivity | Out-Null; Start-Sleep 2
+$balance = @(
+    "Balance avant le test : $(if ($avant) { "$($avant[0]) →, $($avant[1]) ↑" } else { 'point non lu' })",
+    "Après Tous, ← ×2, ↓ ×2 : $(if ($essai) { "$($essai[0]) →, $($essai[1]) ↑ (attendu -2, -2)" } else { 'point non lu' })",
+    "Remise : $(if ($apres) { "$($apres[0]) →, $($apres[1]) ↑" } else { 'point non lu' })")
+$balance
+
+"`nArrêt de l'écoute…"
 Toucher 'Terminer' | Out-Null
 Start-Sleep 3
 New-Item -ItemType Directory -Force $out | Out-Null
 & $adb -s $dev pull /sdcard/Android/data/fr.p308.lanceur/files/diagnostic-can.txt "$out\diagnostic-can.txt" | Out-Null
 ($instants | ForEach-Object { $_.ToString('HH:mm:ss') }) -join ',' | Out-File "$out\gestes.txt" -Encoding utf8
 "Rapport : $out"
-$res = Analyser "$out\diagnostic-can.txt" $instants
+$res = @(Analyser "$out\diagnostic-can.txt" $instants)
+# Tension de la batterie (module 0 code 114) : le codage (brut + 4) × 0,1 doit donner 12 à 13 V moteur coupé.
+$volts = Get-Content "$out\diagnostic-can.txt" -Encoding UTF8 | ForEach-Object {
+    $m = [regex]::Match($_, 'FYT module 0 canal 114 : .*→ i=\[(\d+)'); if ($m.Success) { [int]$m.Groups[1].Value } }
+$res += ''
+$res += if ($volts) { "Tension (0/114) moteur coupé : brut $(($volts | Select-Object -Unique) -join ', ') → " +
+        "$((($volts | Select-Object -Unique) | ForEach-Object { '{0:N1} V' -f (($_ + 4) / 10) }) -join ', ') (attendu 12 à 13 V)" }
+    else { 'Tension (0/114) : pas de changement pendant le test (valeur stable, voir le début du rapport)' }
+$res += ''
+$res += $balance
+# Canaux du module son (4) qui ont bougé pendant le test de la balance : pistes pour la commander sans toucher l'écran.
+$res += 'Canaux du son (module 4) pendant la balance :'
+$res += @(Get-Content "$out\diagnostic-can.txt" -Encoding UTF8 | Where-Object { $_ -match 'FYT module 4 canal' -or $_ -match 'CHANGEMENT .*(balance|fader|bal|fad)' })
 $res
 $res | Out-File "$out\resultat.txt" -Encoding utf8

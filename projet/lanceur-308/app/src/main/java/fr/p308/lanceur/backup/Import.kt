@@ -34,6 +34,10 @@ object Import {
                 val o = JSONObject(son.readText())
                 o.optInt("resonanceHz", -1).takeIf { it >= 0 }?.let(fr.p308.lanceur.sound.SoundPrefs::updateResonance)
                 if (o.has("bassAuto")) fr.p308.lanceur.sound.SoundPrefs.updateBassAuto(o.getBoolean("bassAuto"))
+                // v0.31 : position « Seul » de la balance trouvée au micro, [crans →, crans ↑].
+                o.optJSONArray("champSeul")?.takeIf { it.length() == 2 }?.let {
+                    fr.p308.lanceur.sound.SoundPrefs.updateSoloChamp(it.getInt(0), it.getInt(1))
+                }
                 "Réglage du son reçu du PC : vibration des portes " +
                     (o.optInt("resonanceHz", 0).takeIf { it > 0 }?.let { "$it Hz" } ?: "aucune")
             }.getOrElse { "Réglage du son illisible : ${it.message}" }

@@ -36,6 +36,9 @@ object SoundPrefs {
         private set
     var resonanceHz by mutableIntStateOf(0)
         private set
+    /** v0.31 : balance réglée pour le conducteur seul ou pour tout le monde. */
+    var seatMode by mutableStateOf(SeatMode.SOLO)
+        private set
     /** Annonces vocales des alertes. */
     var voice by mutableStateOf(false)
         private set
@@ -50,6 +53,18 @@ object SoundPrefs {
         bassAuto = p.getBoolean("bassAuto", false)
         bassStrength = p.getInt("bassStrength", 2).coerceIn(1, 3)
         resonanceHz = p.getInt("resonanceHz", 0)
+        seatMode = runCatching { SeatMode.valueOf(p.getString("seatMode", null)!!) }.getOrDefault(SeatMode.SOLO)
+        soloChamp = if (p.contains("soloRight")) p.getInt("soloRight", 0) to p.getInt("soloFront", 0) else null
+    }
+
+    fun updateSeatMode(v: SeatMode) { seatMode = v; prefs?.edit()?.putString("seatMode", v.name)?.apply() }
+
+    /** v0.31 : position « Seul » de la croix Champ trouvée au micro du PC (null = d'après les distances). */
+    var soloChamp by mutableStateOf<Pair<Int, Int>?>(null)
+        private set
+    fun updateSoloChamp(right: Int, front: Int) {
+        soloChamp = right.coerceIn(-8, 8) to front.coerceIn(-8, 8)
+        prefs?.edit()?.putInt("soloRight", soloChamp!!.first)?.putInt("soloFront", soloChamp!!.second)?.apply()
     }
 
     fun updateBassAuto(v: Boolean) { bassAuto = v; prefs?.edit()?.putBoolean("bassAuto", v)?.apply() }

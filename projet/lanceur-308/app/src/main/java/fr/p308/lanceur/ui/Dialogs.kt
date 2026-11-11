@@ -244,7 +244,7 @@ fun WelcomeDialog(onSettings: () -> Unit) {
                     "Pour tout voir bouger sans rien brancher : « Voir la démo ».",
                     "Ta plaque sur la voiture : Réglages → Plaque.",
                     "Données du moteur : un boîtier OBD Bluetooth (ELM327, Vgate vLinker, iCar), puis l'onglet Moteur.",
-                    "Portes et phares en direct : seulement sur les autoradios de marque FYT.",
+                    "Portes, température, batterie en direct : autoradios de marque FYT. Ce que le tien transmet : Véhicule → Mon autoradio.",
                     "Garder cet écran au démarrage : Réglages → Utiliser comme écran d'accueil.",
                 ).forEachIndexed { i, line -> Text("${i + 1}. $line", fontSize = 14.sp, modifier = Modifier.padding(vertical = 3.dp)) }
                 Spacer(Modifier.height(8.dp))

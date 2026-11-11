@@ -97,6 +97,8 @@ private fun AlignPanel() {
         Tile(Modifier.weight(1.2f).fillMaxHeight()) {
             val ctx = LocalContext.current
             Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                SeatModeSection()
+                Spacer(Modifier.height(10.dp))
                 Text("Réglage à faire dans l'autoradio", fontSize = 18.sp, fontWeight = FontWeight.Bold)
                 val plan = fr.p308.lanceur.sound.FytStage.plan(SoundPrefs.distancesCm.toList())
                 if (plan == null) {
@@ -144,6 +146,35 @@ private fun AlignPanel() {
                     )
                 }
             }
+        }
+    }
+}
+
+/**
+ * v0.31 : balance « Seul » (son centré sur le conducteur, d'après les distances) ou « Passagers » (centre : équilibré
+ * pour tout le monde). Le Lanceur règle l'égaliseur FYT à ta place par le service d'accessibilité.
+ */
+@Composable
+private fun SeatModeSection() {
+    val ctx = LocalContext.current
+    val status by fr.p308.lanceur.sound.ChampService.status.collectAsStateWithLifecycle()
+    var msg by remember { mutableStateOf<String?>(null) }
+    val enabled = remember(msg) { fr.p308.lanceur.sound.ChampService.enabled(ctx) }
+    Text("Son pour qui ?", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+    Segmented(fr.p308.lanceur.sound.SeatMode.entries.map { it to it.label }, SoundPrefs.seatMode) { m ->
+        SoundPrefs.updateSeatMode(m)
+        msg = fr.p308.lanceur.sound.ChampService.apply(ctx, m)
+    }
+    Text(
+        if (SoundPrefs.seatMode == fr.p308.lanceur.sound.SeatMode.SOLO) "Seul : la voix vient du milieu du tableau de bord, pour toi."
+        else "Passagers : balance au centre, chacun entend les deux côtés.",
+        fontSize = 12.sp, color = C.Sub,
+    )
+    (status.ifEmpty { null } ?: msg)?.let { Text(it, fontSize = 13.sp, color = if (enabled) C.Green else C.Orange) }
+    val eqApp = remember { ctx.packageManager.getLaunchIntentForPackage(fr.p308.lanceur.sound.ChampService.EQ_PKG) != null }
+    if (!enabled && eqApp) {
+        TextButton(onClick = { fr.p308.lanceur.sound.ChampService.openSettings(ctx) }) {
+            Text("Activer le réglage automatique (Accessibilité)")
         }
     }
 }

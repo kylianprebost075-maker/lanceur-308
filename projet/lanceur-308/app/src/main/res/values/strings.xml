@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="champ_service_description">Règle la balance de l\'autoradio quand tu appuies sur « Seul » ou « Passagers » dans le Lanceur (onglet Son). Il ouvre l\'égaliseur de l\'autoradio, touche ses boutons à ta place puis revient. Il n\'agit que dans l\'égaliseur et ne lit rien d\'autre.</string>
+</resources>

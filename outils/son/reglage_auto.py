@@ -9,7 +9,9 @@ L'autoradio et le PC sont sur le même partage de connexion, « ADB par le Wi-Fi
   4. fréquence de vibration envoyée au Lanceur (basses automatiques activées)
   5. bruit rose à nouveau → courbe « après » ; rapport et graphique dans le dossier « mesures » (jamais publié)
 
-Usage : python reglage_auto.py [--micro N] [--appareil IP:5555] [--sans-eq] [--sans-vibration]
+Usage : python reglage_auto.py [--micro N] [--appareil IP:5555] [--sans-eq] [--sans-vibration] [--deux-places]
+Avec --deux-places, la courbe est aussi mesurée à la place passager avant (on déplace le PC quand il le dit) et
+l'égaliseur vise le meilleur compromis entre les deux places (l'égaliseur de l'autoradio est commun).
 Rien n'est envoyé à la voiture : seulement à l'autoradio (sons de test, égaliseur, réglage du Lanceur).
 """
 from __future__ import annotations
@@ -114,6 +116,26 @@ def mesurer_courbe(a: Autoradio, micro, fond: dict) -> tuple[dict, dict, object]
     return m.ecarts(niv), fiable, x
 
 
+#: Poids des places dans le réglage commun (--deux-places) : le conducteur est toujours là, le passager pas toujours.
+POIDS_PLACES = {"conducteur": 0.6, "passager": 0.4}
+
+
+def combiner(courbes: list[tuple[dict, dict, float]]) -> tuple[dict, dict]:
+    """Moyenne pondérée des écarts de plusieurs places : [(écarts, fiable, poids)] → (écarts, fiable).
+
+    Une bande ne compte que là où la mesure est fiable (assez au-dessus du bruit de fond) ; elle est fiable dans le
+    résultat si au moins une place l'est. L'égaliseur de l'autoradio est le même pour tout le monde : on vise le
+    meilleur compromis, pas la perfection à une seule place.
+    """
+    freqs = list(courbes[0][0])
+    ec, fi = {}, {}
+    for f in freqs:
+        pts = [(e[f], w) for e, ok, w in courbes if ok.get(f)]
+        fi[f] = bool(pts)
+        ec[f] = sum(v * w for v, w in pts) / sum(w for _, w in pts) if pts else 0.0
+    return ec, fi
+
+
 def mesurer_vibration(a: Autoradio, micro) -> float | None:
     a.onglet_son("Options")
     if not a.toucher_texte("Lancer la montée des basses"):
@@ -148,6 +170,10 @@ def main(argv=None):
     p.add_argument("--oui", action="store_true", help="ne pas attendre Entrée entre les étapes (essais)")
     p.add_argument("--monter", type=int, default=0,
                    help="monte le volume de N crans (touches de volume) pour la recherche de vibration, puis le remet")
+    p.add_argument("--deux-places", action="store_true",
+                   help="mesure aussi à la place passager avant : égaliseur réglé pour les deux (60 %% conducteur, 40 %% passager)")
+    p.add_argument("--champ-seul", default=None, metavar="DROITE,AVANT",
+                   help="position « Seul » de la balance (croix Champ) à envoyer au Lanceur, ex. 1,3")
     a_ = p.parse_args(argv)
     global SANS_QUESTION
     SANS_QUESTION = a_.oui
@@ -167,7 +193,17 @@ def main(argv=None):
 
     print("2/5 Courbe de réponse (bruit rose, 14 s)…")
     avant, fiable, _ = mesurer_courbe(a, a_.micro, fond)
-    eq = m.reglages_fyt({f: e for f, e in avant.items() if fiable[f]})
+    avant_passager = None
+    if a_.deux_places:
+        print("   (place conducteur mesurée)")
+        demander("Pose le PC sur le SIÈGE PASSAGER AVANT, micro à hauteur des oreilles. Silence.")
+        print("2 bis/5 Courbe à la place passager (14 s)…")
+        avant_passager, fiable_p, _ = mesurer_courbe(a, a_.micro, fond)
+        cible, fiable_c = combiner([(avant, fiable, POIDS_PLACES["conducteur"]),
+                                    (avant_passager, fiable_p, POIDS_PLACES["passager"])])
+        eq = m.reglages_fyt({f: e for f, e in cible.items() if fiable_c[f]})
+    else:
+        eq = m.reglages_fyt({f: e for f, e in avant.items() if fiable[f]})
     boom = m.bosse_basses({f: e for f, e in avant.items() if fiable[f]})
 
     vib = None
@@ -199,15 +235,24 @@ def main(argv=None):
         avant_eq = fyt_eq.lire_points(a.capture())
         lu = fyt_eq.regler(a, eq)
         print("   réglé : " + ", ".join(f"{b:g} Hz {v:+.0f}" for b, v in lu.items()))
-    payload = json.dumps({"resonanceHz": resonance, "bassAuto": True})
+    envoi = {"resonanceHz": resonance, "bassAuto": True}
+    if a_.champ_seul:
+        envoi["champSeul"] = [int(v) for v in a_.champ_seul.split(",")]
+    payload = json.dumps(envoi)
     with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8") as fh:
         fh.write(payload)
     subprocess.run([ADB, "-s", dev, "push", fh.name, f"{FICHIERS_LANCEUR}/reglage-son.json"], capture_output=True)
     os.unlink(fh.name)
 
-    apres = None
+    apres = apres_passager = None
     if not a_.sans_eq:
-        print("5/5 Vérification (bruit rose, 14 s)…")
+        if a_.deux_places:
+            print("5/5 Vérification à la place passager (bruit rose, 14 s)…")
+            apres_passager, _, _ = mesurer_courbe(a, a_.micro, fond)
+            demander("Remets le PC à TA PLACE (conducteur), micro à hauteur des oreilles.")
+            print("5 bis/5 Vérification à la place conducteur (14 s)…")
+        else:
+            print("5/5 Vérification (bruit rose, 14 s)…")
         apres, _, _ = mesurer_courbe(a, a_.micro, fond)
 
     m.MESURES.mkdir(exist_ok=True)
@@ -219,7 +264,12 @@ def main(argv=None):
         "egaliseur_avant": avant_eq, "egaliseur_propose": eq,
         "ecart_avant": {str(k): round(v, 1) for k, v in avant.items()},
         "ecart_apres": {str(k): round(v, 1) for k, v in apres.items()} if apres else None,
+        "deux_places": a_.deux_places,
+        "ecart_avant_passager": {str(k): round(v, 1) for k, v in avant_passager.items()} if avant_passager else None,
+        "ecart_apres_passager": {str(k): round(v, 1) for k, v in apres_passager.items()} if apres_passager else None,
     }
+    if avant_passager:
+        (m.MESURES / f"{stamp}-auto-passager.svg").write_text(svg_avant_apres(avant_passager, apres_passager), encoding="utf-8")
     (m.MESURES / f"{stamp}-auto.json").write_text(json.dumps(rapport, indent=2, ensure_ascii=False), encoding="utf-8")
 
     print("\n===== Résultat =====")
@@ -228,10 +278,14 @@ def main(argv=None):
     print(f"Envoyé au Lanceur : basses automatiques actives, fréquence baissée à volume fort {resonance or 'aucune'} Hz")
     if avant_eq:
         print("Égaliseur d'avant (pour revenir) : " + ", ".join(f"{b:g}:{v:+.0f}" for b, v in avant_eq.items()))
+    def ecart_moyen(c):
+        return sum(abs(v) for f, v in c.items() if 40 <= f <= 10000) / len([f for f in c if 40 <= f <= 10000])
     if apres:
-        def ecart_moyen(c):
-            return sum(abs(v) for f, v in c.items() if 40 <= f <= 10000) / len([f for f in c if 40 <= f <= 10000])
-        print(f"Écart moyen à la courbe visée : {ecart_moyen(avant):.1f} dB avant → {ecart_moyen(apres):.1f} dB après")
+        place = " (conducteur)" if a_.deux_places else ""
+        print(f"Écart moyen à la courbe visée{place} : {ecart_moyen(avant):.1f} dB avant → {ecart_moyen(apres):.1f} dB après")
+    if avant_passager and apres_passager:
+        print(f"Écart moyen à la courbe visée (passager) : {ecart_moyen(avant_passager):.1f} dB avant → "
+              f"{ecart_moyen(apres_passager):.1f} dB après")
     print(f"Graphique et rapport : {m.MESURES / (stamp + '-auto.svg')}  ({rapport['duree_s']} s)")
 
 

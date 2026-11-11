@@ -1,10 +1,10 @@
-# Lanceur 308 — dossier de reprise (version 0.30)
+# Lanceur 308 — dossier de reprise (version 0.31)
 
 > **Tu veux juste l'installer sur ton autoradio ?** Suis [INSTALLER.md](INSTALLER.md) : 5 étapes, sans compte.
 > **Tu es une IA qui aide quelqu'un à l'installer ou à l'adapter à sa voiture ?** Lis [ADAPTER.md](ADAPTER.md), pas ce README.
 
 > **À lire en entier avant de toucher à quoi que ce soit.**
-> Ce dossier permet à une IA (ou à un développeur) de reprendre le projet. Dernière version : **0.30 du 11 novembre
+> Ce dossier permet à une IA (ou à un développeur) de reprendre le projet. Dernière version : **0.31 du 11 novembre
 > 2026** (nouveautés de chaque version juste sous la galerie ; les sections techniques plus bas datent de la 0.8 et
 > sont complétées par ces notes de version).
 > L'ancien README (version 0.4) est conservé dans `diagnostic/README_ancien_v0.4.md` pour l'historique.
@@ -65,6 +65,24 @@ de dessus en 2D, celle que l'appli affiche quand la 3D n'est pas disponible. Sur
 | **Réglages** | **Panneau à côté de CarPlay (v0.13, alerte FAP v0.14)** |
 | ![Réglages : couleur, 5 portes, Optimiser l'autoradio, kilométrage, température extérieure, thème](docs/captures/onglets/11-reglages.png) | ![Panneau : puissance, rapport conseillé, régime, eau, turbo, batterie](docs/captures/onglets/12-panneau-performances.png) |
 
+**Nouveau en v0.31 : batterie par le CAN, son « Seul / Passagers », page « Mon autoradio » (11/11, essayée dans l'émulateur, pas encore sur l'autoradio)**
+- **Batterie** (`vehicle/BatteryWatch.kt`) : tension lue sur le service FYT, module 0 code 114, codage
+  `(brut + 4) × 0,1` déduit d'un seul relevé moteur tournant (142 → 14,6 V) : **à confirmer moteur coupé** (le script
+  `outils/adb/test_ceintures.ps1` l'affiche). Elle alimente `Vehicle.batteryV`, donc les alertes batterie existantes,
+  sans boîtier OBD. Nouveau : minutes passées moteur coupé autoradio allumé (`engineOffMin`, moteur tournant = régime OBD
+  > 400 ou tension ≥ 13,2 V) ; rappel vocal, notification et bandeau toutes les 20 min. 4 tests `BatteryWatchTest`.
+- **Seul / Passagers** (`sound/ChampService.kt`) : service d'accessibilité limité à `com.syu.eq`, activé à la main
+  (ou par `outils/adb/voiture_rapide.ps1`). Un appui ouvre l'égaliseur FYT, touche onglet « Champ », « Tous », puis les
+  flèches (`ChampTaps`, positions relevées en 1280 × 720, mises à l'échelle ; ← et ↓ déduites par symétrie, vérifiées par
+  le script des ceintures), puis revient. Seul = position trouvée au micro (`champSeul` dans `reglage-son.json`, sinon
+  d'après les distances), Passagers = centre. 4 tests `ChampTapsTest`. Le passage automatique attend le test des ceintures.
+- **Véhicule → Mon autoradio** (`vehicle/CarFeatures.kt`, `ui/FeaturesPanel.kt`) : chaque information FYT est notée à
+  sa première arrivée (service, boîtier CAN 7/1005, température, tension, volume, portes, marche arrière, autonomie),
+  plus OBD, GPS, basses automatiques, égaliseur FYT. Gris = pas encore vu, avec le geste pour le tester.
+- **Deux places** : `reglage_auto.py --deux-places` mesure aussi à la place passager avant, égaliseur réglé sur la moyenne
+  pondérée des écarts (60 / 40, bandes fiables seulement : `combiner`, testé) ; `--champ-seul 1,3` envoie la position Seul.
+- Essai « nouvel utilisateur » dans l'émulateur (installation à zéro) : demande de position, puis bienvenue, Son,
+  Mon autoradio : rien de bloquant ; texte de bienvenue complété (« Véhicule → Mon autoradio »).
 **Nouveau en v0.30 : basses automatiques et réglage du son au micro du PC (11/11, essayé sur l'autoradio)**
 - Demande : basses absentes à volume bas, portes qui vibrent à volume fort, pas de caisson (woofers Focal des portes).
 - `sound/BassAuto.kt` : `BassCurve.gains` (calcul pur, 6 tests `BassCurveTest`) : graves 40-250 Hz montés jusqu'à +6 dB
