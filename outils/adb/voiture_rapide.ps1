@@ -33,10 +33,11 @@ if ($size -gt 20MB) { "APK de $([math]::Round($size / 1MB)) Mo = variante émula
 
 # 2 bis. Le Lanceur redevient l'écran d'accueil (demande de l'utilisateur) : même effet que Réglages → « Utiliser comme
 # écran d'accueil », puis choisi comme accueil par défaut. Réversible : décocher ce réglage dans le Lanceur.
-& $adb -s $dev shell pm enable fr.p308.lanceur/fr.p308.lanceur.HomeAlias | Out-Null
+# (« pm enable » est refusé au shell : l'alias reste activé par le réglage du Lanceur, gardé par la mise à jour.)
 & $adb -s $dev shell cmd package set-home-activity fr.p308.lanceur/fr.p308.lanceur.HomeAlias | Out-Null
-$home = (& $adb -s $dev shell cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME) | Select-Object -Last 1
-"Écran d'accueil : $home"
+$accueil = (& $adb -s $dev shell cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME) | Select-Object -Last 1
+"Écran d'accueil : $accueil"
+if ($accueil -notmatch 'fr.p308.lanceur') { "=> Activer Réglages → « Utiliser comme écran d'accueil » dans le Lanceur, puis relancer." }
 
 # 3. Captures de la 3D
 New-Item -ItemType Directory -Force $out | Out-Null
