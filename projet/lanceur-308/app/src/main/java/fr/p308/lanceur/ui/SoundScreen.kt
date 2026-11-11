@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -36,6 +37,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -90,43 +92,54 @@ private fun AlignPanel() {
                 Speaker.entries.forEach { s -> DistanceField(s) }
             }
         }
+        // v0.29 : l'égaliseur de l'autoradio n'a pas de retard par haut-parleur (relevé du 11/11) : on règle la croix
+        // « Champ » (balance / fader) d'après les distances, puis on finit à l'oreille.
         Tile(Modifier.weight(1.2f).fillMaxHeight()) {
+            val ctx = LocalContext.current
             Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-                Text("Valeurs à recopier dans l'autoradio", fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                val res = TimeAlignment.compute(SoundPrefs.distancesCm.toList())
-                if (res == null) {
-                    Text("Saisis au moins deux distances.", fontSize = 14.sp, color = C.Sub)
+                Text("Réglage à faire dans l'autoradio", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                val plan = fr.p308.lanceur.sound.FytStage.plan(SoundPrefs.distancesCm.toList())
+                if (plan == null) {
+                    Text("Saisis les distances des deux tweeters avant (gauche et droit).", fontSize = 14.sp, color = C.Sub)
                 } else {
-                    Row(Modifier.fillMaxWidth().padding(top = 6.dp)) {
-                        listOf("Haut-parleur" to 1.3f, "Retard" to 1f, "ou en cm" to 0.8f, "Niveau" to 0.9f).forEach { (t, w) ->
-                            Text(t, fontSize = 12.sp, color = C.Sub, modifier = Modifier.weight(w))
+                    Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        StageCross(plan.rightSteps, plan.frontSteps, Modifier.size(120.dp))
+                        Spacer(Modifier.width(14.dp))
+                        Column {
+                            val side = if (plan.rightSteps >= 0) "→ vers la droite" else "← vers la gauche"
+                            Text("${kotlin.math.abs(plan.rightSteps)} cran(s) $side", fontSize = 19.sp, fontWeight = FontWeight.Bold)
+                            Text("${plan.frontSteps} cran(s) ↑ vers l'avant", fontSize = 19.sp, fontWeight = FontWeight.Bold)
+                            Text(
+                                "Le tweeter ${if (plan.nearLeft) "gauche" else "droit"} est ${plan.gapCm} cm plus près : il paraît " +
+                                    "${f1(plan.louderDb)} dB plus fort et tire la voix vers lui.",
+                                fontSize = 12.sp, color = C.Sub,
+                            )
                         }
                     }
-                    res.forEach { r ->
-                        Row(
-                            Modifier.fillMaxWidth().padding(vertical = 3.dp).clip(RoundedCornerShape(10.dp))
-                                .background(C.Field.copy(0.5f)).padding(8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(r.speaker.short, fontSize = 17.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1.3f))
-                            Text("${f2(r.delayMs)} ms", fontSize = 17.sp, modifier = Modifier.weight(1f))
-                            Text("${r.delayCm} cm", fontSize = 15.sp, color = C.Sub, modifier = Modifier.weight(0.8f))
-                            Text(if (r.levelDb > -0.25) "0 dB" else "${f1(r.levelDb)} dB", fontSize = 17.sp,
-                                color = if (r.levelDb < -0.25) C.Orange else C.Text, modifier = Modifier.weight(0.9f))
-                        }
+                    Text(
+                        "1. Ouvre l'égaliseur, onglet « Champ » (en bas à droite).\n" +
+                            "2. Appuie sur « Tous » : le point revient au centre.\n" +
+                            "3. Appuie ${kotlin.math.abs(plan.rightSteps)} fois sur ${if (plan.rightSteps >= 0) "→" else "←"}, " +
+                            "puis ${plan.frontSteps} fois sur ↑.\n" +
+                            "4. Lance le bruit rose : il doit sembler venir du milieu du tableau de bord. S'il penche encore " +
+                            "d'un côté, un cran de plus vers l'autre côté.",
+                        fontSize = 13.sp,
+                    )
+                    Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = {
+                            val i = ctx.packageManager.getLaunchIntentForPackage("com.syu.eq")
+                            if (i != null) ctx.startActivity(i.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+                            else android.widget.Toast.makeText(ctx, "Égaliseur du fabricant introuvable sur cet autoradio", android.widget.Toast.LENGTH_LONG).show()
+                        }, modifier = Modifier.weight(1f)) { Text("Ouvrir l'égaliseur") }
+                        PlayButton("Bruit rose (test)", Modifier.weight(1f)) { SoundGen.play(ctx, SoundGen.Pink(Side.BOTH)) }
                     }
+                    PlayingBar()
                     Spacer(Modifier.height(6.dp))
                     Text(
-                        "Dans l'autoradio (Réglages → Son / DSP → alignement temporel ou « Delay »), mets chaque retard : " +
-                            "en millisecondes, ou en centimètres si l'écran compte en cm. Le plus loin reste à 0. " +
-                            "Niveau : baisse de ce nombre de dB les haut-parleurs les plus proches (si l'autoradio le permet " +
-                            "par voie ; sinon, la balance vers la droite fait à peu près la même chose à l'avant).",
-                        fontSize = 12.sp,
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        "Les woofers Focal des portes passent par le même canal que leur tweeter : on règle sur le tweeter, " +
-                            "c'est lui qui place la scène. Vérification ensuite au micro du PC (onglet Mesure au PC).",
+                        "Cet autoradio ne règle pas de retard par haut-parleur : la balance est la seule compensation possible. " +
+                            "Le nombre de crans est une estimation (≈ ${f1(fr.p308.lanceur.sound.FytStage.DB_PER_STEP)} dB par cran) : " +
+                            "c'est l'écoute qui décide. « Mode de conduite » fait 4 crans à gauche : à l'inverse de ce qu'il faut " +
+                            "pour une conduite à gauche (il pousse encore la voix vers ta portière).",
                         fontSize = 11.sp, color = C.Sub,
                     )
                 }
@@ -350,5 +363,26 @@ private fun OptionsPanel() {
                 fytMsg?.let { Text(it, fontSize = 13.sp, color = C.Green) }
             }
         }
+    }
+}
+
+/**
+ * Croix « Champ » de l'égaliseur FYT, dessinée comme sur l'autoradio (8 crans de chaque côté) avec le point à viser.
+ */
+@Composable
+private fun StageCross(right: Int, front: Int, modifier: Modifier = Modifier) {
+    val line = C.Sub
+    val dot = C.Accent
+    androidx.compose.foundation.Canvas(modifier.clip(RoundedCornerShape(6.dp)).background(Color(0xFF07090F))) {
+        val n = fr.p308.lanceur.sound.FytStage.MAX_STEPS
+        val step = size.width / (2 * n + 2)
+        val c = androidx.compose.ui.geometry.Offset(size.width / 2, size.height / 2)
+        for (k in listOf(-n / 2, n / 2)) {
+            drawLine(line.copy(alpha = 0.35f), androidx.compose.ui.geometry.Offset(c.x + k * step, 0f), androidx.compose.ui.geometry.Offset(c.x + k * step, size.height))
+            drawLine(line.copy(alpha = 0.35f), androidx.compose.ui.geometry.Offset(0f, c.y + k * step), androidx.compose.ui.geometry.Offset(size.width, c.y + k * step))
+        }
+        drawLine(line, androidx.compose.ui.geometry.Offset(c.x, 0f), androidx.compose.ui.geometry.Offset(c.x, size.height), strokeWidth = 2f)
+        drawLine(line, androidx.compose.ui.geometry.Offset(0f, c.y), androidx.compose.ui.geometry.Offset(size.width, c.y), strokeWidth = 2f)
+        drawCircle(dot, radius = step * 0.9f, center = androidx.compose.ui.geometry.Offset(c.x + right * step, c.y - front * step))
     }
 }

@@ -4,6 +4,11 @@ Les versions publiées se téléchargent sur la page
 [Releases](https://github.com/kylianprebost075-maker/lanceur-308/releases). Une mise à jour s'installe par-dessus
 l'ancienne version et garde les réglages. Le détail technique de chaque version est dans le [README](README.md).
 
+## 0.29 — 11 novembre 2026
+- **Onglet Son → Alignement refait** pour les autoradios FYT : leur égaliseur ne règle pas de retard par haut-parleur.
+  À partir des distances aux deux tweeters, l'appli dit où placer le point dans la croix « Champ » de l'égaliseur (combien
+  de crans à droite et vers l'avant), avec un bouton pour ouvrir l'égaliseur et un bruit rose pour finir à l'oreille.
+
 ## 0.28 — 11 novembre 2026
 - **Température extérieure lue directement** sur les autoradios FYT : elle s'affiche comme dans la barre du haut, sans
   rien régler. L'ancien réglage « Température extérieure » reste en secours pour les autres autoradios.
