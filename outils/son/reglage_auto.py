@@ -146,6 +146,8 @@ def main(argv=None):
     p.add_argument("--sans-eq", action="store_true", help="mesurer seulement, sans toucher à l'égaliseur")
     p.add_argument("--sans-vibration", action="store_true")
     p.add_argument("--oui", action="store_true", help="ne pas attendre Entrée entre les étapes (essais)")
+    p.add_argument("--monter", type=int, default=0,
+                   help="monte le volume de N crans (touches de volume) pour la recherche de vibration, puis le remet")
     a_ = p.parse_args(argv)
     global SANS_QUESTION
     SANS_QUESTION = a_.oui
@@ -170,10 +172,24 @@ def main(argv=None):
 
     vib = None
     if not a_.sans_vibration:
-        demander("Monte le volume au niveau où les portes vibrent d'habitude.")
+        if a_.monter:
+            print(f"   Volume +{a_.monter} crans (touches de volume de l'autoradio)…")
+            for _ in range(a_.monter):
+                a.sh("input", "keyevent", "24")
+                time.sleep(0.3)
+        else:
+            demander("Monte le volume au niveau où les portes vibrent d'habitude.")
         print("3/5 Montée lente des basses (33 s)…")
-        vib = mesurer_vibration(a, a_.micro)
-        demander("Remets ton VOLUME HABITUEL.")
+        try:
+            vib = mesurer_vibration(a, a_.micro)
+        finally:
+            if a_.monter:
+                for _ in range(a_.monter):
+                    a.sh("input", "keyevent", "25")
+                    time.sleep(0.3)
+                print("   Volume remis comme avant.")
+        if not a_.monter:
+            demander("Remets ton VOLUME HABITUEL.")
     resonance = int(round(vib)) if vib else (int(boom) if boom else 0)
 
     avant_eq = None

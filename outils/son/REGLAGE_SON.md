@@ -44,4 +44,8 @@ Les enregistrements restent dans `outils\son\mesures` (jamais publiés).
 basses (le micro entend le grésillement des portes et en déduit la fréquence), réglage des 15 bandes de l'égaliseur FYT
 (points glissés par ADB ; valeurs d'avant notées dans le rapport), fréquence de vibration envoyée au Lanceur
 (`reglage-son.json`, basses automatiques activées), puis nouvelle courbe pour comparer. Rapport et graphique avant / après
-dans `mesures/` (jamais publié). Options : `--sans-eq`, `--sans-vibration`, `--micro N`, `--appareil IP:5555`.
+dans `mesures/` (jamais publié). Options : `--sans-eq`, `--sans-vibration`, `--micro N`, `--appareil IP:5555`, `--monter N`, `--oui`.
+
+**Choix du micro** : un micro de PC portable avec réduction de bruit (« Microphone Array », mode partagé) efface le
+bruit rose et donne une mesure fausse (basses −20 dB, aigus +15 dB : le script ne règle alors rien). Prendre le micro
+brut (essai du 11/11 : n° 19 « Microphone Array 1 (… SST) », voir `python mesure_son.py micros`).

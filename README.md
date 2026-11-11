@@ -27,6 +27,14 @@ pilotés par l'appli, plongée à la place du conducteur dans l'onglet Entretien
 | **Vue conducteur (onglet Entretien)** | |
 | ![Habitacle vu du siège conducteur : volant et compteurs](docs/captures/interieur.png) | |
 
+### Sur le vrai autoradio (11 novembre 2026, version 0.30)
+
+Captures prises par ADB sur l'autoradio FYT de la voiture (écran 1280 × 720), recadrées sur la voiture.
+
+| 3/4 avant | 3/4 arrière | Profil |
+|---|---|---|
+| ![La 308 en 3D sur l'autoradio, 3/4 avant](docs/captures/autoradio/accueil-3-4-avant.png) | ![La 308 en 3D sur l'autoradio, 3/4 arrière](docs/captures/autoradio/accueil-3-4-arriere.png) | ![La 308 en 3D sur l'autoradio, de profil](docs/captures/autoradio/accueil-profil.png) |
+
 ### Les onglets de l'appli (mis à jour en v0.16)
 
 Captures prises les 8 et 9 novembre 2026 dans l'émulateur Android (écran 1024 × 600 comme l'autoradio), en **mode démo**
@@ -57,7 +65,7 @@ de dessus en 2D, celle que l'appli affiche quand la 3D n'est pas disponible. Sur
 | **Réglages** | **Panneau à côté de CarPlay (v0.13, alerte FAP v0.14)** |
 | ![Réglages : couleur, 5 portes, Optimiser l'autoradio, kilométrage, température extérieure, thème](docs/captures/onglets/11-reglages.png) | ![Panneau : puissance, rapport conseillé, régime, eau, turbo, batterie](docs/captures/onglets/12-panneau-performances.png) |
 
-**Nouveau en v0.30 : basses automatiques (11/11, essayée dans l'émulateur seulement)**
+**Nouveau en v0.30 : basses automatiques et réglage du son au micro du PC (11/11, essayé sur l'autoradio)**
 - Demande : basses absentes à volume bas, portes qui vibrent à volume fort, pas de caisson (woofers Focal des portes).
 - `sound/BassAuto.kt` : `BassCurve.gains` (calcul pur, 6 tests `BassCurveTest`) : graves 40-250 Hz montés jusqu'à +6 dB
   à volume 0, plus rien dès 60 % ; bande la plus proche de la vibration baissée de 0 (50 %) à −6 dB (100 %) ; intensité
@@ -67,7 +75,16 @@ de dessus en 2D, celle que l'appli affiche quand la 3D n'est pas disponible. Sur
   Si l'autoradio refuse l'égaliseur global : état « refuse » affiché, rien de changé. Radio FM non concernée.
 - `ResonanceSweep` : sinus 30 → 150 Hz en 30 s ; « Ça vibre ! (xx Hz) » enregistre la fréquence (`SoundPrefs.resonanceHz`).
 - Limite : l'égaliseur d'Android n'a en général que 5 bandes (60, 230, 910 Hz…) : la baisse touche toute la bande
-  des 60 Hz (≈ 30-120 Hz), pas seulement la fréquence exacte. **Pas encore essayé sur l'autoradio** (hors de portée).
+  des 60 Hz (≈ 30-120 Hz), pas seulement la fréquence exacte. Volume FYT maximum = **36** sur cet autoradio.
+- **Réglage automatique depuis le PC** (`outils/son/reglage_auto.py`, voir `outils/son/REGLAGE_SON.md`) : le PC pilote
+  l'autoradio par ADB Wi-Fi, mesure au micro, règle l'égaliseur FYT 15 bandes (`fyt_eq.py`, points glissés) et envoie la
+  fréquence à baisser au Lanceur (`reglage-son.json`, importé par `Import.kt`). **Essai du 11/11** : avec le micro par
+  défaut du PC (réseau de micros avec réduction de bruit) la mesure était fausse et rien n'a été touché ; avec le micro
+  brut (n° 19 « … SST », `--micro 19`), volume 24/36 : bosse 80-125 Hz, pic 630-800 Hz, aigus forts → écart moyen à la
+  cible **4,8 dB → 1,8 dB**. Aucune vibration de porte détectée jusqu'à 30/36. Options ajoutées : `--monter N` (le PC
+  monte le volume de N crans pour la recherche de vibration puis le remet), `--oui` (sans Entrée).
+- Leçon : la variante émulateur (`build_emu.ps1`, 24 Mo, 3D coupée) écrase `app-release.apk` ; toujours reconstruire la
+  vraie version en dernier. `outils/adb/voiture_rapide.ps1` refuse une APK de plus de 20 Mo.
 
 **Nouveau en v0.29 : onglet Son adapté à l'égaliseur FYT (11/11)**
 - Relevé par ADB de `com.syu.eq` : EQ 15 bandes (25 Hz-16 kHz, ±12), ASP basses/aigus ±10 + préréglages, onglet **Champ =
@@ -646,7 +663,7 @@ Simule ouvrants, phares, marche arrière, batterie faible, accélérations ; les
 | **0.27** | Droits d'auteur (`LICENSE.md`, tous droits réservés) et crédits (`CREDITS.md`), mention dans les Réglages. |
 | **0.28** | Température extérieure lue directement (canal FYT 0/40) ; voiture 3D mieux cadrée sur 1280 × 720. |
 | **0.29** | Onglet Son : réglage de la croix « Champ » de l'égaliseur FYT d'après les distances (pas de retard possible). |
-| **0.30** | Basses automatiques selon le volume + recherche de la fréquence qui fait vibrer les portes (essayée dans l'émulateur). |
+| **0.30** | Basses automatiques selon le volume ; réglage du son automatique au micro du PC (`outils/son/reglage_auto.py`) ; essayé sur l'autoradio. |
 
 ---
 

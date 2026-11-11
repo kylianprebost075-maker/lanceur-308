@@ -78,7 +78,7 @@ class ResonanceSweep(override val title: String = "Recherche de la vibration (30
 /**
  * Applique la courbe à tout le son d'Android (égaliseur global, session 0) : musique, CarPlay par l'appli de
  * l'autoradio, Lanceur. La radio FM de l'autoradio passe ailleurs et n'est pas touchée. Le volume lu est celui de
- * l'autoradio (service FYT, module son 4, code 2 : le chiffre de la barre du haut), sinon celui d'Android.
+ * l'autoradio (service FYT, module son 4, code 2 : le chiffre de la barre du haut, de 0 à 36), sinon celui d'Android.
  * Si l'autoradio refuse l'égaliseur global, l'état le dit et rien n'est changé.
  */
 object BassAuto {
@@ -88,8 +88,8 @@ object BassAuto {
 
     /** Volume de l'autoradio (service FYT), -1 tant qu'il n'a rien dit. */
     @Volatile var fytVolume = -1
-    /** Plus haut volume FYT vu (les autoradios FYT vont en général jusqu'à 40). */
-    @Volatile var fytMax = 40
+    /** Plus haut volume FYT vu ; 36 = maximum relevé sur l'autoradio de l'auteur (11/11), relevé plus haut s'il le faut. */
+    @Volatile var fytMax = 36
 
     private val _status = MutableStateFlow(Status.OFF)
     val status: StateFlow<Status> = _status.asStateFlow()
