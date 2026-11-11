@@ -18,6 +18,7 @@ class App : Application() {
         Vehicle.init(this)
         Maintenance.init(this)
         Fuel.init(this)
+        fr.p308.lanceur.drive.TankGauge.init(this)
         Chrono.init(this)
         GpsMonitor.init(this)
         // Après Vehicle.init : le mode démo est déjà connu, le trajet en cours peut être repris.

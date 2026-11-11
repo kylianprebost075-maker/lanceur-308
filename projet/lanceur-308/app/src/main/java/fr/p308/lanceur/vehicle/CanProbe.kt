@@ -107,6 +107,13 @@ object CanProbe {
         fyt?.disconnect(ctx)
         fyt = null
         event("FYT : ${fytValues.size} canaux avaient une valeur")
+        // v0.33 : valeurs finales du module CAN (7) qui ne sont pas nulles, même si elles n'ont pas changé pendant
+        // l'écoute : c'est là que se trouvent l'autonomie, la consommation et les autres chiffres de l'ordinateur de bord.
+        synchronized(fytValues) {
+            fytValues.filter { it.key.startsWith("module 7 ") && !Regex("^i=\\[0(,0)*]$").matches(it.value) && it.value.isNotBlank() }
+                .toSortedMap(compareBy { it.substringAfter("canal ").toIntOrNull() ?: 0 })
+                .forEach { (k, v) -> event("VALEUR FYT $k = $v") }
+        }
         val file = File(ctx.getExternalFilesDir(null), "diagnostic-can.txt")
         writeSynced(file, _state.value.events.joinToString("\n").toByteArray())
         _state.update { it.copy(running = false, reportFile = file.absolutePath) }

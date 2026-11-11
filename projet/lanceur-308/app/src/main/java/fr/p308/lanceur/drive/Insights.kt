@@ -50,14 +50,22 @@ object FuelModel {
     }
 }
 
-/** Autonomie estimée : km avant l'allumage du témoin de réserve, litres restants, base du calcul. */
-data class RangeInfo(val km: Int, val liters: Double, val l100: Double, val basis: String)
+/**
+ * Autonomie estimée : km avant l'allumage du témoin de réserve, litres restants, base du calcul.
+ * v0.33 : [kmToEmpty] = km jusqu'au réservoir vide (réserve comprise), [start] = point de départ du calcul
+ * (« plein du 03/11 » ou « niveau saisi le 11/11 : 25 L »), [sinceKm] = km parcourus depuis.
+ */
+data class RangeInfo(
+    val km: Int, val liters: Double, val l100: Double, val basis: String,
+    val kmToEmpty: Int = km, val start: String = "", val sinceKm: Int = 0,
+)
 
 /**
- * Autonomie ESTIMÉE (la 308 ne la donne pas sur la prise OBD) : réservoir de 60 L plein au dernier plein complet,
- * moins les km parcourus depuis × la consommation, plus les pleins partiels faits depuis. Consommation : celle
+ * Autonomie ESTIMÉE (la 308 ne la donne pas sur la prise OBD) : on part du dernier point connu, soit le dernier plein
+ * complet (réservoir de 60 L plein), soit le niveau saisi à la main s'il est plus récent (v0.33), on retire les km
+ * parcourus depuis × la consommation, on ajoute les pleins partiels faits depuis. Consommation : celle
  * mesurée entre les pleins s'il y en a, sinon la moyenne estimée des derniers trajets, sinon 6 L/100.
- * Résultat donné jusqu'au témoin de réserve (≈ 6 L restants).
+ * Résultat donné jusqu'au témoin de réserve (≈ 6 L restants). Recalculé toutes les 30 s (le kilométrage avance en roulant).
  */
 object FuelRange {
     const val TANK_L = fr.p308.lanceur.vehicle.CarProfile.TANK_L
@@ -65,31 +73,110 @@ object FuelRange {
 
     private val _state = kotlinx.coroutines.flow.MutableStateFlow<RangeInfo?>(null)
     val state: kotlinx.coroutines.flow.StateFlow<RangeInfo?> = _state
+    private val DAY = java.time.format.DateTimeFormatter.ofPattern("dd/MM")
 
-    fun compute(fills: List<FuelEntry>, trips: List<TripRecord>, odometerKm: Int?): RangeInfo? {
-        val lastFull = fills.withIndex().lastOrNull { it.value.full } ?: return null
-        val odo = odometerKm ?: return null
-        val since = (odo - lastFull.value.km).coerceAtLeast(0)
-        if (since > 2_000) return null // plein trop ancien (ou kilométrage faux) : rien de fiable
+    /** Consommation à utiliser (L/100) et d'où elle vient : mesurée entre pleins, sinon estimée des trajets, sinon 6. */
+    fun consumption(fills: List<FuelEntry>, trips: List<TripRecord>): Pair<Double, String> {
         val measured = fr.p308.lanceur.maintenance.Fuel.stats(fills).avgL100?.toDouble()
         val recent = trips.filter { it.l100 != null }.take(10)
         val estimated = if (recent.sumOf { it.distanceKm } >= 30) {
             recent.sumOf { it.fuelL ?: 0.0 } / recent.sumOf { it.distanceKm } * 100
         } else null
-        val l100 = (measured ?: estimated ?: 6.0).coerceIn(3.5, 12.0)
         val basis = when {
             measured != null -> "conso mesurée entre tes pleins"
             estimated != null -> "conso estimée des derniers trajets"
             else -> "conso moyenne par défaut, pas encore de mesure"
         }
-        val partial = fills.drop(lastFull.index + 1).sumOf { it.liters.toDouble() }
-        val liters = (TANK_L - since * l100 / 100 + partial).coerceIn(0.0, TANK_L)
-        val km = ((liters - RESERVE_L).coerceAtLeast(0.0) / l100 * 100).toInt()
-        return RangeInfo(km, liters, l100, basis)
+        return (measured ?: estimated ?: 6.0).coerceIn(3.5, 12.0) to basis
     }
 
-    fun update(fills: List<FuelEntry>, trips: List<TripRecord>, odometerKm: Int?) {
-        _state.value = compute(fills, trips, odometerKm)
+    fun compute(
+        fills: List<FuelEntry>, trips: List<TripRecord>, odometerKm: Int?,
+        level: fr.p308.lanceur.maintenance.TankLevel? = null,
+    ): RangeInfo? {
+        val lastFull = fills.withIndex().lastOrNull { it.value.full }
+        val odo = odometerKm ?: return null
+        // Le niveau saisi l'emporte s'il est au même kilométrage ou après le dernier plein complet (et pas plus ancien).
+        val useLevel = level != null && (lastFull == null || level.km > lastFull.value.km ||
+            (level.km == lastFull.value.km && !level.date.isBefore(lastFull.value.date)))
+        if (!useLevel && lastFull == null) return null
+        val startKm = if (useLevel) level!!.km else lastFull!!.value.km
+        val startL = if (useLevel) level!!.liters.toDouble().coerceIn(0.0, TANK_L) else TANK_L
+        val since = (odo - startKm).coerceAtLeast(0)
+        if (since > 2_000) return null // point de départ trop ancien (ou kilométrage faux) : rien de fiable
+        val (l100, basis) = consumption(fills, trips)
+        // Pleins partiels versés après le point de départ.
+        val partial = if (useLevel) fills.filter { !it.full && (it.km > level!!.km || (it.km == level.km && it.date.isAfter(level.date))) }
+            .sumOf { it.liters.toDouble() }
+        else fills.drop(lastFull!!.index + 1).sumOf { it.liters.toDouble() }
+        val liters = (startL - since * l100 / 100 + partial).coerceIn(0.0, TANK_L)
+        val km = ((liters - RESERVE_L).coerceAtLeast(0.0) / l100 * 100).toInt()
+        val start = if (useLevel) "niveau saisi le ${level!!.date.format(DAY)} : %.0f L".format(java.util.Locale.FRANCE, level.liters)
+        else "plein complet du ${lastFull!!.value.date.format(DAY)}"
+        return RangeInfo(km, liters, l100, basis, kmToEmpty = (liters / l100 * 100).toInt(), start = start, sinceKm = since)
+    }
+
+    fun update(
+        fills: List<FuelEntry>, trips: List<TripRecord>, odometerKm: Int?,
+        level: fr.p308.lanceur.maintenance.TankLevel? = fr.p308.lanceur.maintenance.Fuel.level.value,
+    ) {
+        _state.value = compute(fills, trips, odometerKm, level)
+    }
+}
+
+/** Plein repéré tout seul : litres ajoutés (estimés), moment, autonomie avant et après. */
+data class DetectedFill(val liters: Double, val atMs: Long, val fromKm: Int, val toKm: Int)
+
+/** Jauge déduite de l'ordinateur de bord : autonomie reçue, litres correspondants, dernier plein repéré. */
+data class GaugeState(val canKm: Int? = null, val liters: Double? = null, val l100: Double = 6.0, val lastFill: DetectedFill? = null)
+
+/**
+ * Jauge automatique (v0.33). La 308 ne donne le niveau de gazole ni sur la prise OBD (12 PID seulement, pas le 2F ;
+ * la jauge est au BSI, hors de portée du boîtier), ni tel quel sur le CAN de l'autoradio. Mais le boîtier CAN transmet
+ * l'autonomie calculée par l'ordinateur de bord (module 7, code 103), qui suit la vraie jauge. On en déduit :
+ * - les litres restants ≈ autonomie × consommation / 100 (estimation : la consommation est celle du Lanceur, pas
+ *   celle, inconnue, que l'ordinateur de bord utilise) ;
+ * - un plein : l'autonomie remonte d'un coup d'au moins [FILL_MIN_KM] km entre deux valeurs reçues (y compris d'un
+ *   allumage de l'autoradio au suivant, la dernière valeur étant gardée) → litres ajoutés ≈ écart × consommation / 100.
+ * En roulant, l'autonomie de l'ordinateur ne remonte que de quelques km (conduite plus douce) : jamais de 100 d'un coup.
+ * Calculs purs vérifiés par TankGaugeTest.
+ */
+object TankGauge {
+    const val FILL_MIN_KM = 100
+
+    fun litersFromRange(rangeKm: Int, l100: Double): Double = (rangeKm * l100 / 100).coerceIn(0.0, FuelRange.TANK_L)
+
+    fun detectFill(prevKm: Int?, newKm: Int, l100: Double, nowMs: Long): DetectedFill? =
+        if (prevKm != null && newKm - prevKm >= FILL_MIN_KM)
+            DetectedFill(((newKm - prevKm) * l100 / 100).coerceAtMost(FuelRange.TANK_L), nowMs, prevKm, newKm)
+        else null
+
+    private var prefs: android.content.SharedPreferences? = null
+    private val _state = kotlinx.coroutines.flow.MutableStateFlow(GaugeState())
+    val state: kotlinx.coroutines.flow.StateFlow<GaugeState> = _state
+
+    fun init(ctx: android.content.Context) {
+        val p = ctx.getSharedPreferences("fuel", android.content.Context.MODE_PRIVATE)
+        prefs = p
+        val fill = if (p.contains("gaugeFillMs")) DetectedFill(p.getFloat("gaugeFillL", 0f).toDouble(), p.getLong("gaugeFillMs", 0),
+            p.getInt("gaugeFillFrom", 0), p.getInt("gaugeFillTo", 0)) else null
+        // L'autonomie gardée sert seulement à repérer un plein fait autoradio éteint : elle n'est pas affichée.
+        _state.value = GaugeState(lastFill = fill)
+    }
+
+    /** Appelé à chaque autonomie reçue du CAN. Renvoie le plein repéré, s'il y en a un. */
+    fun onCanRange(km: Int, nowMs: Long = System.currentTimeMillis()): DetectedFill? {
+        val p = prefs
+        val (l100, _) = FuelRange.consumption(fr.p308.lanceur.maintenance.Fuel.entries.value, TripLog.history.value)
+        val prev = _state.value.canKm ?: p?.getInt("gaugeKm", -1)?.takeIf { it >= 0 }
+        val fill = detectFill(prev, km, l100, nowMs)
+        if (prev != km) p?.edit()?.putInt("gaugeKm", km)?.apply()
+        if (fill != null) {
+            p?.edit()?.putFloat("gaugeFillL", fill.liters.toFloat())?.putLong("gaugeFillMs", fill.atMs)
+                ?.putInt("gaugeFillFrom", fill.fromKm)?.putInt("gaugeFillTo", fill.toKm)?.apply()
+        }
+        _state.value = GaugeState(km, litersFromRange(km, l100), l100, fill ?: _state.value.lastFill)
+        return fill
     }
 }
 

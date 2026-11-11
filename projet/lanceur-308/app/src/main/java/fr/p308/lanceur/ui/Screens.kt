@@ -279,8 +279,12 @@ fun HomeAndMaintenanceScreen(vs: VehicleState, items: List<MaintenanceItem>, int
                         }
                         Row(Modifier.weight(1f)) {
                             val range by fr.p308.lanceur.drive.FuelRange.state.collectAsStateWithLifecycle()
+                            // v0.33 : litres restants à côté de l'autonomie : déduits de l'ordinateur de bord (CAN) quand il
+                            // parle, sinon calculés par le Lanceur depuis le dernier plein ou le niveau saisi.
+                            val gauge by fr.p308.lanceur.drive.TankGauge.state.collectAsStateWithLifecycle()
+                            val liters = if (vs.fuelRangeKm != null) gauge.liters ?: range?.liters else range?.liters
                             Metric(
-                                "Autonomie",
+                                liters?.let { "Autonomie · ≈ %.0f L".format(Locale.FRANCE, it) } ?: "Autonomie",
                                 vs.fuelRangeKm?.let { "$it km" } ?: range?.let { "≈ ${it.km} km" } ?: "—",
                                 Modifier.weight(1f),
                             )

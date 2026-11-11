@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material3.OutlinedButton
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import fr.p308.lanceur.maintenance.Fuel
 import fr.p308.lanceur.maintenance.FuelEntry
@@ -56,6 +57,9 @@ fun FuelPanel(currentKm: Int?) {
     val stats = remember(entries) { Fuel.stats(entries) }
     var editing by remember { mutableStateOf<FuelEntry?>(null) }
     var adding by remember { mutableStateOf(false) }
+    var leveling by remember { mutableStateOf(false) }
+    var prefill by remember { mutableStateOf<Float?>(null) }
+    val gauge by fr.p308.lanceur.drive.TankGauge.state.collectAsStateWithLifecycle()
     val range by fr.p308.lanceur.drive.FuelRange.state.collectAsStateWithLifecycle()
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -64,18 +68,44 @@ fun FuelPanel(currentKm: Int?) {
             StatTile("Coût au km", stats.costPerKm?.let { "%.3f €".format(Locale.FRANCE, it) }, Modifier.weight(1f))
             StatTile("Ce mois-ci", eur(stats.monthSpend), Modifier.weight(1f))
         }
-        // Autonomie estimée depuis le dernier plein complet, jusqu'au témoin de réserve.
-        Column(Modifier.padding(horizontal = 4.dp)) {
-            Text(
-                range?.let { "Autonomie ≈ ${it.km} km" } ?: "Autonomie : —",
-                fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
-                color = range?.let { if (it.km < 60) C.Orange else C.Text } ?: C.Sub,
-            )
-            Text(
-                range?.let { "Jusqu'au témoin de réserve. ≈ %.0f L dans le réservoir, %s (%.1f L/100).".format(Locale.FRANCE, it.liters, it.basis, it.l100) }
-                    ?: "Saisis un plein complet (avec le kilométrage) pour qu'elle soit estimée.",
-                fontSize = 11.sp, color = C.Sub,
-            )
+        // Autonomie recalculée par le Lanceur depuis le dernier plein complet ou le niveau saisi (v0.33).
+        Row(Modifier.padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                // Ordinateur de bord (CAN) d'abord : il suit la vraie jauge. Sinon le calcul du Lanceur.
+                val can = gauge.canKm
+                val canL = gauge.liters
+                if (can != null && canL != null) {
+                    Text("≈ %.0f L · %d km d'autonomie".format(Locale.FRANCE, canL, can),
+                        fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = if (can < 60) C.Orange else C.Text)
+                    Text("Lu tout seul : autonomie de l'ordinateur de bord, litres déduits à %.1f L/100.".format(Locale.FRANCE, gauge.l100) +
+                        (range?.let { " Calcul du Lanceur : ≈ %.0f L, ≈ %d km.".format(Locale.FRANCE, it.liters, it.km) } ?: ""),
+                        fontSize = 11.sp, color = C.Sub)
+                } else {
+                Text(
+                    range?.let { "≈ %.0f L · ≈ %d km d'autonomie".format(Locale.FRANCE, it.liters, it.km) } ?: "Réservoir : —",
+                    fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
+                    color = range?.let { if (it.km < 60) C.Orange else C.Text } ?: C.Sub,
+                )
+                Text(
+                    range?.let {
+                        "Jusqu'au témoin de réserve (≈ %d km jusqu'au réservoir vide). Depuis le %s, %d km parcourus, %s (%.1f L/100)."
+                            .format(Locale.FRANCE, it.kmToEmpty, it.start, it.sinceKm, it.basis, it.l100)
+                    } ?: if (currentKm == null) "Saisis d'abord le kilométrage (Réglages), puis un plein complet ou le niveau du réservoir."
+                    else "Saisis un plein complet, ou le niveau du réservoir avec le bouton à droite.",
+                    fontSize = 11.sp, color = C.Sub,
+                )
+                }
+                // Plein repéré tout seul : litres ajoutés, et bouton pour le noter au carnet (il ne manque que le prix).
+                gauge.lastFill?.let { f ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("⛽ Dernier plein détecté : ≈ +%.0f L le %s".format(Locale.FRANCE, f.liters,
+                            java.time.Instant.ofEpochMilli(f.atMs).atZone(java.time.ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("dd/MM à HH:mm"))),
+                            fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = C.Green, modifier = Modifier.weight(1f))
+                        TextButton(onClick = { prefill = f.liters.toFloat(); adding = true }) { Text("Noter au carnet") }
+                    }
+                }
+            }
+            OutlinedButton(onClick = { leveling = true }) { Text("Niveau du réservoir") }
         }
         Tile(Modifier.weight(1f).fillMaxWidth()) {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -105,8 +135,78 @@ fun FuelPanel(currentKm: Int?) {
             }
         }
     }
-    if (adding) FuelDialog(null, currentKm) { adding = false }
+    if (leveling) TankLevelDialog(currentKm, range?.liters) { leveling = false }
+    if (adding) FuelDialog(null, currentKm, prefill) { adding = false; prefill = null }
     editing?.let { FuelDialog(it, currentKm) { editing = null } }
+}
+
+/**
+ * v0.33 : « il me reste à peu près tant de litres ». Le niveau saisi devient le point de départ du calcul de
+ * l'autonomie (à la place du dernier plein complet) : utile sans plein complet récent, ou pour recaler le calcul
+ * sur la jauge du tableau de bord.
+ */
+@Composable
+private fun TankLevelDialog(currentKm: Int?, estimatedL: Double?, onDismiss: () -> Unit) {
+    val tank = fr.p308.lanceur.drive.FuelRange.TANK_L
+    val reserve = fr.p308.lanceur.drive.FuelRange.RESERVE_L
+    val saved by Fuel.level.collectAsStateWithLifecycle()
+    var liters by remember { mutableStateOf(estimatedL?.let { "%.0f".format(Locale.FRANCE, it) } ?: "") }
+    var km by remember { mutableStateOf(currentKm?.toString() ?: "") }
+    var error by remember { mutableStateOf<String?>(null) }
+    fun recompute() = fr.p308.lanceur.drive.FuelRange.update(
+        Fuel.entries.value, fr.p308.lanceur.drive.TripLog.history.value, fr.p308.lanceur.vehicle.Vehicle.state.value.odometerKm)
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+        modifier = Modifier.widthIn(max = 640.dp).padding(16.dp),
+        containerColor = C.Card,
+        title = { Text("Niveau du réservoir", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                NoAutoKeyboardInDialog()
+                Text("Regarde la jauge du tableau de bord et touche le niveau le plus proche, ou tape les litres. " +
+                    "Réservoir de %.0f L, témoin de réserve vers %.0f L.".format(Locale.FRANCE, tank, reserve), fontSize = 13.sp, color = C.Sub)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf("Plein" to tank, "3/4" to tank * 0.75, "1/2" to tank * 0.5, "1/4" to tank * 0.25, "Réserve" to reserve).forEach { (label, l) ->
+                        OutlinedButton(onClick = { liters = "%.0f".format(Locale.FRANCE, l) }, modifier = Modifier.weight(1f)) {
+                            Text(label, fontSize = 12.sp, maxLines = 1)
+                        }
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(liters, { liters = it }, Modifier.weight(1f), singleLine = true, label = { Text("Litres restants") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
+                    OutlinedTextField(km, { km = it.filter(Char::isDigit) }, Modifier.weight(1f), singleLine = true, label = { Text("Kilométrage") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+                }
+                saved?.let {
+                    Text("Niveau déjà saisi : %.0f L le %s à %s km.".format(Locale.FRANCE, it.liters, it.date.format(DATE), fmtKm(it.km)),
+                        fontSize = 12.sp, color = C.Sub)
+                }
+                error?.let { Text(it, color = C.Red) }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                val l = liters.replace(',', '.').trim().toFloatOrNull()
+                val k = km.toIntOrNull()
+                if (l == null || k == null || l < 0f || l > tank) {
+                    error = "Vérifie les litres (0 à %.0f) et le kilométrage.".format(Locale.FRANCE, tank)
+                } else {
+                    Fuel.setLevel(l, k)
+                    recompute()
+                    onDismiss()
+                }
+            }) { Text("Enregistrer") }
+        },
+        dismissButton = {
+            Row {
+                if (saved != null) TextButton(onClick = { Fuel.clearLevel(); recompute(); onDismiss() }) { Text("Oublier ce niveau", color = C.Red) }
+                TextButton(onClick = onDismiss) { Text("Annuler") }
+            }
+        },
+    )
 }
 
 @Composable
@@ -118,10 +218,11 @@ private fun StatTile(label: String, value: String?, modifier: Modifier) {
 }
 
 @Composable
-private fun FuelDialog(initial: FuelEntry?, currentKm: Int?, onDismiss: () -> Unit) {
+private fun FuelDialog(initial: FuelEntry?, currentKm: Int?, prefillLiters: Float? = null, onDismiss: () -> Unit) {
     var date by remember { mutableStateOf((initial?.date ?: LocalDate.now()).format(DATE)) }
     var km by remember { mutableStateOf((initial?.km ?: currentKm)?.toString() ?: "") }
-    var liters by remember { mutableStateOf(initial?.liters?.let { "%.2f".format(Locale.FRANCE, it) } ?: "") }
+    // Plein détecté tout seul : litres estimés proposés, à corriger avec le ticket de la pompe.
+    var liters by remember { mutableStateOf((initial?.liters ?: prefillLiters)?.let { "%.2f".format(Locale.FRANCE, it) } ?: "") }
     var price by remember { mutableStateOf(initial?.price?.let { "%.2f".format(Locale.FRANCE, it) } ?: "") }
     var full by remember { mutableStateOf(initial?.full ?: true) }
     var error by remember { mutableStateOf<String?>(null) }

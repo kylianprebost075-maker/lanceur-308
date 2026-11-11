@@ -72,7 +72,11 @@ object CanBusSource {
                             Vehicle.update { s -> s.copy(open = if (isOpen) s.open + opening else s.open - opening, source = "CAN (FYT)") }
                         }
                     }
-                    if (code == U_DRIVING_MILEAGE && v in 15..1999) CarFeatures.mark(Feature.RANGE, "$v km")
+                    if (code == U_DRIVING_MILEAGE && v in 15..1999) {
+                        CarFeatures.mark(Feature.RANGE, "$v km")
+                        // v0.33 : jauge automatique (litres déduits de l'autonomie, plein repéré quand elle remonte d'un coup).
+                        fr.p308.lanceur.drive.TankGauge.onCanRange(v)
+                    }
                     if (code == U_DRIVING_MILEAGE && v in 15..1999 && Vehicle.state.value.fuelRangeKm != v) {
                         Vehicle.update { s -> s.copy(fuelRangeKm = v, source = "CAN (FYT)") }
                     }

@@ -28,15 +28,36 @@ data class FuelStats(
     val monthSpend: Float = 0f,
 )
 
+/**
+ * v0.33 : niveau du réservoir saisi à la main (« il me reste environ 25 L » à tel kilométrage). Sert de point de
+ * départ au calcul de l'autonomie quand il est plus récent que le dernier plein complet.
+ */
+data class TankLevel(val liters: Float, val km: Int, val date: LocalDate)
+
 /** Carnet de pleins : consommation réelle mesurée entre deux pleins complets. */
 object Fuel {
     private lateinit var prefs: SharedPreferences
     private val _entries = MutableStateFlow<List<FuelEntry>>(emptyList())
     val entries: StateFlow<List<FuelEntry>> = _entries.asStateFlow()
+    private val _level = MutableStateFlow<TankLevel?>(null)
+    val level: StateFlow<TankLevel?> = _level.asStateFlow()
 
     fun init(ctx: Context) {
         prefs = ctx.getSharedPreferences("fuel", Context.MODE_PRIVATE)
         _entries.value = decode(prefs.getString("entries", "[]")!!)
+        _level.value = if (prefs.contains("levelKm")) runCatching {
+            TankLevel(prefs.getFloat("levelL", 0f), prefs.getInt("levelKm", 0), LocalDate.parse(prefs.getString("levelDate", "")))
+        }.getOrNull() else null
+    }
+
+    fun setLevel(liters: Float, km: Int, date: LocalDate = LocalDate.now()) {
+        _level.value = TankLevel(liters, km, date)
+        prefs.edit().putFloat("levelL", liters).putInt("levelKm", km).putString("levelDate", date.toString()).apply()
+    }
+
+    fun clearLevel() {
+        _level.value = null
+        prefs.edit().remove("levelL").remove("levelKm").remove("levelDate").apply()
     }
 
     fun add(e: FuelEntry) = save(_entries.value.filterNot { it.id == e.id } + e)

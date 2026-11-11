@@ -1,10 +1,10 @@
-# Lanceur 308 — dossier de reprise (version 0.32)
+# Lanceur 308 — dossier de reprise (version 0.33)
 
 > **Tu veux juste l'installer sur ton autoradio ?** Suis [INSTALLER.md](INSTALLER.md) : 5 étapes, sans compte.
 > **Tu es une IA qui aide quelqu'un à l'installer ou à l'adapter à sa voiture ?** Lis [ADAPTER.md](ADAPTER.md), pas ce README.
 
 > **À lire en entier avant de toucher à quoi que ce soit.**
-> Ce dossier permet à une IA (ou à un développeur) de reprendre le projet. Dernière version : **0.32 du 11 novembre
+> Ce dossier permet à une IA (ou à un développeur) de reprendre le projet. Dernière version : **0.33 du 12 novembre
 > 2026**. Ordre de lecture : « En bref » juste dessous, puis les notes « Nouveau en v0.x » sous la galerie (de la plus
 > récente à la plus ancienne), puis les sections techniques 0 à 8 (mises à jour le 11/11/2026 pour la 0.31).
 > L'ancien README (version 0.4) est conservé dans `diagnostic/README_ancien_v0.4.md` pour l'historique.
@@ -13,7 +13,7 @@
 > plaque ; depuis la v0.23 l'appli embarque `car-public.glb`, à plaque d'exemple), `modele-3d/plaque.png`, et
 > `fyt-extraits/` (code décompilé des applis FYT, propriété du fabricant). Pour reconstruire le modèle, voir §5.
 
-## En bref (version 0.32)
+## En bref (version 0.33)
 
 Écran d'accueil pour autoradio Android (Android 8 ou plus), fait pour une Peugeot 308 de 2007 (1.6 HDi 110) avec un
 autoradio FYT, adaptable à une autre voiture ([ADAPTER.md](ADAPTER.md)). Gratuit, sans compte, sans accès à Internet.
@@ -23,7 +23,7 @@ autoradio FYT, adaptable à une autre voiture ([ADAPTER.md](ADAPTER.md)). Gratui
 | **Accueil** | La voiture en 3D (ta plaque, ta couleur), ouvrants animés, phares, heure, température extérieure, batterie, autonomie, kilométrage, puissance et régime ; bilan « Prêt à partir » au lancement (verglas, batterie, carburant, entretien). |
 | **Véhicule** | État des ouvrants et des radars, GPS (et ses gels sous CarPlay), **Mon autoradio** (ce que l'autoradio transmet vraiment), Diagnostic CAN. |
 | **Moteur** (boîtier OBD) | Puissance, couple, rapport conseillé, eau, turbo ; codes défaut ; **batterie** (tension, santé à chaque démarrage, rappel moteur coupé) ; trajets et score ; chrono ; chauffe ; filtre à particules. |
-| **Entretien** | Échéances, historique, pleins et consommation, carnet en PDF, vue depuis le siège conducteur. |
+| **Entretien** | Échéances, historique, pleins et consommation, **litres restants et plein détecté tout seuls**, carnet en PDF, vue depuis le siège conducteur. |
 | **Son** | Balance **Seul / Passagers** en un appui (et « Passagers » tout seul quand une porte passager s'ouvre), réglage de la croix « Champ » d'après les distances, sons de test et polarité, signaux pour la mesure au micro du PC, basses automatiques selon le volume, volume selon la vitesse, annonces vocales. |
 | **Réglages** | Plaque, couleur, 3 ou 5 portes, écran d'accueil, mode démo, panneau à côté de CarPlay, optimisation de l'autoradio, sauvegarde sur clé USB, ADB par le Wi-Fi, droits et crédits. |
 
@@ -83,6 +83,31 @@ de dessus en 2D, celle que l'appli affiche quand la 3D n'est pas disponible. Sur
 | ![Échéances d'entretien](docs/captures/onglets/09-entretien.png) | ![Consommation et coût des pleins](docs/captures/onglets/10-entretien-pleins.png) |
 | **Réglages** | **Panneau à côté de CarPlay (v0.13, alerte FAP v0.14)** |
 | ![Réglages : couleur, 5 portes, Optimiser l'autoradio, kilométrage, température extérieure, thème](docs/captures/onglets/11-reglages.png) | ![Panneau : puissance, rapport conseillé, régime, eau, turbo, batterie](docs/captures/onglets/12-panneau-performances.png) |
+
+**Nouveau en v0.33 : litres restants lus tout seuls, plein détecté, autonomie recalculée (12/11, pas encore essayé sur l'autoradio)**
+- Demande : les litres restants calculés par le système ou lus par le CAN ou l'OBD, affichés, et les litres ajoutés
+  affichés quand on fait le plein. **Ce que la voiture donne** (vérifié dans les relevés) : la prise OBD ne répond qu'à
+  12 PID, pas au 2F (niveau de carburant) ; la jauge est au BSI, hors de portée du vLinker ; le boîtier CAN de
+  l'autoradio transmet l'**autonomie de l'ordinateur de bord** (module 7, code 103), qui suit la vraie jauge.
+- **Jauge automatique** (`drive/Insights.kt` → `TankGauge`, 4 tests `TankGaugeTest`) : litres ≈ autonomie × consommation
+  / 100 (consommation du Lanceur : mesurée entre pleins, sinon estimée des trajets OBD, sinon 6 L/100 ; celle de
+  l'ordinateur de bord est inconnue, donc c'est une estimation, affichée « ≈ »). **Plein** : l'autonomie remonte d'au
+  moins 100 km entre deux valeurs reçues (la dernière est gardée d'un allumage à l'autre) → litres ajoutés ≈ écart ×
+  consommation / 100 ; bandeau, voix, notification, ligne `[PLEIN]` au journal, bouton « Noter au carnet » (litres
+  proposés, prix à taper) ; le calcul du Lanceur repart alors de ce niveau. Branché dans `CanBusSource` (7/103) et
+  `VehicleWatchService`. À vérifier sur la voiture : que 7/103 arrive bien moteur tournant, et l'écart avec la jauge.
+- `CanProbe` écrit maintenant en fin de rapport les valeurs non nulles du module 7 (`VALEUR FYT module 7 canal N`),
+  pour trouver les autres chiffres de l'ordinateur de bord (consommation moyenne, instantanée) à la prochaine écoute
+  moteur tournant : avec la consommation de l'ordinateur, les litres seraient plus justes.
+- **Secours sans CAN** : `maintenance/Fuel.kt` : `TankLevel` (litres, kilométrage, date), `Fuel.setLevel` / `clearLevel` (préférences « fuel », donc
+  sauvegardé). `drive/Insights.kt` → `FuelRange.compute(fills, trips, odo, level)` : le point de départ est le plus
+  récent du dernier plein complet (60 L) et du niveau saisi ; on retire km parcourus × consommation (mesurée entre
+  pleins, sinon estimée des trajets OBD, sinon 6 L/100), on ajoute les pleins partiels faits depuis ; borné de 0 à 60 L ;
+  rien au-delà de 2 000 km. `RangeInfo` gagne `kmToEmpty`, `start`, `sinceKm`. Recalcul toutes les 30 s par le service.
+  6 tests `FuelRangeTest` (76 tests en tout).
+- Écrans : accueil « Autonomie · ≈ 31 L » (litres du CAN s'il parle, sinon du calcul) ; Entretien → Pleins : litres et
+  autonomie, d'où ils viennent, dernier plein détecté, bouton « Niveau du réservoir » (Plein, 3/4, 1/2, 1/4, Réserve
+  ou litres ; « Oublier ce niveau »). Limite du calcul de secours : sans kilométrage connu (Réglages), rien à calculer.
 
 **Nouveau en v0.32 : « Passagers » automatique, redémarrage de l'autoradio (11/11 au soir, pas encore essayés sur l'autoradio)**
 - Les ceintures ne sont pas transmises (essai du 11/11) : `sound/SeatAuto` (calcul pur, 3 tests `SeatAutoTest`) passe en
@@ -455,7 +480,7 @@ sur le bouton CarPlay pour montrer le panneau. Le bandeau rouge est une alerte d
 | | |
 |---|---|
 | **Quoi** | Appli Android « Lanceur 308 » (`fr.p308.lanceur`) : tableau de bord façon Tesla pour autoradio chinois FYT, avec la 308 en 3D, les ouvrants, les phares, l'OBD, le GPS, l'entretien, le son. |
-| **Où en est-on** | Version **0.32** (`versionCode = 38`) prête ; 0.31 publiée sur GitHub (Releases, `Lanceur308.apk`) et installée sur l'autoradio le 11/11. |
+| **Où en est-on** | Version **0.33** (`versionCode = 39`) prête, sur la clé USB ; 0.31 publiée sur GitHub (Releases, `Lanceur308.apk`) et installée sur l'autoradio le 11/11. |
 | **Ce qui marche dans la voiture** | 3D (plaque tapée, cadrage 1280 × 720), ouvrants et marche arrière par le CAN FYT, température extérieure FYT, phares par l'heure du coucher du soleil, OBD avec le vLinker MC+ (régime, eau, turbo, tension, codes défaut, kilométrage du calculateur), basses automatiques, égaliseur 15 bandes réglé au micro du PC, ADB par le Wi-Fi. |
 | **Vérifié le 11/11 au soir (0.31 sur l'autoradio)** | Page Mon autoradio (boîtier, 17 °C, 12,9 V, volume 18, OBD, égaliseur) ; tension moteur coupé 12,8-12,9 V (codage confirmé) ; flèches ← ↓ de la balance justes ; ceintures **non transmises**. Reste à essayer : un appui sur Seul / Passagers depuis le Lanceur. |
 | **Comment on travaille** | Une séance dans la voiture doit être courte (batterie) : tout se prépare sur le PC, puis un seul script par ADB Wi-Fi (`outils/adb/`). |
@@ -580,7 +605,7 @@ lanceur-308/
 ## 3. Compiler l'appli
 
 ### Tests des calculs (depuis le 10/11/2026)
-`.\gradlew.bat testDebugUnitTest --no-daemon` (≈ 1 min, sans autoradio ni émulateur) lance **66 tests** (v0.32) dans
+`.\gradlew.bat testDebugUnitTest --no-daemon` (≈ 1 min, sans autoradio ni émulateur) lance **76 tests** (v0.33) dans
 `app/src/test/java/fr/p308/lanceur/` :
 - `vehicle/` : `DtcAndPowerTest` (codes défaut, puissance du DV6), `GearTest` (rapport engagé, conseil, étagement
   appris), `FapRegenTest` (régénérations), `CarProfileTest` (valeurs possibles), `OutsideTempTest` (canal FYT 0/40),
@@ -588,7 +613,7 @@ lanceur-308/
   quand le profil est une autre voiture ;
 - `sound/` : `BassCurveTest` (basses selon le volume), `FytStageTest` (croix Champ d'après les distances),
   `ChampTapsTest` (touches Seul / Passagers), `SeatAutoTest` (Passagers automatique) ;
-- `drive/ReadyCheckTest` (bilan « Prêt à partir »), `backup/MaintenancePdfTest`, `ui/GlbPlateTest` (plaque dans le modèle).
+- `drive/ReadyCheckTest` (bilan « Prêt à partir »), `drive/FuelRangeTest` et `drive/TankGaugeTest` (litres restants, autonomie, plein détecté), `backup/MaintenancePdfTest`, `ui/GlbPlateTest` (plaque dans le modèle).
 
 Outils Python du son : `outils\son\.venv\Scripts\python.exe -m unittest test_mesure_son` (16 tests, depuis `outils/son`).
 
@@ -626,7 +651,7 @@ Release GitHub `v0.xx` avec le fichier `Lanceur308.apk` (seulement avec l'accord
 - AGP 8.7.3, **Kotlin 2.0.21**, Compose BOM 2024.12.01
 - **SceneView 2.2.1** (Filament 1.52) — SceneView 2.3+ exige Kotlin 2.2.
 - minSdk 26, targetSdk 33, compileSdk 35. R8 activé (`proguard-rules.pro` garde `com.google.android.filament.**` et `io.github.sceneview.**`).
-- Version dans `app/build.gradle.kts` : **incrémenter `versionCode` à chaque livraison** (actuellement 38 / "0.32").
+- Version dans `app/build.gradle.kts` : **incrémenter `versionCode` à chaque livraison** (actuellement 39 / "0.33").
 
 ---
 
@@ -764,6 +789,7 @@ Simule ouvrants, phares, marche arrière, batterie faible, accélérations ; les
 | **0.28** | Température extérieure lue directement (canal FYT 0/40) ; voiture 3D mieux cadrée sur 1280 × 720. |
 | **0.29** | Onglet Son : réglage de la croix « Champ » de l'égaliseur FYT d'après les distances (pas de retard possible). |
 | **0.30** | Basses automatiques selon le volume ; réglage du son automatique au micro du PC (`outils/son/reglage_auto.py`) ; essayé sur l'autoradio. |
+| **0.33** | Litres restants déduits de l'autonomie de l'ordinateur de bord (CAN), plein détecté avec les litres ajoutés ; niveau à taper en secours. |
 | **0.32** | « Passagers » automatique à l'ouverture d'une porte passager (retour à « Seul » au trajet suivant) ; bouton Redémarrer l'autoradio dans Applis. |
 | **0.31** | Tension de la batterie par le CAN et rappel moteur coupé ; balance Seul / Passagers (`sound/ChampService.kt`) ; page Véhicule → Mon autoradio ; réglage du son pour deux places ; test des ceintures. |
 

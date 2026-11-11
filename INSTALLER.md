@@ -63,6 +63,10 @@ Android demande d'abord l'accès à la position (vitesse GPS, heure, phares au c
 - **Ta plaque sur la voiture** : Réglages → **Plaque** → tape-la → **Poser**. Elle reste sur ton
   autoradio, elle n'est envoyée nulle part.
 - **La couleur de la voiture** : en haut des Réglages.
+- **Litres restants et plein** : sur un autoradio FYT qui transmet l'autonomie de l'ordinateur de bord, les litres
+  restants s'affichent tout seuls sur l'accueil, et un plein est annoncé avec les litres ajoutés. Sinon : Entretien →
+  Pleins → **Niveau du réservoir** → touche le niveau de ta jauge ; le Lanceur recalcule ensuite en roulant (il lui
+  faut le kilométrage : Réglages → Kilométrage, une fois). Ce sont des estimations, pas une mesure de la jauge.
 - **Redémarrer l'autoradio** : Applis → « ⟳ Redémarrer l'autoradio » en haut (si ton autoradio le refuse, l'appli
   te le dit : passe alors par son bouton marche).
 - **Garder cet écran au démarrage** : Réglages → **Utiliser comme écran d'accueil**. Décoche pour revenir à

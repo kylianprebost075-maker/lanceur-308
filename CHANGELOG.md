@@ -4,6 +4,16 @@ Les versions publiées se téléchargent sur la page
 [Releases](https://github.com/kylianprebost075-maker/lanceur-308/releases). Une mise à jour s'installe par-dessus
 l'ancienne version et garde les réglages. Le détail technique de chaque version est dans le [README](README.md).
 
+## 0.33 — 12 novembre 2026 (pas encore essayée sur l'autoradio)
+- **Litres restants lus tout seuls** (autoradios FYT qui transmettent l'autonomie de l'ordinateur de bord) : le
+  Lanceur déduit les litres de cette autonomie et les affiche sur l'accueil (« Autonomie · ≈ 31 L ») et dans
+  Entretien → Pleins. C'est une estimation : la voiture ne donne son niveau de gazole ni par la prise OBD ni par le
+  boîtier CAN, seulement son autonomie.
+- **Plein détecté tout seul** : quand l'autonomie remonte d'un coup d'au moins 100 km, le Lanceur annonce le plein
+  et les litres ajoutés (bandeau, voix, notification), et propose de le noter au carnet (il ne manque que le prix).
+- **Sans cette information** (autre voiture) : Entretien → Pleins → « Niveau du réservoir » (Plein, 3/4, 1/2, 1/4,
+  Réserve ou litres) ; le Lanceur recalcule ensuite les litres et l'autonomie en roulant, d'après ta consommation.
+
 ## 0.32 — 11 novembre 2026 (pas encore essayée sur l'autoradio)
 - **Passagers automatique** (Son → Alignement) : quand une porte passager (avant droite, arrière) s'ouvre autoradio
   allumé et voiture à l'arrêt, le son passe tout seul en « Passagers » ; au trajet suivant, il revient à « Seul ». Un

@@ -132,6 +132,31 @@ class VehicleWatchService : Service(), LocationListener {
                 .collect { (open, fg) -> if (open.isEmpty() || fg) overlay.hide() else overlay.show("⚠  " + describeOpen(open)) }
         }
         scope.launch {
+            // v0.33 : plein repéré tout seul (l'autonomie de l'ordinateur de bord remonte d'un coup) : on l'annonce, et
+            // le calcul du Lanceur repart de ce niveau. Seuls les pleins repérés après le lancement comptent.
+            var seen = fr.p308.lanceur.drive.TankGauge.state.value.lastFill?.atMs ?: 0L
+            fr.p308.lanceur.drive.TankGauge.state.collect { g ->
+                val fill = g.lastFill ?: return@collect
+                if (fill.atMs <= seen) return@collect
+                seen = fill.atMs
+                val odo = Vehicle.state.value.odometerKm
+                if (odo != null && g.liters != null) {
+                    fr.p308.lanceur.maintenance.Fuel.setLevel(g.liters.toFloat(), odo)
+                    fr.p308.lanceur.drive.FuelRange.update(fr.p308.lanceur.maintenance.Fuel.entries.value, TripLog.history.value, odo)
+                }
+                val msg = "Plein détecté : ≈ +%.0f L (autonomie %d → %d km)".format(java.util.Locale.FRANCE, fill.liters, fill.fromKm, fill.toKm)
+                fr.p308.lanceur.vehicle.ObdLog.log("PLEIN", msg)
+                fr.p308.lanceur.sound.Voice.say("Plein détecté : environ %.0f litres ajoutés.".format(java.util.Locale.FRANCE, fill.liters))
+                getSystemService(NotificationManager::class.java).notify(FILL_NOTIF, NotificationCompat.Builder(this@VehicleWatchService, CH_ALERT)
+                    .setSmallIcon(R.drawable.ic_car)
+                    .setContentTitle("Plein détecté")
+                    .setContentText("$msg. Ajoute le prix dans Entretien → Pleins.")
+                    .setAutoCancel(true)
+                    .build())
+                banner.show("⛽  $msg", 0xE62C7A3F.toInt(), 12_000)
+            }
+        }
+        scope.launch {
             // v0.32 : son « Passagers » quand une porte passager s'ouvre (les ceintures ne sont pas transmises).
             // Nouveau trajet (autoradio qui vient de démarrer) : un « Passagers » mis automatiquement revient à « Seul ».
             val snd = fr.p308.lanceur.sound.SoundPrefs
@@ -381,7 +406,7 @@ class VehicleWatchService : Service(), LocationListener {
         val step = BatteryWatch.drainStep(b.engineOffMin)
         if (step > lastDrainStep && !Vehicle.demo) BatteryWatch.drainMessage(b)?.let { msg ->
             if (step == 1) fr.p308.lanceur.sound.Voice.say("Moteur coupé depuis ${b.engineOffMin} minutes : la batterie se vide.")
-            getSystemService(NotificationManager::class.java).notify(BATTERY_NOTIF + 1, NotificationCompat.Builder(this, CH_ALERT)
+            getSystemService(NotificationManager::class.java).notify(DRAIN_NOTIF,NotificationCompat.Builder(this, CH_ALERT)
                 .setSmallIcon(R.drawable.ic_car)
                 .setContentTitle("Batterie")
                 .setContentText(msg)
@@ -445,6 +470,8 @@ class VehicleWatchService : Service(), LocationListener {
         private const val CH_SERVICE = "service"
         private const val CH_ALERT = "alerts"
         private const val BATTERY_NOTIF = 4242
+        private const val FILL_NOTIF = 4260
+        private const val DRAIN_NOTIF = 4261
         private const val CRANK_NOTIF = 4243
         private const val FAP_NOTIF = 4244
         private const val HEALTH_NOTIF = 4245
