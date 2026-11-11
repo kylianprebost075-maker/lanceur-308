@@ -23,6 +23,9 @@
     <!-- v0.16 : fermer les applis qui traînent en arrière-plan (jamais celle à l'écran). -->
     <uses-permission android:name="android.permission.KILL_BACKGROUND_PROCESSES" />
 
+    <!-- v0.30 : basses selon le volume (égaliseur d'Android sur tout le son). -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+
     <queries>
         <package android:name="com.syu.ms" />
         <intent>

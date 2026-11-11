@@ -13,6 +13,8 @@ import android.content.Context
 object CanBusSource {
     private const val MODULE_MAIN = 0
     private const val MODULE_CANBUS = 7
+    private const val MODULE_SOUND = 4
+    private const val U_SOUND_VOL = 2
 
     private const val U_LAMPLET = 4
     private const val U_BACKCAR = 12
@@ -36,6 +38,8 @@ object CanBusSource {
         val canCodes = 0..300
 
         bridge = FytBridge(onUpdate = { module, code, ints, _, _ ->
+            // v0.30 : volume de l'autoradio (module son 4, code 2), pour les basses selon le volume.
+            if (module == MODULE_SOUND && code == U_SOUND_VOL) { ints?.firstOrNull()?.let(fr.p308.lanceur.sound.BassAuto::onFytVolume); return@FytBridge }
             val temp = ints?.let { OutsideTemp.onValue(module, code, it) }
             if (Vehicle.demo) return@FytBridge
             if (temp != null && (Vehicle.state.value.outsideTempC != temp || Vehicle.state.value.outsideTempEstimated)) {
@@ -75,7 +79,7 @@ object CanBusSource {
                 }
             }
         }, log = {}).also {
-            it.connect(app, mapOf(MODULE_MAIN to mainCodes, MODULE_CANBUS to canCodes))
+            it.connect(app, mapOf(MODULE_MAIN to mainCodes, MODULE_CANBUS to canCodes, MODULE_SOUND to listOf(U_SOUND_VOL)))
         }
     }
 

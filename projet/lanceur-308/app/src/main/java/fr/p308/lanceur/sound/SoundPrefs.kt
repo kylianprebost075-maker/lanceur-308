@@ -29,6 +29,13 @@ object SoundPrefs {
     /** Intensité 1 (léger) à 3 (fort). */
     var speedStrength by mutableIntStateOf(2)
         private set
+    /** v0.30 : basses selon le volume (BassAuto), intensité 1 à 3, fréquence qui fait vibrer les portes (0 = inconnue). */
+    var bassAuto by mutableStateOf(false)
+        private set
+    var bassStrength by mutableIntStateOf(2)
+        private set
+    var resonanceHz by mutableIntStateOf(0)
+        private set
     /** Annonces vocales des alertes. */
     var voice by mutableStateOf(false)
         private set
@@ -40,7 +47,14 @@ object SoundPrefs {
         speedVolume = p.getBoolean("speedVolume", false)
         speedStrength = p.getInt("speedStrength", 2).coerceIn(1, 3)
         voice = p.getBoolean("voice", false)
+        bassAuto = p.getBoolean("bassAuto", false)
+        bassStrength = p.getInt("bassStrength", 2).coerceIn(1, 3)
+        resonanceHz = p.getInt("resonanceHz", 0)
     }
+
+    fun updateBassAuto(v: Boolean) { bassAuto = v; prefs?.edit()?.putBoolean("bassAuto", v)?.apply() }
+    fun updateBassStrength(v: Int) { bassStrength = v.coerceIn(1, 3); prefs?.edit()?.putInt("bassStrength", bassStrength)?.apply() }
+    fun updateResonance(hz: Int) { resonanceHz = hz.coerceIn(0, 200); prefs?.edit()?.putInt("resonanceHz", resonanceHz)?.apply() }
 
     fun setDistance(s: Speaker, cm: Int) {
         distancesCm[s.ordinal] = cm.coerceIn(0, 400)

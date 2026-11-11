@@ -4,6 +4,11 @@ Les versions publiées se téléchargent sur la page
 [Releases](https://github.com/kylianprebost075-maker/lanceur-308/releases). Une mise à jour s'installe par-dessus
 l'ancienne version et garde les réglages. Le détail technique de chaque version est dans le [README](README.md).
 
+## 0.30 — 11 novembre 2026 (pas encore essayée sur un vrai autoradio)
+- **Basses automatiques** (Son → Options) : plus de basses quand le volume est bas, et à volume fort la fréquence qui
+  fait vibrer les portes est baissée. Une montée lente des basses (30 → 150 Hz) et un bouton « Ça vibre » trouvent cette
+  fréquence. Agit sur la musique et CarPlay, pas sur la radio FM.
+
 ## 0.29 — 11 novembre 2026
 - **Onglet Son → Alignement refait** pour les autoradios FYT : leur égaliseur ne règle pas de retard par haut-parleur.
   À partir des distances aux deux tweeters, l'appli dit où placer le point dans la croix « Champ » de l'égaliseur (combien

@@ -314,6 +314,8 @@ private fun OptionsPanel() {
                     Segmented(listOf(1 to "Léger", 2 to "Moyen", 3 to "Fort"), SoundPrefs.speedStrength) { SoundPrefs.updateSpeedStrength(it) }
                 }
                 Spacer(Modifier.height(12.dp))
+                BassSection()
+                Spacer(Modifier.height(12.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text("Annonces vocales", fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
@@ -384,5 +386,67 @@ private fun StageCross(right: Int, front: Int, modifier: Modifier = Modifier) {
         drawLine(line, androidx.compose.ui.geometry.Offset(c.x, 0f), androidx.compose.ui.geometry.Offset(c.x, size.height), strokeWidth = 2f)
         drawLine(line, androidx.compose.ui.geometry.Offset(0f, c.y), androidx.compose.ui.geometry.Offset(size.width, c.y), strokeWidth = 2f)
         drawCircle(dot, radius = step * 0.9f, center = androidx.compose.ui.geometry.Offset(c.x + right * step, c.y - front * step))
+    }
+}
+
+/**
+ * v0.30 : basses selon le volume. 1) trouver la fréquence qui fait vibrer les portes (montée lente 30 → 150 Hz, on
+ * touche « Ça vibre »), 2) l'appli monte les basses à volume bas et baisse cette fréquence à volume fort.
+ */
+@Composable
+private fun ColumnScope.BassSection() {
+    val ctx = LocalContext.current
+    val status by fr.p308.lanceur.sound.BassAuto.status.collectAsStateWithLifecycle()
+    val gains by fr.p308.lanceur.sound.BassAuto.gains.collectAsStateWithLifecycle()
+    val play by SoundGen.state.collectAsStateWithLifecycle()
+    var sweep by remember { mutableStateOf<fr.p308.lanceur.sound.ResonanceSweep?>(null) }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text("Basses automatiques", fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+            Text(
+                "Plus de basses quand le volume est bas ; à volume fort, la fréquence qui fait vibrer les portes est " +
+                    "baissée. Agit sur la musique et CarPlay (pas sur la radio FM).",
+                fontSize = 12.sp, color = C.Sub,
+            )
+        }
+        Switch(SoundPrefs.bassAuto, SoundPrefs::updateBassAuto)
+    }
+    if (SoundPrefs.bassAuto) {
+        Segmented(listOf(1 to "Doux", 2 to "Moyen", 3 to "Fort"), SoundPrefs.bassStrength) { SoundPrefs.updateBassStrength(it) }
+        Text(
+            status.label + if (gains.isNotEmpty()) " : " + gains.filter { kotlin.math.abs(it.second) >= 0.1 }
+                .joinToString(", ") { "${it.first} Hz ${if (it.second > 0) "+" else ""}${f1(it.second)} dB" }.ifEmpty { "son neutre à ce volume" } else "",
+            fontSize = 12.sp, color = if (status == fr.p308.lanceur.sound.BassAuto.Status.UNSUPPORTED) C.Orange else C.Sub,
+        )
+    }
+    Spacer(Modifier.height(6.dp))
+    Text(
+        "Vibration des portes : " + if (SoundPrefs.resonanceHz > 0) "${SoundPrefs.resonanceHz} Hz" else "pas encore trouvée",
+        fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+    )
+    Text(
+        "Monte le volume comme quand ça vibre, lance la montée des basses (30 s), et touche « Ça vibre » dès que la porte " +
+            "se met à vibrer.",
+        fontSize = 12.sp, color = C.Sub,
+    )
+    val s = sweep
+    val sweeping = play.playing && s != null
+    Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (!sweeping) {
+            Button(onClick = {
+                val sig = fr.p308.lanceur.sound.ResonanceSweep()
+                sweep = sig
+                SoundGen.play(ctx, sig)
+            }, modifier = Modifier.weight(1f)) { Text("Lancer la montée des basses") }
+            if (SoundPrefs.resonanceHz > 0) {
+                TextButton(onClick = { SoundPrefs.updateResonance(0) }) { Text("Effacer") }
+            }
+        } else {
+            Button(
+                onClick = { SoundPrefs.updateResonance(s!!.currentHz.toInt()); SoundGen.stop(ctx) },
+                colors = ButtonDefaults.buttonColors(containerColor = C.Orange), modifier = Modifier.weight(1f),
+            ) { Text("Ça vibre ! (${play.detail})") }
+            TextButton(onClick = { SoundGen.stop(ctx) }) { Text("Arrêter") }
+        }
     }
 }
