@@ -20,12 +20,26 @@ import java.time.LocalDate
  */
 object Import {
     const val FILE = "import-entretien.json"
+    const val SOUND_FILE = "reglage-son.json"
     private var lastCheckMs = 0L
 
     /** Renvoie le message à afficher si un import vient d'être fait, sinon null. */
     fun check(ctx: Context, nowMs: Long = System.currentTimeMillis()): String? {
         if (nowMs - lastCheckMs < 60_000L || Vehicle.demo) return null
         lastCheckMs = nowMs
+        // v0.30 : réglage du son mesuré au micro du PC (outils/son/reglage_auto.py), déposé par ADB.
+        val son = UsbStorage.volumes(ctx).map { File(it.dir, SOUND_FILE) }.firstOrNull { it.exists() }
+        if (son != null) {
+            val msg = runCatching {
+                val o = JSONObject(son.readText())
+                o.optInt("resonanceHz", -1).takeIf { it >= 0 }?.let(fr.p308.lanceur.sound.SoundPrefs::updateResonance)
+                if (o.has("bassAuto")) fr.p308.lanceur.sound.SoundPrefs.updateBassAuto(o.getBoolean("bassAuto"))
+                "Réglage du son reçu du PC : vibration des portes " +
+                    (o.optInt("resonanceHz", 0).takeIf { it > 0 }?.let { "$it Hz" } ?: "aucune")
+            }.getOrElse { "Réglage du son illisible : ${it.message}" }
+            runCatching { son.renameTo(File(son.parentFile, "$SOUND_FILE.importé")) }
+            fr.p308.lanceur.vehicle.ObdLog.log("SON", msg)
+        }
         // Clé USB d'abord, puis la mémoire de l'autoradio (même dossier Android/data/fr.p308.lanceur/files/).
         val file = UsbStorage.volumes(ctx).sortedByDescending { it.usb }
             .map { File(it.dir, FILE) }.firstOrNull { it.exists() } ?: return null

@@ -8,6 +8,8 @@ l'ancienne version et garde les réglages. Le détail technique de chaque versio
 - **Basses automatiques** (Son → Options) : plus de basses quand le volume est bas, et à volume fort la fréquence qui
   fait vibrer les portes est baissée. Une montée lente des basses (30 → 150 Hz) et un bouton « Ça vibre » trouvent cette
   fréquence. Agit sur la musique et CarPlay, pas sur la radio FM.
+- **Réglage du son automatique depuis le PC** (`outils/son/reglage_auto.py`) : le PC pilote l'autoradio par le Wi-Fi,
+  mesure au micro, règle l'égaliseur 15 bandes et envoie la fréquence de vibration des portes au Lanceur.
 
 ## 0.29 — 11 novembre 2026
 - **Onglet Son → Alignement refait** pour les autoradios FYT : leur égaliseur ne règle pas de retard par haut-parleur.

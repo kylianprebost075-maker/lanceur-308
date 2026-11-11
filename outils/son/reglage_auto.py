@@ -1,0 +1,223 @@
+"""Réglage automatique du son de la voiture : le PC pilote l'autoradio par ADB (Wi-Fi), écoute au micro et règle.
+
+PC posé à la place du conducteur, micro à hauteur des oreilles, portes fermées, moteur coupé (contact mis).
+L'autoradio et le PC sont sur le même partage de connexion, « ADB par le Wi-Fi » activé dans les Réglages du Lanceur.
+
+  1. bruit de fond, puis bruit rose joué par le Lanceur → courbe de réponse « avant »
+  2. montée lente des basses (30 → 150 Hz) à volume fort → fréquence où les portes vibrent (grésillement au micro)
+  3. égaliseur 15 bandes de l'autoradio réglé d'après la courbe (glisser des points, valeurs d'avant notées)
+  4. fréquence de vibration envoyée au Lanceur (basses automatiques activées)
+  5. bruit rose à nouveau → courbe « après » ; rapport et graphique dans le dossier « mesures » (jamais publié)
+
+Usage : python reglage_auto.py [--micro N] [--appareil IP:5555] [--sans-eq] [--sans-vibration]
+Rien n'est envoyé à la voiture : seulement à l'autoradio (sons de test, égaliseur, réglage du Lanceur).
+"""
+from __future__ import annotations
+
+import argparse
+import datetime as dt
+import json
+import os
+import re
+import socket
+import subprocess
+import sys
+import tempfile
+import time
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+
+import mesure_son as m
+import fyt_eq
+
+ADB = str(Path(os.environ.get("LOCALAPPDATA", "")) / "Android" / "Sdk" / "platform-tools" / "adb.exe")
+FICHIERS_LANCEUR = "/sdcard/Android/data/fr.p308.lanceur/files"
+
+
+# --------------------------------------------------------------------------------------------- autoradio
+
+def trouver_autoradio() -> str | None:
+    """Premier appareil du réseau Wi-Fi du PC dont le port ADB (5555) répond."""
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+    except OSError:
+        return None
+    finally:
+        s.close()
+    base = ip.rsplit(".", 1)[0]
+
+    def essai(k):
+        c = socket.socket()
+        c.settimeout(0.6)
+        try:
+            return f"{base}.{k}" if c.connect_ex((f"{base}.{k}", 5555)) == 0 else None
+        finally:
+            c.close()
+
+    with ThreadPoolExecutor(64) as ex:
+        for r in ex.map(essai, [k for k in range(1, 255) if f"{base}.{k}" != ip]):
+            if r:
+                return f"{r}:5555"
+    return None
+
+
+class Autoradio(fyt_eq.Adb):
+    def dump(self) -> str:
+        self.sh("uiautomator", "dump", "/sdcard/ui.xml")
+        return self.sh("cat", "/sdcard/ui.xml")
+
+    def toucher_texte(self, texte: str, essais: int = 3) -> bool:
+        """Touche l'élément dont le texte commence par `texte` (lu dans l'arbre de l'écran)."""
+        for _ in range(essais):
+            mt = re.search(r'text="' + re.escape(texte) + r'[^"]*"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', self.dump())
+            if mt:
+                x1, y1, x2, y2 = map(int, mt.groups())
+                self.sh("input", "tap", str((x1 + x2) // 2), str((y1 + y2) // 2))
+                time.sleep(1.5)
+                return True
+            time.sleep(1)
+        return False
+
+    def onglet_son(self, sous_onglet: str):
+        self.sh("am", "start", "-n", "fr.p308.lanceur/.MainActivity")
+        time.sleep(2)
+        if not self.toucher_texte("Son"):
+            raise SystemExit("Onglet Son du Lanceur introuvable à l'écran.")
+        if not self.toucher_texte(sous_onglet):
+            raise SystemExit(f"Sous-onglet « {sous_onglet} » introuvable.")
+
+
+# --------------------------------------------------------------------------------------------- étapes
+
+SANS_QUESTION = False
+
+
+def demander(msg: str):
+    if SANS_QUESTION:
+        print(f"\n>> {msg}")
+        return
+    input(f"\n>> {msg}\n   Entrée pour continuer. ")
+
+
+def mesurer_courbe(a: Autoradio, micro, fond: dict) -> tuple[dict, dict, object]:
+    a.onglet_son("Mesure au PC")
+    if not a.toucher_texte("Bruit rose les deux"):
+        raise SystemExit("Bouton « Bruit rose les deux » introuvable.")
+    x = m.enregistrer(14, micro)
+    a.toucher_texte("Arrêter")
+    m.sauver_wav(x, "auto-rose")
+    x = x[m.RATE:]
+    niv = m.niveaux_tiers(x)
+    fiable = {f: niv[f] - fond[f] >= 10 for f in m.TIERS}
+    return m.ecarts(niv), fiable, x
+
+
+def mesurer_vibration(a: Autoradio, micro) -> float | None:
+    a.onglet_son("Options")
+    if not a.toucher_texte("Lancer la montée des basses"):
+        raise SystemExit("Bouton « Lancer la montée des basses » introuvable (Lanceur 0.30 ou plus récent ?).")
+    x = m.enregistrer(33, micro)
+    m.sauver_wav(x, "auto-vibration")
+    return m.frequence_vibration(x)
+
+
+def svg_avant_apres(avant: dict, apres: dict | None) -> str:
+    """Graphique : courbe avant (gris) et après (bleu) l'égaliseur."""
+    fiables = {f: True for f in avant}
+    s = m.svg_courbe(avant, fiables).replace("#1f6feb", "#9aa4b2")
+    if apres:
+        import math
+        lw, lh, g, d, h, b = 900, 380, 60, 20, 20, 50
+        fmin, fmax = math.log10(20), math.log10(20000)
+        X = lambda f: g + (math.log10(f) - fmin) / (fmax - fmin) * (lw - g - d)
+        Y = lambda db: h + (12 - max(-12, min(12, db))) / 24 * (lh - h - b)
+        pts = " ".join(f"{X(f):.1f},{Y(v):.1f}" for f, v in apres.items())
+        s = s.replace("</svg>", f'<polyline points="{pts}" fill="none" stroke="#1f6feb" stroke-width="3"/>'
+                                 f'<text x="{lw - 230}" y="{h + 14}">gris : avant · bleu : après</text></svg>')
+    return s
+
+
+def main(argv=None):
+    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p.add_argument("--micro", type=int, default=None, help="numéro du micro (python mesure_son.py micros)")
+    p.add_argument("--appareil", default=None, help="adresse ADB de l'autoradio (sinon recherche sur le Wi-Fi)")
+    p.add_argument("--sans-eq", action="store_true", help="mesurer seulement, sans toucher à l'égaliseur")
+    p.add_argument("--sans-vibration", action="store_true")
+    p.add_argument("--oui", action="store_true", help="ne pas attendre Entrée entre les étapes (essais)")
+    a_ = p.parse_args(argv)
+    global SANS_QUESTION
+    SANS_QUESTION = a_.oui
+    t0 = time.time()
+
+    dev = a_.appareil or trouver_autoradio()
+    if not dev:
+        sys.exit("Autoradio introuvable : même partage de connexion ? « ADB par le Wi-Fi » activé dans le Lanceur ?")
+    subprocess.run([ADB, "connect", dev], capture_output=True)
+    a = Autoradio(ADB, dev)
+    print(f"Autoradio : {dev}")
+
+    demander("PC à ta place, micro à hauteur des oreilles, portes fermées, moteur coupé, VOLUME HABITUEL. Silence.")
+    print("1/5 Bruit de fond (4 s)…")
+    fondx = m.enregistrer(4, a_.micro)
+    fond = m.niveaux_tiers(fondx) if len(fondx) > 8192 else {f: -200 for f in m.TIERS}
+
+    print("2/5 Courbe de réponse (bruit rose, 14 s)…")
+    avant, fiable, _ = mesurer_courbe(a, a_.micro, fond)
+    eq = m.reglages_fyt({f: e for f, e in avant.items() if fiable[f]})
+    boom = m.bosse_basses({f: e for f, e in avant.items() if fiable[f]})
+
+    vib = None
+    if not a_.sans_vibration:
+        demander("Monte le volume au niveau où les portes vibrent d'habitude.")
+        print("3/5 Montée lente des basses (33 s)…")
+        vib = mesurer_vibration(a, a_.micro)
+        demander("Remets ton VOLUME HABITUEL.")
+    resonance = int(round(vib)) if vib else (int(boom) if boom else 0)
+
+    avant_eq = None
+    if not a_.sans_eq:
+        print("4/5 Égaliseur 15 bandes de l'autoradio…")
+        fyt_eq.ouvrir_eq(a)
+        avant_eq = fyt_eq.lire_points(a.capture())
+        lu = fyt_eq.regler(a, eq)
+        print("   réglé : " + ", ".join(f"{b:g} Hz {v:+.0f}" for b, v in lu.items()))
+    payload = json.dumps({"resonanceHz": resonance, "bassAuto": True})
+    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8") as fh:
+        fh.write(payload)
+    subprocess.run([ADB, "-s", dev, "push", fh.name, f"{FICHIERS_LANCEUR}/reglage-son.json"], capture_output=True)
+    os.unlink(fh.name)
+
+    apres = None
+    if not a_.sans_eq:
+        print("5/5 Vérification (bruit rose, 14 s)…")
+        apres, _, _ = mesurer_courbe(a, a_.micro, fond)
+
+    m.MESURES.mkdir(exist_ok=True)
+    stamp = f"{dt.datetime.now():%Y%m%d-%H%M%S}"
+    (m.MESURES / f"{stamp}-auto.svg").write_text(svg_avant_apres(avant, apres), encoding="utf-8")
+    rapport = {
+        "date": stamp, "autoradio": dev, "duree_s": round(time.time() - t0),
+        "vibration_hz": vib, "bosse_basses_hz": boom, "resonance_envoyee_hz": resonance,
+        "egaliseur_avant": avant_eq, "egaliseur_propose": eq,
+        "ecart_avant": {str(k): round(v, 1) for k, v in avant.items()},
+        "ecart_apres": {str(k): round(v, 1) for k, v in apres.items()} if apres else None,
+    }
+    (m.MESURES / f"{stamp}-auto.json").write_text(json.dumps(rapport, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    print("\n===== Résultat =====")
+    print(f"Vibration des portes : {f'{vib:.0f} Hz' if vib else 'aucune détectée'}"
+          + (f" ; bosse dans les basses vers {boom:g} Hz" if boom else ""))
+    print(f"Envoyé au Lanceur : basses automatiques actives, fréquence baissée à volume fort {resonance or 'aucune'} Hz")
+    if avant_eq:
+        print("Égaliseur d'avant (pour revenir) : " + ", ".join(f"{b:g}:{v:+.0f}" for b, v in avant_eq.items()))
+    if apres:
+        def ecart_moyen(c):
+            return sum(abs(v) for f, v in c.items() if 40 <= f <= 10000) / len([f for f in c if 40 <= f <= 10000])
+        print(f"Écart moyen à la courbe visée : {ecart_moyen(avant):.1f} dB avant → {ecart_moyen(apres):.1f} dB après")
+    print(f"Graphique et rapport : {m.MESURES / (stamp + '-auto.svg')}  ({rapport['duree_s']} s)")
+
+
+if __name__ == "__main__":
+    main()

@@ -184,6 +184,71 @@ def analyse_saturation(x: np.ndarray, rate: int = RATE, limite: float = 3.0) -> 
     return res
 
 
+# Égaliseur 15 bandes des autoradios FYT (appli com.syu.eq, onglet DSP), relevé sur l'autoradio le 11/11/2026.
+FYT15 = [25, 40, 63, 100, 160, 250, 400, 630, 1000, 1600, 2500, 4000, 6300, 10000, 16000]
+
+
+def reglages_fyt(ec: dict[float, float]) -> dict[float, float]:
+    """Réglage proposé pour chacune des 15 bandes FYT (pas de 1 dB), d'après l'écart à la cible.
+    Fenêtre d'un tiers d'octave autour de chaque bande (elles sont espacées de 2/3 d'octave) ; même prudence que
+    reglages_eq : on coupe jusqu'à -8 dB, on monte de +4 dB au plus. Sous 40 Hz, jamais de montée (portes sans caisson)."""
+    out = {}
+    for b in FYT15:
+        proches = [e for f, e in ec.items() if b / 2 ** (1 / 3) <= f <= b * 2 ** (1 / 3)]
+        if not proches:
+            out[b] = 0.0
+            continue
+        g = float(np.clip(-np.mean(proches), -8.0, 4.0))
+        if b < 40:
+            g = min(g, 0.0)
+        out[b] = float(round(g))
+    return out
+
+
+def frequence_vibration(x: np.ndarray, rate: int = RATE, fmin: float = 25.0, fmax: float = 170.0) -> float | None:
+    """Fréquence (Hz) où quelque chose vibre pendant une montée lente de son pur dans les basses (30 → 150 Hz).
+    Par tranches de 0,25 s : la fréquence jouée est le pic entre fmin et fmax ; une vibration (porte, garniture)
+    ajoute un grésillement large au-dessus de 300 Hz. On cherche la tranche où ce grésillement, rapporté au son joué,
+    dépasse le plus son niveau habituel (au moins 8 dB au-dessus de la médiane). None si rien ne vibre."""
+    n = int(0.25 * rate)
+    if len(x) < 8 * n:
+        return None
+    win = np.hanning(n)
+    freqs = np.fft.rfftfreq(n, 1 / rate)
+    bas = (freqs >= fmin) & (freqs <= fmax)
+    haut = (freqs >= 300) & (freqs <= 4000)
+    f0s, ratios, niveaux = [], [], []
+    for d in range(0, len(x) - n + 1, n):
+        spec = np.abs(np.fft.rfft(x[d:d + n] * win)) ** 2
+        i = int(np.argmax(np.where(bas, spec, 0)))
+        e0 = spec[max(0, i - 2):i + 3].sum()
+        f0 = freqs[i]
+        # Retire les harmoniques du son joué (une distorsion légère n'est pas une vibration de porte).
+        masque = haut.copy()
+        for k in range(2, 40):
+            masque &= np.abs(freqs - k * f0) > 3 * freqs[1]
+        eh = spec[masque].sum()
+        f0s.append(f0)
+        niveaux.append(e0)
+        ratios.append(10 * math.log10((eh + 1e-20) / (e0 + 1e-20)))
+    niveaux = np.array(niveaux)
+    ratios = np.array(ratios)
+    actif = niveaux > 0.05 * niveaux.max()  # tranches où le son de test joue vraiment
+    if actif.sum() < 6:
+        return None
+    r = np.where(actif, ratios, -1e9)
+    i = int(np.argmax(r))
+    if r[i] - np.median(ratios[actif]) < 8.0:
+        return None
+    return float(f0s[i])
+
+
+def bosse_basses(ec: dict[float, float], fmin: float = 40, fmax: float = 200, seuil: float = 3.0) -> float | None:
+    """Tiers d'octave le plus « boumeux » entre fmin et fmax (écart à la cible ≥ seuil dB), ou None."""
+    cand = {f: e for f, e in ec.items() if fmin <= f <= fmax and e >= seuil}
+    return max(cand, key=cand.get) if cand else None
+
+
 # --------------------------------------------------------------------------------------------- enregistrement
 
 def enregistrer(secondes: float, micro: int | None) -> np.ndarray:

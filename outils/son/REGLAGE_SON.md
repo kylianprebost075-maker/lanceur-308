@@ -37,3 +37,11 @@ Les enregistrements restent dans `outils\son\mesures` (jamais publiés).
 - Volume selon la vitesse (Léger / Moyen / Fort) et annonces vocales : Son → Options.
 - Piloter le DSP de l'autoradio directement : Son → Options → « Chercher les applis son » → « Copier sur la clé USB »,
   puis rapporter la clé au PC pour étudier les commandes. Rien n'est modifié sur l'autoradio.
+
+## Réglage automatique (v0.30, depuis le PC, autoradio relié par ADB Wi-Fi)
+
+`python reglage_auto.py` fait tout seul, en 3 minutes environ : bruit de fond, courbe au bruit rose, montée lente des
+basses (le micro entend le grésillement des portes et en déduit la fréquence), réglage des 15 bandes de l'égaliseur FYT
+(points glissés par ADB ; valeurs d'avant notées dans le rapport), fréquence de vibration envoyée au Lanceur
+(`reglage-son.json`, basses automatiques activées), puis nouvelle courbe pour comparer. Rapport et graphique avant / après
+dans `mesures/` (jamais publié). Options : `--sans-eq`, `--sans-vibration`, `--micro N`, `--appareil IP:5555`.
