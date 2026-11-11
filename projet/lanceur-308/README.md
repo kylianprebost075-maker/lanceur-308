@@ -14,7 +14,7 @@
 Voir le `README.md` à la racine du dépôt (§3) : `.\gradlew.bat assembleRelease` sous Windows,
 `./gradlew assembleRelease` sous macOS, avec Java 17.
 
-APK : `app/build/outputs/apk/release/app-release.apk` (version optimisée R8, ~16 Mo), signée avec la clé de debug :
+APK : `app/build/outputs/apk/release/app-release.apk` (version optimisée R8, ~17 Mo), signée avec la clé de debug :
 toujours la même, sinon l'installation par-dessus l'ancienne version échoue.
 
 **Le modèle 3D `app/src/main/assets/models/car.glb` n'est pas publié** : le reconstruire avec les outils du dossier

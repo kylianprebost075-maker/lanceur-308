@@ -69,7 +69,7 @@
     <li>Les questions de l'IA et ses réponses (captures réelles)</li>
     <li>Installer l'appli sur l'autoradio · Premiers réglages · Dépannage</li>
   </ol>
-  <p class="small">Démonstration faite le 10 novembre 2026 avec Antigravity 2.31 et Lanceur 308 version 0.25. Les captures
+  <p class="small">Démonstration faite le 10 novembre 2026 avec Antigravity 2.31 et Lanceur 308 version 0.25 (guide revu pour la 0.31 le 11 novembre). Les captures
   d'Antigravity sont réelles (interface en anglais). Celles de l'autoradio viennent d'un émulateur Android 8 réglé comme un
   autoradio (1024 × 600) : la voiture y est dessinée en 2D ; sur un vrai autoradio, elle est en 3D comme ci-dessus.</p>
 </section>
@@ -251,6 +251,12 @@ Lis le fichier ADAPTER.md de ce projet et suis-le : pose-moi d'abord tes questio
   </div></div>
   <img class="shot" src="images/e09-plaque-posee.png" alt="Réglages, plaque posée">
   <p class="cap">Plaque de démonstration « CLIO-3 » posée.</p>
+
+  <div class="step"><div class="num">19</div><div>
+    <b>Dans la voiture, contact mis</b> : onglet <b>Véhicule → Mon autoradio</b> (depuis la version 0.31). Chaque
+    information que ton autoradio transmet passe au vert (température, batterie, volume…). Une ligne grise dit quel geste
+    faire pour la tester : ouvre une porte, passe la marche arrière.
+  </div></div>
 </section>
 
 <section class="page">
@@ -262,6 +268,7 @@ Lis le fichier ADAPTER.md de ce projet et suis-le : pose-moi d'abord tes questio
     <tr><td>La fabrication échoue (« SDK location not found », « JAVA_HOME »)</td><td>Android Studio n'est pas installé, ou pas encore ouvert une fois. Ouvre-le une fois, puis dis à l'IA : « Android Studio est installé, réessaie. »</td></tr>
     <tr><td>L'appli ne s'installe pas</td><td>Vérifie la version d'Android (8.0 minimum). Si une autre version de Lanceur 308 est déjà installée avec une autre signature, désinstalle-la d'abord.</td></tr>
     <tr><td>Le boîtier OBD ne se connecte pas</td><td>Contact mis. Bluetooth classique : associe-le dans les réglages Bluetooth de l'autoradio (1234 ou 0000), puis onglet Moteur → Rechercher OBD. Le message de l'onglet Moteur dit où ça bloque.</td></tr>
+    <tr><td>Portes, température ou batterie n'apparaissent pas</td><td>Véhicule → Mon autoradio, contact mis : ce qui reste gris n'est pas transmis par ton autoradio (ou pas encore : fais le geste indiqué). Ne change pas le boîtier CAN dans le menu d'usine de l'autoradio s'il marche ailleurs.</td></tr>
     <tr><td>Un problème dans l'appli</td><td>Laisse une clé USB branchée : l'appli y écrit un journal. Ouvre un ticket sur la page « Issues » du projet, sans publier le dossier entier (il contient tes trajets).</td></tr>
   </table>
 

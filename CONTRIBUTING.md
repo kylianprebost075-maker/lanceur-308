@@ -18,7 +18,8 @@ Ouvre un ticket sur la page [Issues](https://github.com/kylianprebost075-maker/l
 ## Dire que ça marche sur ta voiture
 
 C'est l'aide la plus utile : l'appli n'a roulé que sur une Peugeot 308. Ouvre un ticket « Ça marche sur… » avec ta
-voiture, ton autoradio, ton boîtier OBD, et ce qui marche ou non (portes, phares, données moteur). Si tu as adapté
+voiture, ton autoradio, ton boîtier OBD, et ce qui marche ou non (portes, phares, données moteur). Le plus simple :
+une capture de Véhicule → **Mon autoradio**, contact mis (elle ne montre aucune donnée personnelle). Si tu as adapté
 `CarProfile.kt`, colle les valeurs : elles serviront aux suivants.
 
 ## Proposer une modification

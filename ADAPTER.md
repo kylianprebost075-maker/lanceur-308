@@ -1,8 +1,8 @@
 # ADAPTER.md — instructions pour l'IA qui aide quelqu'un à installer Lanceur 308
 
 > **Tu es une IA (Claude, Gemini / Antigravity, ChatGPT, Copilot…) et quelqu'un vient de t'ouvrir ce projet ?**
-> Ce fichier est ta feuille de route. Suis-la dans l'ordre. Ne lis PAS tout le dépôt : le `README.md` fait plus de
-> 600 lignes et sert à l'auteur. Tout ce qu'il te faut est ici et dans `CarProfile.kt`.
+> Ce fichier est ta feuille de route (à jour pour la version 0.31). Suis-la dans l'ordre. Ne lis PAS tout le dépôt :
+> le `README.md` fait plus de 750 lignes et sert à l'auteur. Tout ce qu'il te faut est ici et dans `CarProfile.kt`.
 
 ## Règles
 
@@ -58,14 +58,15 @@ CE QUE TU VEUX
 ## Étape 2 — la fiche personnalisée (toujours)
 
 À partir des réponses, écris à la personne une fiche courte : **ce qui marchera, ce qui ne marchera pas, quoi régler**.
-Règles (vérifiées dans le code de la version 0.24) :
+Règles (vérifiées dans le code de la version 0.31) :
 
 | Si… | Alors… |
 |---|---|
 | Android plus ancien que 8.0 | L'appli ne s'installe pas (`minSdk = 26`). Arrête-toi là et dis-le. |
-| N'importe quel Android 8.0 ou plus | Marchent : écran d'accueil, voiture 3D, plaque, mode démo, vitesse GPS, chrono, trajets, carnet d'entretien, pleins, rappels. |
-| Autoradio FYT **et** boîtier CAN réglé (question 10 = oui) | Portes, coffre, capot, phares et radar de recul s'affichent en direct. Les codes CAN ont été relevés sur une 308 : sur une autre voiture, **à essayer** (onglet Véhicule → Diagnostic CAN montre ce qui arrive). |
-| Autoradio non FYT | Pas de portes ni de phares en direct (le reste marche). |
+| N'importe quel Android 8.0 ou plus | Marchent : écran d'accueil, voiture 3D, plaque, mode démo, vitesse GPS, chrono, trajets, carnet d'entretien et PDF, pleins, rappels, bilan « Prêt à partir », sons de test, phares d'après le coucher du soleil. Basses automatiques : seulement si l'autoradio accepte l'égaliseur d'Android (l'onglet Son le dit). |
+| Autoradio FYT **et** boîtier CAN réglé (question 10 = oui) | Portes, coffre, capot, marche arrière, autonomie, température extérieure, tension de la batterie (même sans boîtier OBD) : **à essayer**, ça dépend du boîtier CAN. Après installation : Véhicule → **Mon autoradio** montre en vert ce qui arrive vraiment. Les phares ne sont transmis que par certains boîtiers (pas celui de l'auteur). |
+| Autoradio FYT (avec l'appli égaliseur `com.syu.eq`) | Son → Alignement : balance réglée d'après les distances, bouton **Seul / Passagers** (une autorisation Android → Accessibilité, à activer une fois ; elle ne touche que l'égaliseur). Positions des boutons relevées sur un écran 1280 × 720 : sur un autre écran, **à essayer**. |
+| Autoradio non FYT | Pas de portes, température ni tension par l'autoradio ; balance à régler à la main (le reste marche). |
 | Pas de boîtier OBD | Pas de régime, température d'eau, turbo, tension, codes défaut. Conseille un **Vgate vLinker MC+** (Bluetooth Low Energy, connexion automatique, sans appairage). |
 | Boîtier OBD **Bluetooth classique** (ELM327 et clones) | Il faut l'associer d'abord dans les réglages Bluetooth de l'autoradio (code `1234` ou `0000`), puis onglet Moteur → Rechercher OBD. Les clones à bas prix répondent parfois mal. |
 | Boîtier OBD **Wi-Fi** | **Non pris en charge** : seul le Bluetooth (classique ou Low Energy) l'est. |
@@ -105,8 +106,8 @@ copie sur une clé USB, installation depuis le gestionnaire de fichiers de l'aut
    La signature utilise la clé de test d'Android, créée automatiquement sur l'ordinateur : rien à fournir.
    ⚠️ Une APK construite ainsi ne s'installe pas par-dessus celle téléchargée sur GitHub (signature différente) :
    il faut d'abord désinstaller l'autre (les réglages de l'appli sont alors perdus).
-4. Dis à la personne d'installer `app-release.apk` comme expliqué dans `INSTALLER.md`, et de commencer par le
-   **Mode démo** pour vérifier que tout s'affiche.
+4. Dis à la personne d'installer `app-release.apk` comme expliqué dans `INSTALLER.md`, de commencer par le
+   **Mode démo** pour vérifier que tout s'affiche, puis, contact mis, de regarder Véhicule → **Mon autoradio**.
 
 ## Le modèle 3D
 
@@ -131,6 +132,9 @@ copie sur une clé USB, installation depuis le gestionnaire de fichiers de l'aut
 
 ## Si quelque chose ne marche pas
 
+- Commence par Véhicule → **Mon autoradio** : elle dit ce que l'autoradio transmet (vert) et ce qui n'est pas encore
+  arrivé (gris, avec le geste à faire). Rien ne passe au vert sur un autoradio FYT : le boîtier CAN n'est pas réglé dans
+  le menu d'usine, ce que l'appli ne peut pas corriger (et que tu ne dois pas faire changer s'il marche ailleurs).
 - L'appli écrit un journal sur la clé USB laissée branchée : `Android/data/fr.p308.lanceur/files/journal/`. Le message
   de l'onglet Moteur dit toujours où bloque la connexion OBD.
 - Ce dossier contient les trajets (positions GPS) et peut contenir le numéro de série de la voiture : ne le fais **jamais** publier en entier ;
