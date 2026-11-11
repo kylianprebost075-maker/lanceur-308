@@ -54,10 +54,25 @@ object SoundPrefs {
         bassStrength = p.getInt("bassStrength", 2).coerceIn(1, 3)
         resonanceHz = p.getInt("resonanceHz", 0)
         seatMode = runCatching { SeatMode.valueOf(p.getString("seatMode", null)!!) }.getOrDefault(SeatMode.SOLO)
+        seatAuto = p.getBoolean("seatAuto", false)
+        autoPassengers = p.getBoolean("autoPassengers", true)
         soloChamp = if (p.contains("soloRight")) p.getInt("soloRight", 0) to p.getInt("soloFront", 0) else null
     }
 
-    fun updateSeatMode(v: SeatMode) { seatMode = v; prefs?.edit()?.putString("seatMode", v.name)?.apply() }
+    /** [auto] = choisi par l'appli (porte passager), pas par l'utilisateur. */
+    fun updateSeatMode(v: SeatMode, auto: Boolean = false) {
+        seatMode = v
+        seatAuto = auto
+        prefs?.edit()?.putString("seatMode", v.name)?.putBoolean("seatAuto", auto)?.apply()
+    }
+
+    /** v0.32 : « Passagers » mis automatiquement (ramené à « Seul » au démarrage suivant). */
+    var seatAuto = false
+        private set
+    /** v0.32 : passer seul en « Passagers » quand une porte passager s'ouvre. */
+    var autoPassengers by mutableStateOf(true)
+        private set
+    fun updateAutoPassengers(v: Boolean) { autoPassengers = v; prefs?.edit()?.putBoolean("autoPassengers", v)?.apply() }
 
     /** v0.31 : position « Seul » de la croix Champ trouvée au micro du PC (null = d'après les distances). */
     var soloChamp by mutableStateOf<Pair<Int, Int>?>(null)

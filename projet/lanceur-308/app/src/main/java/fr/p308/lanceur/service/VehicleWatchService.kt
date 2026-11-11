@@ -132,6 +132,31 @@ class VehicleWatchService : Service(), LocationListener {
                 .collect { (open, fg) -> if (open.isEmpty() || fg) overlay.hide() else overlay.show("⚠  " + describeOpen(open)) }
         }
         scope.launch {
+            // v0.32 : son « Passagers » quand une porte passager s'ouvre (les ceintures ne sont pas transmises).
+            // Nouveau trajet (autoradio qui vient de démarrer) : un « Passagers » mis automatiquement revient à « Seul ».
+            val snd = fr.p308.lanceur.sound.SoundPrefs
+            if (fr.p308.lanceur.sound.SeatAuto.shouldRevert(snd.seatMode, snd.seatAuto, android.os.SystemClock.elapsedRealtime())) {
+                snd.updateSeatMode(fr.p308.lanceur.sound.SeatMode.SOLO)
+                launch {
+                    delay(20_000) // le temps que le service d'accessibilité soit prêt après le démarrage
+                    fr.p308.lanceur.sound.ChampService.apply(this@VehicleWatchService, fr.p308.lanceur.sound.SeatMode.SOLO)
+                }
+            }
+            var before = Vehicle.state.value.open
+            Vehicle.state.map { it.open }.distinctUntilChanged().collect { open ->
+                val opened = open - before
+                before = open
+                if (Vehicle.demo) return@collect
+                if (fr.p308.lanceur.sound.SeatAuto.shouldSwitch(opened, snd.seatMode, snd.autoPassengers,
+                        fr.p308.lanceur.drive.Trip.state.value.currentKmh)) {
+                    snd.updateSeatMode(fr.p308.lanceur.sound.SeatMode.PASSENGERS, auto = true)
+                    val msg = fr.p308.lanceur.sound.ChampService.apply(this@VehicleWatchService, fr.p308.lanceur.sound.SeatMode.PASSENGERS)
+                    fr.p308.lanceur.vehicle.ObdLog.log("SON", "Porte passager ouverte : son pour les passagers ($msg)")
+                    banner.show("🎵  Porte passager ouverte : son réglé pour les passagers (Son → Seul pour revenir)", 0xE62C58BD.toInt(), 8_000)
+                }
+            }
+        }
+        scope.launch {
             // Usure de l'huile recalculée quand les trajets ou l'entretien changent, avant de vérifier les échéances.
             combine(Vehicle.state.map { it.odometerKm }.distinctUntilChanged(), Maintenance.items, TripLog.history) { km, items, trips ->
                 fr.p308.lanceur.maintenance.OilWear.recompute(items, trips)

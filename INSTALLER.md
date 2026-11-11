@@ -63,6 +63,8 @@ Android demande d'abord l'accès à la position (vitesse GPS, heure, phares au c
 - **Ta plaque sur la voiture** : Réglages → **Plaque** → tape-la → **Poser**. Elle reste sur ton
   autoradio, elle n'est envoyée nulle part.
 - **La couleur de la voiture** : en haut des Réglages.
+- **Redémarrer l'autoradio** : Applis → « ⟳ Redémarrer l'autoradio » en haut (si ton autoradio le refuse, l'appli
+  te le dit : passe alors par son bouton marche).
 - **Garder cet écran au démarrage** : Réglages → **Utiliser comme écran d'accueil**. Décoche pour revenir à
   l'écran d'origine de l'autoradio.
 - Android demande aussi le Bluetooth (boîtier OBD) : accepte, sinon l'onglet Moteur reste vide.
@@ -74,7 +76,9 @@ Android demande d'abord l'accès à la position (vitesse GPS, heure, phares au c
 - **Seul / Passagers** : un appui met la balance pour toi seul, ou au centre quand tu as des passagers. Pour que le
   Lanceur règle l'égaliseur tout seul, active-le une fois : Android → Paramètres → **Accessibilité** → « Lanceur 308 :
   balance Seul / Passagers » (bouton « Activer » dans l'onglet Son). Il ne touche que l'égaliseur, quand tu appuies.
-  Sans cette autorisation, l'appli te dit quoi régler à la main.
+  Sans cette autorisation, l'appli te dit quoi régler à la main. Option **Passagers automatique** (autoradios FYT qui
+  transmettent les portes) : une porte passager qui s'ouvre, voiture à l'arrêt, met le son en « Passagers » ; au
+  trajet suivant il revient à « Seul ».
 - **Options → Basses automatiques** : plus de basses à volume bas, moins de vibrations de portes à volume fort.
 - Pour aller plus loin, un ordinateur peut mesurer le son au micro et régler l'égaliseur tout seul :
   [outils/son/REGLAGE_SON.md](outils/son/REGLAGE_SON.md).

@@ -69,6 +69,22 @@ object DevOptions {
 
     private const val ADB_PORT = "5555"
 
+    /**
+     * v0.32 : redémarre l'autoradio (Applis → Redémarrer). Une appli ordinaire n'a pas le droit REBOOT ; sur cet
+     * autoradio, SELinux est « Permissive » et `setprop` passe déjà pour ADB par le Wi-Fi, donc on demande le
+     * redémarrage par la propriété `sys.powerctl`, puis par `svc power reboot` et `reboot`. Si rien n'a marché après
+     * 10 s, renvoie la phrase à afficher (sinon l'autoradio redémarre avant). À appeler hors du fil de l'écran.
+     */
+    fun reboot(): String {
+        sh("setprop sys.powerctl reboot")
+        Thread.sleep(4000)
+        sh("svc power reboot")
+        Thread.sleep(3000)
+        sh("reboot")
+        Thread.sleep(3000)
+        return "L'autoradio refuse le redémarrage par une appli. Maintiens le bouton marche de l'autoradio, ou coupe et remets le contact."
+    }
+
     private fun sh(cmd: String): String = runCatching {
         val p = ProcessBuilder("sh", "-c", cmd).redirectErrorStream(true).start()
         val out = p.inputStream.bufferedReader().readText()

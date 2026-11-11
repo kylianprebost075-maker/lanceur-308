@@ -1,10 +1,10 @@
-# Lanceur 308 — dossier de reprise (version 0.31)
+# Lanceur 308 — dossier de reprise (version 0.32)
 
 > **Tu veux juste l'installer sur ton autoradio ?** Suis [INSTALLER.md](INSTALLER.md) : 5 étapes, sans compte.
 > **Tu es une IA qui aide quelqu'un à l'installer ou à l'adapter à sa voiture ?** Lis [ADAPTER.md](ADAPTER.md), pas ce README.
 
 > **À lire en entier avant de toucher à quoi que ce soit.**
-> Ce dossier permet à une IA (ou à un développeur) de reprendre le projet. Dernière version : **0.31 du 11 novembre
+> Ce dossier permet à une IA (ou à un développeur) de reprendre le projet. Dernière version : **0.32 du 11 novembre
 > 2026**. Ordre de lecture : « En bref » juste dessous, puis les notes « Nouveau en v0.x » sous la galerie (de la plus
 > récente à la plus ancienne), puis les sections techniques 0 à 8 (mises à jour le 11/11/2026 pour la 0.31).
 > L'ancien README (version 0.4) est conservé dans `diagnostic/README_ancien_v0.4.md` pour l'historique.
@@ -13,7 +13,7 @@
 > plaque ; depuis la v0.23 l'appli embarque `car-public.glb`, à plaque d'exemple), `modele-3d/plaque.png`, et
 > `fyt-extraits/` (code décompilé des applis FYT, propriété du fabricant). Pour reconstruire le modèle, voir §5.
 
-## En bref (version 0.31)
+## En bref (version 0.32)
 
 Écran d'accueil pour autoradio Android (Android 8 ou plus), fait pour une Peugeot 308 de 2007 (1.6 HDi 110) avec un
 autoradio FYT, adaptable à une autre voiture ([ADAPTER.md](ADAPTER.md)). Gratuit, sans compte, sans accès à Internet.
@@ -24,7 +24,7 @@ autoradio FYT, adaptable à une autre voiture ([ADAPTER.md](ADAPTER.md)). Gratui
 | **Véhicule** | État des ouvrants et des radars, GPS (et ses gels sous CarPlay), **Mon autoradio** (ce que l'autoradio transmet vraiment), Diagnostic CAN. |
 | **Moteur** (boîtier OBD) | Puissance, couple, rapport conseillé, eau, turbo ; codes défaut ; **batterie** (tension, santé à chaque démarrage, rappel moteur coupé) ; trajets et score ; chrono ; chauffe ; filtre à particules. |
 | **Entretien** | Échéances, historique, pleins et consommation, carnet en PDF, vue depuis le siège conducteur. |
-| **Son** | Balance **Seul / Passagers** en un appui, réglage de la croix « Champ » d'après les distances, sons de test et polarité, signaux pour la mesure au micro du PC, basses automatiques selon le volume, volume selon la vitesse, annonces vocales. |
+| **Son** | Balance **Seul / Passagers** en un appui (et « Passagers » tout seul quand une porte passager s'ouvre), réglage de la croix « Champ » d'après les distances, sons de test et polarité, signaux pour la mesure au micro du PC, basses automatiques selon le volume, volume selon la vitesse, annonces vocales. |
 | **Réglages** | Plaque, couleur, 3 ou 5 portes, écran d'accueil, mode démo, panneau à côté de CarPlay, optimisation de l'autoradio, sauvegarde sur clé USB, ADB par le Wi-Fi, droits et crédits. |
 
 **Ce que donne l'autoradio FYT** (boîtier CAN Raise `PSA-RZ-15-0127-B1` chez l'auteur) : ouvrants, marche arrière,
@@ -84,6 +84,14 @@ de dessus en 2D, celle que l'appli affiche quand la 3D n'est pas disponible. Sur
 | **Réglages** | **Panneau à côté de CarPlay (v0.13, alerte FAP v0.14)** |
 | ![Réglages : couleur, 5 portes, Optimiser l'autoradio, kilométrage, température extérieure, thème](docs/captures/onglets/11-reglages.png) | ![Panneau : puissance, rapport conseillé, régime, eau, turbo, batterie](docs/captures/onglets/12-panneau-performances.png) |
 
+**Nouveau en v0.32 : « Passagers » automatique, redémarrage de l'autoradio (11/11 au soir, pas encore essayés sur l'autoradio)**
+- Les ceintures ne sont pas transmises (essai du 11/11) : `sound/SeatAuto` (calcul pur, 3 tests `SeatAutoTest`) passe en
+  « Passagers » quand une porte passager (7/2, 7/3, 7/4) vient de s'ouvrir, en mode « Seul », option active, à 5 km/h
+  au plus. Branché dans `VehicleWatchService` (bandeau + ligne `[SON]` au journal, `ChampService.apply`). Choix
+  automatique noté (`SoundPrefs.seatAuto`) : au démarrage suivant de l'autoradio (service lancé moins de 5 min après
+  l'allumage), il revient à « Seul » (application 20 s plus tard). Un choix à la main n'est jamais changé.
+  Limite connue : des passagers montés avant l'allumage de l'autoradio ne sont pas vus.
+- **Redémarrer l'autoradio** (Applis → « ⟳ Redémarrer l'autoradio », confirmation) : `DevOptions.reboot` essaie`n  `setprop sys.powerctl reboot`, puis `svc power reboot` et `reboot` (une appli n'a pas le droit REBOOT ; ça passe`n  parce que SELinux est « Permissive »). Essayé dans l'émulateur mis en Permissive : il redémarre. Pas encore sur l'autoradio.
 **Nouveau en v0.31 : batterie par le CAN, son « Seul / Passagers », page « Mon autoradio » (11/11, essayée dans l'émulateur, pas encore sur l'autoradio)**
 - **Batterie** (`vehicle/BatteryWatch.kt`) : tension lue sur le service FYT, module 0 code 114, codage
   `(brut + 4) × 0,1` déduit d'un seul relevé moteur tournant (142 → 14,6 V) : **à confirmer moteur coupé** (le script
@@ -441,7 +449,7 @@ sur le bouton CarPlay pour montrer le panneau. Le bandeau rouge est une alerte d
 | | |
 |---|---|
 | **Quoi** | Appli Android « Lanceur 308 » (`fr.p308.lanceur`) : tableau de bord façon Tesla pour autoradio chinois FYT, avec la 308 en 3D, les ouvrants, les phares, l'OBD, le GPS, l'entretien, le son. |
-| **Où en est-on** | Version **0.31** (`versionCode = 37`), publiée sur GitHub (Releases, `Lanceur308.apk`). Installée sur l'autoradio : 0.30 (la 0.31 sera posée à la prochaine séance par `outils/adb/voiture_rapide.ps1`). |
+| **Où en est-on** | Version **0.32** (`versionCode = 38`) prête ; 0.31 publiée sur GitHub (Releases, `Lanceur308.apk`) et installée sur l'autoradio le 11/11. |
 | **Ce qui marche dans la voiture** | 3D (plaque tapée, cadrage 1280 × 720), ouvrants et marche arrière par le CAN FYT, température extérieure FYT, phares par l'heure du coucher du soleil, OBD avec le vLinker MC+ (régime, eau, turbo, tension, codes défaut, kilométrage du calculateur), basses automatiques, égaliseur 15 bandes réglé au micro du PC, ADB par le Wi-Fi. |
 | **Vérifié le 11/11 au soir (0.31 sur l'autoradio)** | Page Mon autoradio (boîtier, 17 °C, 12,9 V, volume 18, OBD, égaliseur) ; tension moteur coupé 12,8-12,9 V (codage confirmé) ; flèches ← ↓ de la balance justes ; ceintures **non transmises**. Reste à essayer : un appui sur Seul / Passagers depuis le Lanceur. |
 | **Comment on travaille** | Une séance dans la voiture doit être courte (batterie) : tout se prépare sur le PC, puis un seul script par ADB Wi-Fi (`outils/adb/`). |
@@ -566,14 +574,14 @@ lanceur-308/
 ## 3. Compiler l'appli
 
 ### Tests des calculs (depuis le 10/11/2026)
-`.\gradlew.bat testDebugUnitTest --no-daemon` (≈ 1 min, sans autoradio ni émulateur) lance **63 tests** (v0.31) dans
+`.\gradlew.bat testDebugUnitTest --no-daemon` (≈ 1 min, sans autoradio ni émulateur) lance **66 tests** (v0.32) dans
 `app/src/test/java/fr/p308/lanceur/` :
 - `vehicle/` : `DtcAndPowerTest` (codes défaut, puissance du DV6), `GearTest` (rapport engagé, conseil, étagement
   appris), `FapRegenTest` (régénérations), `CarProfileTest` (valeurs possibles), `OutsideTempTest` (canal FYT 0/40),
   `BatteryWatchTest` (tension FYT 0/114, rappel moteur coupé) ; `Author308.kt` ignore les tests propres à la 308
   quand le profil est une autre voiture ;
 - `sound/` : `BassCurveTest` (basses selon le volume), `FytStageTest` (croix Champ d'après les distances),
-  `ChampTapsTest` (touches Seul / Passagers) ;
+  `ChampTapsTest` (touches Seul / Passagers), `SeatAutoTest` (Passagers automatique) ;
 - `drive/ReadyCheckTest` (bilan « Prêt à partir »), `backup/MaintenancePdfTest`, `ui/GlbPlateTest` (plaque dans le modèle).
 
 Outils Python du son : `outils\son\.venv\Scripts\python.exe -m unittest test_mesure_son` (16 tests, depuis `outils/son`).
@@ -612,7 +620,7 @@ Release GitHub `v0.xx` avec le fichier `Lanceur308.apk` (seulement avec l'accord
 - AGP 8.7.3, **Kotlin 2.0.21**, Compose BOM 2024.12.01
 - **SceneView 2.2.1** (Filament 1.52) — SceneView 2.3+ exige Kotlin 2.2.
 - minSdk 26, targetSdk 33, compileSdk 35. R8 activé (`proguard-rules.pro` garde `com.google.android.filament.**` et `io.github.sceneview.**`).
-- Version dans `app/build.gradle.kts` : **incrémenter `versionCode` à chaque livraison** (actuellement 37 / "0.31").
+- Version dans `app/build.gradle.kts` : **incrémenter `versionCode` à chaque livraison** (actuellement 38 / "0.32").
 
 ---
 
@@ -750,6 +758,7 @@ Simule ouvrants, phares, marche arrière, batterie faible, accélérations ; les
 | **0.28** | Température extérieure lue directement (canal FYT 0/40) ; voiture 3D mieux cadrée sur 1280 × 720. |
 | **0.29** | Onglet Son : réglage de la croix « Champ » de l'égaliseur FYT d'après les distances (pas de retard possible). |
 | **0.30** | Basses automatiques selon le volume ; réglage du son automatique au micro du PC (`outils/son/reglage_auto.py`) ; essayé sur l'autoradio. |
+| **0.32** | « Passagers » automatique à l'ouverture d'une porte passager (retour à « Seul » au trajet suivant) ; bouton Redémarrer l'autoradio dans Applis. |
 | **0.31** | Tension de la batterie par le CAN et rappel moteur coupé ; balance Seul / Passagers (`sound/ChampService.kt`) ; page Véhicule → Mon autoradio ; réglage du son pour deux places ; test des ceintures. |
 
 ---

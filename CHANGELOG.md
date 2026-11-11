@@ -4,6 +4,14 @@ Les versions publiées se téléchargent sur la page
 [Releases](https://github.com/kylianprebost075-maker/lanceur-308/releases). Une mise à jour s'installe par-dessus
 l'ancienne version et garde les réglages. Le détail technique de chaque version est dans le [README](README.md).
 
+## 0.32 — 11 novembre 2026 (pas encore essayée sur l'autoradio)
+- **Passagers automatique** (Son → Alignement) : quand une porte passager (avant droite, arrière) s'ouvre autoradio
+  allumé et voiture à l'arrêt, le son passe tout seul en « Passagers » ; au trajet suivant, il revient à « Seul ». Un
+  choix fait à la main n'est jamais changé ; interrupteur pour couper l'option. Les ceintures, essayées le 11/11, ne
+  sont pas transmises par le boîtier CAN : les portes sont le seul signe d'un passager.
+- **Redémarrer l'autoradio** depuis Applis (bouton en haut, avec confirmation). Marche sur les autoradios dont
+  SELinux est « Permissive » (cas de l'autoradio de l'auteur) ; sinon l'appli dit de passer par le bouton marche.
+
 ## 0.31 — 11 novembre 2026 (pas encore essayée sur l'autoradio)
 - **Batterie sans boîtier OBD** : la tension est lue par le boîtier CAN de l'autoradio (FYT). Moteur coupé et autoradio
   allumé, un rappel toutes les 20 min (« la batterie se vide »), avec le temps écoulé dans Moteur → Batterie.

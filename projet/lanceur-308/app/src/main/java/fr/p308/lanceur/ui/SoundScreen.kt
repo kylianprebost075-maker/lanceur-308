@@ -167,10 +167,22 @@ private fun SeatModeSection() {
     }
     Text(
         if (SoundPrefs.seatMode == fr.p308.lanceur.sound.SeatMode.SOLO) "Seul : la voix vient du milieu du tableau de bord, pour toi."
-        else "Passagers : balance au centre, chacun entend les deux côtés.",
+        else "Passagers : balance au centre, chacun entend les deux côtés." +
+            if (SoundPrefs.seatAuto) " (mis tout seul : une porte passager s'est ouverte)" else "",
         fontSize = 12.sp, color = C.Sub,
     )
     (status.ifEmpty { null } ?: msg)?.let { Text(it, fontSize = 13.sp, color = if (enabled) C.Green else C.Orange) }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text("Passagers automatique", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            Text(
+                "Une porte passager s'ouvre, autoradio allumé, voiture à l'arrêt : le son passe en « Passagers ». " +
+                    "Au trajet suivant, il revient à « Seul ». Ton choix à la main n'est jamais changé.",
+                fontSize = 11.sp, color = C.Sub,
+            )
+        }
+        Switch(SoundPrefs.autoPassengers, SoundPrefs::updateAutoPassengers)
+    }
     val eqApp = remember { ctx.packageManager.getLaunchIntentForPackage(fr.p308.lanceur.sound.ChampService.EQ_PKG) != null }
     if (!enabled && eqApp) {
         TextButton(onClick = { fr.p308.lanceur.sound.ChampService.openSettings(ctx) }) {

@@ -79,8 +79,10 @@ import fr.p308.lanceur.maintenance.fmtKm
 import fr.p308.lanceur.vehicle.Vehicle
 import fr.p308.lanceur.vehicle.odometerOrigin
 import fr.p308.lanceur.vehicle.odometerText
+import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -481,6 +483,24 @@ private var cachedApps: List<AppEntry>? = null
 fun AppDrawer(onDismiss: () -> Unit) {
     val ctx = LocalContext.current
     var assigning by remember { mutableStateOf<AppEntry?>(null) }
+    var confirmReboot by remember { mutableStateOf(false) }
+    var rebootMsg by remember { mutableStateOf<String?>(null) }
+    val rebootScope = rememberCoroutineScope()
+    if (confirmReboot) {
+        AlertDialog(
+            onDismissRequest = { if (rebootMsg == null) confirmReboot = false },
+            containerColor = C.Card,
+            title = { Text("Redémarrer l'autoradio ?") },
+            text = { Text(rebootMsg ?: "L'écran s'éteint puis l'autoradio redémarre (environ 1 minute). La musique et CarPlay s'arrêtent pendant ce temps.") },
+            confirmButton = {
+                if (rebootMsg == null) Button(onClick = {
+                    rebootMsg = "Redémarrage…"
+                    rebootScope.launch { rebootMsg = withContext(Dispatchers.IO) { DevOptions.reboot() } }
+                }) { Text("Redémarrer") }
+            },
+            dismissButton = { TextButton(onClick = { confirmReboot = false; rebootMsg = null }) { Text(if (rebootMsg == null) "Annuler" else "Fermer") } },
+        )
+    }
     val apps by produceState(cachedApps ?: emptyList()) {
         if (cachedApps != null) return@produceState
         val loaded = withContext(Dispatchers.IO) {
@@ -501,6 +521,8 @@ fun AppDrawer(onDismiss: () -> Unit) {
                 Text("Applis", fontSize = 22.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                 Text("Appui long : assigner au dock", fontSize = 13.sp, color = C.Sub)
                 Spacer(Modifier.width(12.dp))
+                // v0.32 : redémarrer l'autoradio sans chercher le bouton marche.
+                TextButton(onClick = { confirmReboot = true }) { Text("⟳ Redémarrer l'autoradio", color = C.Orange) }
                 TextButton(onClick = onDismiss) { Text("Fermer") }
             }
             LazyVerticalGrid(GridCells.Adaptive(104.dp), Modifier.weight(1f)) {

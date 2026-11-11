@@ -19,6 +19,34 @@ import kotlinx.coroutines.flow.asStateFlow
 enum class SeatMode(val label: String) { SOLO("Seul"), PASSENGERS("Passagers") }
 
 /**
+ * Passage automatique en « Passagers » (v0.32). Les ceintures ne sont pas transmises par le boîtier CAN (essai du
+ * 11/11) : le seul signe d'un passager est une porte passager (avant droite, arrière) qui s'ouvre pendant que
+ * l'autoradio est allumé. On passe alors en « Passagers », à l'arrêt seulement (l'égaliseur s'ouvre 4 s à l'écran).
+ * Au démarrage suivant de l'autoradio (nouveau trajet), un « Passagers » mis automatiquement revient à « Seul ».
+ * Un choix fait à la main n'est jamais changé. Calcul pur, vérifié par SeatAutoTest.
+ */
+object SeatAuto {
+    val PASSENGER_DOORS = setOf(
+        fr.p308.lanceur.vehicle.Opening.FRONT_RIGHT,
+        fr.p308.lanceur.vehicle.Opening.REAR_LEFT,
+        fr.p308.lanceur.vehicle.Opening.REAR_RIGHT,
+    )
+    /** Au-dessus, on ne touche à rien (porte mal fermée en roulant, ou fausse info). */
+    const val MAX_KMH = 5f
+    /** Autoradio démarré depuis moins longtemps : c'est un nouveau trajet. */
+    const val BOOT_WINDOW_MS = 5 * 60_000L
+
+    /** Faut-il passer en « Passagers » ? [newlyOpen] = ouvrants qui viennent de s'ouvrir. */
+    fun shouldSwitch(
+        newlyOpen: Set<fr.p308.lanceur.vehicle.Opening>, mode: SeatMode, enabled: Boolean, kmh: Float,
+    ): Boolean = enabled && mode == SeatMode.SOLO && kmh <= MAX_KMH && newlyOpen.any { it in PASSENGER_DOORS }
+
+    /** Faut-il revenir à « Seul » au démarrage ? Seulement si « Passagers » avait été mis automatiquement. */
+    fun shouldRevert(mode: SeatMode, setAutomatically: Boolean, uptimeMs: Long): Boolean =
+        mode == SeatMode.PASSENGERS && setAutomatically && uptimeMs < BOOT_WINDOW_MS
+}
+
+/**
  * Touches à faire dans l'onglet « Champ » de l'égaliseur FYT (com.syu.eq) pour placer le point de la croix balance /
  * fader : onglet Champ, « Tous » (centre), puis les flèches. Positions relevées sur l'autoradio de l'auteur
  * (1280 × 720, 11/11) : onglet (1100, 680), Tous (335, 498), → (1150, 356), ↑ (941, 168), ← (730, 356), ↓ (941, 544)
