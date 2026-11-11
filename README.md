@@ -91,7 +91,13 @@ de dessus en 2D, celle que l'appli affiche quand la 3D n'est pas disponible. Sur
   automatique noté (`SoundPrefs.seatAuto`) : au démarrage suivant de l'autoradio (service lancé moins de 5 min après
   l'allumage), il revient à « Seul » (application 20 s plus tard). Un choix à la main n'est jamais changé.
   Limite connue : des passagers montés avant l'allumage de l'autoradio ne sont pas vus.
-- **Redémarrer l'autoradio** (Applis → « ⟳ Redémarrer l'autoradio », confirmation) : `DevOptions.reboot` essaie`n  `setprop sys.powerctl reboot`, puis `svc power reboot` et `reboot` (une appli n'a pas le droit REBOOT ; ça passe`n  parce que SELinux est « Permissive »). Essayé dans l'émulateur mis en Permissive : il redémarre. Pas encore sur l'autoradio.
+- **Redémarrer l'autoradio** (Applis → « ⟳ Redémarrer l'autoradio », confirmation) : `DevOptions.reboot` essaie
+  `setprop sys.powerctl reboot`, puis `svc power reboot` et `reboot` (une appli n'a pas le droit REBOOT ; ça passe
+  parce que SELinux est « Permissive »). Essayé dans l'émulateur mis en Permissive : il redémarre. Pas encore sur l'autoradio.
+- **Logo au démarrage** (demande du 11/11) : l'autoradio garde son choix dans `persist.sys.carmarkbox` (= `logo_001`)
+  et l'empreinte de l'image dans `persist.lsec.cp.logo_md5`. Il se change dans le menu de l'autoradio (réglages
+  d'usine, code 3368, ligne du logo), pas par le Lanceur : changer la propriété seule ne réécrit pas l'image.
+
 **Nouveau en v0.31 : batterie par le CAN, son « Seul / Passagers », page « Mon autoradio » (11/11, essayée dans l'émulateur, pas encore sur l'autoradio)**
 - **Batterie** (`vehicle/BatteryWatch.kt`) : tension lue sur le service FYT, module 0 code 114, codage
   `(brut + 4) × 0,1` déduit d'un seul relevé moteur tournant (142 → 14,6 V) : **à confirmer moteur coupé** (le script
