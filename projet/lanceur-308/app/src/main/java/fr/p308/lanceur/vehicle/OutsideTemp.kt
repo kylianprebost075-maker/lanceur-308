@@ -30,6 +30,23 @@ object OutsideTemp {
         "s16/10" to { v -> (if (v in 32768..65535) v - 65536 else v) / 10f },
     )
 
+    /**
+     * v0.28 : canal standard des autoradios FYT, celui qu'affiche la barre du haut (vu dans le projet Dashphonic,
+     * licence MIT) : module principal 0, code 40. Valeur = dixièmes de degré + 1000 (1160 = 16,0 °C) ; bits 30-31 non
+     * nuls = pas de capteur ou valeur hors limites ; bit 28 = Fahrenheit. Lu directement, sans rien apprendre.
+     */
+    const val FYT_MODULE = 0
+    const val FYT_CODE = 40
+    private const val FYT_FOUND = "0:40 (canal FYT standard)"
+
+    /** Décode le canal FYT standard ; null s'il n'y a pas de valeur valable. */
+    fun decodeFyt(raw: Int): Float? {
+        if (raw == 0 || (raw ushr 30) != 0) return null
+        val v = ((raw and 0x0FFFFFFF) - 1000) / 10f
+        val c = if ((raw ushr 28) and 1 == 1) (v - 32f) * 5f / 9f else v
+        return c.takeIf { it in -40f..60f }
+    }
+
     data class Status(val found: String? = null, val candidates: Int = 0, val message: String = "")
 
     private var prefs: SharedPreferences? = null
@@ -48,6 +65,14 @@ object OutsideTemp {
 
     /** Appelé par CanBusSource pour chaque valeur reçue. Renvoie la température si c'est le canal appris. */
     fun onValue(module: Int, code: Int, ints: IntArray): Float? {
+        // Canal FYT standard d'abord : il ne demande aucun réglage.
+        if (module == FYT_MODULE && code == FYT_CODE) {
+            val t = ints.firstOrNull()?.let(::decodeFyt)
+            if (t != null) {
+                if (_status.value.found != FYT_FOUND) _status.value = Status(found = FYT_FOUND, message = "Lue directement sur l'autoradio")
+                return t
+            }
+        }
         var out: Float? = null
         val p = prefs
         val learned = p?.getString("tempKey", null)

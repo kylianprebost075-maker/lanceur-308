@@ -4,6 +4,11 @@ Les versions publiées se téléchargent sur la page
 [Releases](https://github.com/kylianprebost075-maker/lanceur-308/releases). Une mise à jour s'installe par-dessus
 l'ancienne version et garde les réglages. Le détail technique de chaque version est dans le [README](README.md).
 
+## 0.28 — 11 novembre 2026
+- **Température extérieure lue directement** sur les autoradios FYT : elle s'affiche comme dans la barre du haut, sans
+  rien régler. L'ancien réglage « Température extérieure » reste en secours pour les autres autoradios.
+- **Voiture 3D mieux cadrée** sur les écrans 1280 × 720 : elle n'est plus coupée en bas, les plaques sont visibles.
+
 ## 0.27 — 11 novembre 2026
 - Droits d'auteur : [LICENSE.md](LICENSE.md) (tous droits réservés, usage personnel gratuit) et crédits complets :
   [CREDITS.md](CREDITS.md). La mention apparaît aussi en bas des Réglages de l'appli.

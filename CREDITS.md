@@ -39,7 +39,8 @@ Texte de la licence Apache 2.0 : https://www.apache.org/licenses/LICENSE-2.0
 
 Aucun code de ces projets n'a été copié ; ils ont servi de comparaison ou d'inspiration.
 
-- **Dashphonic** (vsevalid) : façon de parler aux autoradios FYT.
+- **Dashphonic** (vsevalid, licence MIT) : façon de parler aux autoradios FYT, et le canal de la température extérieure
+  (module principal, code 40, dixièmes de degré + 1000), réécrit dans `vehicle/OutsideTemp.kt`.
 - **Dashwheel** (deviloufr-ai) : organisation d'un tableau de bord pour plusieurs autoradios.
 - **AndrOBD** (fr3ts0n) : découpage d'un lecteur OBD.
 - **Reality Design — Car Launcher** : idées de l'écran « Prêt à partir » et du carnet d'entretien en PDF.

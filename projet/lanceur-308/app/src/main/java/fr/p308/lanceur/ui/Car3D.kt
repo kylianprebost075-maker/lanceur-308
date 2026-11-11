@@ -783,7 +783,9 @@ private const val REVERSE_GLOW = 7f
 private const val FOG_GLOW = 7f
 private const val FOG_LUMENS = 110_000f
 
-private const val EXTERIOR_FOCAL = 30.0
+// v0.28 : cadrage revu sur le vrai écran (1280 × 720) : à 30 et en visant -0,08, le bas de la voiture et la plaque
+// arrière étaient coupés par le bas du cadre.
+private const val EXTERIOR_FOCAL = 25.0
 private const val INTERIOR_FOCAL = 15.5
 
 private const val EXTERIOR_NEAR = 0.20f
@@ -791,7 +793,7 @@ private const val INTERIOR_NEAR = 0.03f
 private const val CAMERA_FAR = 14f
 
 private val CAMERA = Position(0f, 1.18f, 3.15f)
-private val TARGET = Position(0f, -0.08f, 0f)
+private val TARGET = Position(0f, -0.38f, 0f)
 
 private val EYE = Position(0.325f, 1.08f, -0.14f)
 private val LOOK_AHEAD = Position(0.325f, 0.86f, 1.40f)
