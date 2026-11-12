@@ -4,6 +4,13 @@ Les versions publiées se téléchargent sur la page
 [Releases](https://github.com/kylianprebost075-maker/lanceur-308/releases). Une mise à jour s'installe par-dessus
 l'ancienne version et garde les réglages. Le détail technique de chaque version est dans le [README](README.md).
 
+## 0.35 — 12 novembre 2026 (version d'essai, pas encore essayée sur l'autoradio)
+- **Essai du micro** (rien de visible dans l'appli) : pour savoir si le Lanceur pourrait baisser la musique quand
+  quelqu'un parle, sans la baisser quand on chante, le PC peut enregistrer le micro de l'autoradio quelques minutes
+  (`outils/adb/essai_micro.ps1`). L'appli déclare pour cela l'autorisation du micro, mais ne la demande jamais à
+  l'écran : seul le PC branché en ADB la donne, lance l'enregistrement, récupère le son, puis la retire. Le son ne
+  quitte pas le PC. Si l'essai ne donne rien, l'autorisation sera retirée de l'appli.
+
 ## 0.34 — 12 novembre 2026 (pas encore essayée sur l'autoradio)
 - **Plein écran** : la barre d'Android du haut est cachée dans le Lanceur (elle reste dans les autres applis). Un
   glissement depuis le bord du haut la montre quelques secondes.

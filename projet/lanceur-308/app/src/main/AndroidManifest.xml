@@ -26,6 +26,10 @@
     <!-- v0.30 : basses selon le volume (égaliseur d'Android sur tout le son). -->
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 
+    <!-- v0.35, essai : micro de l'autoradio enregistré une minute à la demande du PC (MicTest). Jamais demandé à
+         l'écran : l'autorisation n'est donnée que par le PC en ADB, le temps de l'essai. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
     <queries>
         <package android:name="com.syu.ms" />
         <package android:name="com.syu.eq" />
@@ -79,6 +83,12 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
+
+        <!-- v0.35, essai du micro : commandes réservées au PC en ADB (autorisation DUMP, que les applis n'ont pas). -->
+        <receiver
+            android:name=".sound.MicTestReceiver"
+            android:exported="true"
+            android:permission="android.permission.DUMP" />
 
         <!-- v0.31 : balance « Seul / Passagers ». Touche l'égaliseur FYT (com.syu.eq) à la place du doigt, seulement
              quand on le demande. Inactif tant qu'il n'est pas activé à la main dans Android, Accessibilité. -->
