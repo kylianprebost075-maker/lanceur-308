@@ -4,6 +4,12 @@ Les versions publiées se téléchargent sur la page
 [Releases](https://github.com/kylianprebost075-maker/lanceur-308/releases). Une mise à jour s'installe par-dessus
 l'ancienne version et garde les réglages. Le détail technique de chaque version est dans le [README](README.md).
 
+## 0.34 — 12 novembre 2026 (pas encore essayée sur l'autoradio)
+- **Plein écran** : la barre d'Android du haut est cachée dans le Lanceur (elle reste dans les autres applis). Un
+  glissement depuis le bord du haut la montre quelques secondes.
+- **Retiré : « Volume selon la vitesse »** (le son qui montait puis redescendait autour de 50, 80 et 110 km/h). Le
+  Lanceur ne touche plus au volume en roulant.
+
 ## 0.33 — 12 novembre 2026 (pas encore essayée sur l'autoradio)
 - **Litres restants lus tout seuls** (autoradios FYT qui transmettent l'autonomie de l'ordinateur de bord) : le
   Lanceur déduit les litres de cette autonomie et les affiche sur l'accueil (« Autonomie · ≈ 31 L ») et dans

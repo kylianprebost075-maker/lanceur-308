@@ -345,18 +345,6 @@ private fun OptionsPanel() {
     Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Tile(Modifier.weight(1f).fillMaxHeight()) {
             Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text("Volume selon la vitesse", fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
-                        Text("Monte un peu à 50, 80 et 110 km/h, redescend en ville. Ton réglage à la main reste la base.",
-                            fontSize = 12.sp, color = C.Sub)
-                    }
-                    Switch(SoundPrefs.speedVolume, SoundPrefs::updateSpeedVolume)
-                }
-                if (SoundPrefs.speedVolume) {
-                    Segmented(listOf(1 to "Léger", 2 to "Moyen", 3 to "Fort"), SoundPrefs.speedStrength) { SoundPrefs.updateSpeedStrength(it) }
-                }
-                Spacer(Modifier.height(12.dp))
                 BassSection()
                 Spacer(Modifier.height(12.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {

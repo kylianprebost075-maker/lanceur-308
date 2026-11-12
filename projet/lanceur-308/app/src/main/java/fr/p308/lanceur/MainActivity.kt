@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.view.View
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -37,6 +38,24 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         AppVisibility.foreground.value = true
+        fullScreen()
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) fullScreen()
+    }
+
+    /**
+     * v0.34 : plein écran, la barre d'Android du haut est cachée dans le Lanceur (elle revient dans les autres applis).
+     * Un glissement depuis le bord du haut la montre quelques secondes.
+     */
+    @Suppress("DEPRECATION")
+    private fun fullScreen() {
+        window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
+            View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+            View.SYSTEM_UI_FLAG_LAYOUT_STABLE or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
+            View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
     }
 
     override fun onPause() {

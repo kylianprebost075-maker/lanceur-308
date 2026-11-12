@@ -13,7 +13,7 @@
 > plaque ; depuis la v0.23 l'appli embarque `car-public.glb`, à plaque d'exemple), `modele-3d/plaque.png`, et
 > `fyt-extraits/` (code décompilé des applis FYT, propriété du fabricant). Pour reconstruire le modèle, voir §5.
 
-## En bref (version 0.33)
+## En bref (version 0.34)
 
 Écran d'accueil pour autoradio Android (Android 8 ou plus), fait pour une Peugeot 308 de 2007 (1.6 HDi 110) avec un
 autoradio FYT, adaptable à une autre voiture ([ADAPTER.md](ADAPTER.md)). Gratuit, sans compte, sans accès à Internet.
@@ -24,7 +24,7 @@ autoradio FYT, adaptable à une autre voiture ([ADAPTER.md](ADAPTER.md)). Gratui
 | **Véhicule** | État des ouvrants et des radars, GPS (et ses gels sous CarPlay), **Mon autoradio** (ce que l'autoradio transmet vraiment), Diagnostic CAN. |
 | **Moteur** (boîtier OBD) | Puissance, couple, rapport conseillé, eau, turbo ; codes défaut ; **batterie** (tension, santé à chaque démarrage, rappel moteur coupé) ; trajets et score ; chrono ; chauffe ; filtre à particules. |
 | **Entretien** | Échéances, historique, pleins et consommation, **litres restants et plein détecté tout seuls**, carnet en PDF, vue depuis le siège conducteur. |
-| **Son** | Balance **Seul / Passagers** en un appui (et « Passagers » tout seul quand une porte passager s'ouvre), réglage de la croix « Champ » d'après les distances, sons de test et polarité, signaux pour la mesure au micro du PC, basses automatiques selon le volume, volume selon la vitesse, annonces vocales. |
+| **Son** | Balance **Seul / Passagers** en un appui (et « Passagers » tout seul quand une porte passager s'ouvre), réglage de la croix « Champ » d'après les distances, sons de test et polarité, signaux pour la mesure au micro du PC, basses automatiques selon le volume, annonces vocales. |
 | **Réglages** | Plaque, couleur, 3 ou 5 portes, écran d'accueil, mode démo, panneau à côté de CarPlay, optimisation de l'autoradio, sauvegarde sur clé USB, ADB par le Wi-Fi, droits et crédits. |
 
 **Ce que donne l'autoradio FYT** (boîtier CAN Raise `PSA-RZ-15-0127-B1` chez l'auteur) : ouvrants, marche arrière,
@@ -76,7 +76,7 @@ de dessus en 2D, celle que l'appli affiche quand la 3D n'est pas disponible. Sur
 | **Son — Alignement (v0.15)** | **Son — Tests et polarité (v0.15)** |
 | ![Distances oreille / haut-parleurs et retards à recopier dans le DSP](docs/captures/onglets/15-son-alignement.png) | ![Sons de test par côté, balayage, test de polarité A / B en cours](docs/captures/onglets/16-son-tests.png) |
 | **Son — Mesure au micro du PC (v0.15)** | **Son — Options (v0.15)** |
-| ![Bruit rose, clics gauche / droite, montée en volume pour l'outil PC](docs/captures/onglets/17-son-mesure-pc.png) | ![Volume selon la vitesse, annonces vocales, applis son de l'autoradio](docs/captures/onglets/18-son-options.png) |
+| ![Bruit rose, clics gauche / droite, montée en volume pour l'outil PC](docs/captures/onglets/17-son-mesure-pc.png) | ![Basses automatiques, annonces vocales, applis son de l'autoradio](docs/captures/onglets/18-son-options.png) |
 | **Optimiser l'autoradio (v0.16)** | **Optimiser — réglages guidés (v0.16)** |
 | ![Mémoire libérée à la main ou toute seule (v0.18), mode CarPlay, nettoyage à l'ouverture de CarPlay](docs/captures/onglets/19-optimisation.png) | ![Animations, recherche Wi-Fi / Bluetooth, veille FYT, applis inutilisées](docs/captures/onglets/20-optimisation-reglages.png) |
 | **Entretien** | **Entretien — Pleins** |
@@ -364,8 +364,7 @@ personnel gratuit), [CREDITS.md](CREDITS.md), et la mention en bas des Réglages
   une courbe « voiture » par tiers d'octave et réglages d'égaliseur 10 bandes (+ graphique SVG) ; clics gauche puis
   droite à 500 ms exactes → décalage restant ; montée en volume d'un son pur 400 Hz → distorsion par palier et volume
   maximum sans saturer l'ampli. Analyse testée sur signaux synthétiques (`test_mesure_son.py`).
-- **Volume selon la vitesse** (paliers 50 / 80 / 110 km/h, intensité réglable, le réglage à la main reste la base) et
-  **annonces vocales** (turbo refroidi, régénération du FAP, réserve, surchauffe, batterie ; musique baissée).
+- **Annonces vocales** (turbo refroidi, régénération du FAP, réserve, surchauffe, batterie ; musique baissée).
 - **DSP de l'autoradio** : pas encore piloté (commandes inconnues). Bouton qui copie seulement les APK des applis son
   du système sur la clé pour les étudier (`QUERY_ALL_PACKAGES` ajoutée pour les trouver).
 
@@ -480,7 +479,7 @@ sur le bouton CarPlay pour montrer le panneau. Le bandeau rouge est une alerte d
 | | |
 |---|---|
 | **Quoi** | Appli Android « Lanceur 308 » (`fr.p308.lanceur`) : tableau de bord façon Tesla pour autoradio chinois FYT, avec la 308 en 3D, les ouvrants, les phares, l'OBD, le GPS, l'entretien, le son. |
-| **Où en est-on** | Version **0.33** (`versionCode = 39`) prête, sur la clé USB ; 0.31 publiée sur GitHub (Releases, `Lanceur308.apk`) et installée sur l'autoradio le 11/11. |
+| **Où en est-on** | Version **0.34** (`versionCode = 40`) prête, pas encore essayée ; 0.31 publiée sur GitHub (Releases, `Lanceur308.apk`) et installée sur l'autoradio le 11/11. |
 | **Ce qui marche dans la voiture** | 3D (plaque tapée, cadrage 1280 × 720), ouvrants et marche arrière par le CAN FYT, température extérieure FYT, phares par l'heure du coucher du soleil, OBD avec le vLinker MC+ (régime, eau, turbo, tension, codes défaut, kilométrage du calculateur), basses automatiques, égaliseur 15 bandes réglé au micro du PC, ADB par le Wi-Fi. |
 | **Vérifié le 11/11 au soir (0.31 sur l'autoradio)** | Page Mon autoradio (boîtier, 17 °C, 12,9 V, volume 18, OBD, égaliseur) ; tension moteur coupé 12,8-12,9 V (codage confirmé) ; flèches ← ↓ de la balance justes ; ceintures **non transmises**. Reste à essayer : un appui sur Seul / Passagers depuis le Lanceur. |
 | **Comment on travaille** | Une séance dans la voiture doit être courte (batterie) : tout se prépare sur le PC, puis un seul script par ADB Wi-Fi (`outils/adb/`). |
@@ -651,7 +650,7 @@ Release GitHub `v0.xx` avec le fichier `Lanceur308.apk` (seulement avec l'accord
 - AGP 8.7.3, **Kotlin 2.0.21**, Compose BOM 2024.12.01
 - **SceneView 2.2.1** (Filament 1.52) — SceneView 2.3+ exige Kotlin 2.2.
 - minSdk 26, targetSdk 33, compileSdk 35. R8 activé (`proguard-rules.pro` garde `com.google.android.filament.**` et `io.github.sceneview.**`).
-- Version dans `app/build.gradle.kts` : **incrémenter `versionCode` à chaque livraison** (actuellement 39 / "0.33").
+- Version dans `app/build.gradle.kts` : **incrémenter `versionCode` à chaque livraison** (actuellement 40 / "0.34").
 
 ---
 
@@ -678,7 +677,7 @@ Release GitHub `v0.xx` avec le fichier `Lanceur308.apk` (seulement avec l'accord
 | `vehicle/OutsideTemp.kt` | Température extérieure (canal FYT 0/40, sinon canal appris) |
 | `vehicle/BatteryWatch.kt`, `vehicle/CrankWatch.kt` | Alertes de tension, rappel moteur coupé, santé mesurée à chaque démarrage |
 | `vehicle/CanProbe.kt` | Diagnostic CAN : enregistre tout ce qui change (rapport `diagnostic-can.txt`) |
-| `sound/` | `SoundGen` (sons de test), `BassAuto` (basses selon le volume), `FytStage` (croix Champ), `ChampService` (service d'accessibilité Seul / Passagers), `SpeedVolume`, `Voice`, `SoundPrefs` |
+| `sound/` | `SoundGen` (sons de test), `BassAuto` (basses selon le volume), `FytStage` (croix Champ), `ChampService` (service d'accessibilité Seul / Passagers), `Voice`, `SoundPrefs` |
 | `vehicle/FytBridge.kt` | Transactions Binder vers `com.syu.ms` |
 | `vehicle/Engine.kt` | **OBD ELM327** BLE + SPP (vLinker MC+, iCar Pro…) |
 | `vehicle/Vehicle.kt`, `VehicleState.kt` | État global du véhicule (StateFlow) + mode démo |

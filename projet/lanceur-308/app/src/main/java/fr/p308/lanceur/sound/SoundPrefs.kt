@@ -23,12 +23,6 @@ object SoundPrefs {
     /** Distances oreille du conducteur → haut-parleur, en cm (0 = pas encore mesurée). */
     val distancesCm = mutableStateListOf(0, 0, 0, 0)
 
-    /** Volume qui monte avec la vitesse (bruit de roulement). */
-    var speedVolume by mutableStateOf(false)
-        private set
-    /** Intensité 1 (léger) à 3 (fort). */
-    var speedStrength by mutableIntStateOf(2)
-        private set
     /** v0.30 : basses selon le volume (BassAuto), intensité 1 à 3, fréquence qui fait vibrer les portes (0 = inconnue). */
     var bassAuto by mutableStateOf(false)
         private set
@@ -47,8 +41,6 @@ object SoundPrefs {
         val p = ctx.getSharedPreferences("sound", Context.MODE_PRIVATE)
         prefs = p
         Speaker.entries.forEachIndexed { i, s -> distancesCm[i] = p.getInt("dist_${s.name}", 0) }
-        speedVolume = p.getBoolean("speedVolume", false)
-        speedStrength = p.getInt("speedStrength", 2).coerceIn(1, 3)
         voice = p.getBoolean("voice", false)
         bassAuto = p.getBoolean("bassAuto", false)
         bassStrength = p.getInt("bassStrength", 2).coerceIn(1, 3)
@@ -89,16 +81,6 @@ object SoundPrefs {
     fun setDistance(s: Speaker, cm: Int) {
         distancesCm[s.ordinal] = cm.coerceIn(0, 400)
         prefs?.edit()?.putInt("dist_${s.name}", distancesCm[s.ordinal])?.apply()
-    }
-
-    fun updateSpeedVolume(v: Boolean) {
-        speedVolume = v
-        prefs?.edit()?.putBoolean("speedVolume", v)?.apply()
-    }
-
-    fun updateSpeedStrength(v: Int) {
-        speedStrength = v.coerceIn(1, 3)
-        prefs?.edit()?.putInt("speedStrength", speedStrength)?.apply()
     }
 
     fun updateVoice(v: Boolean) {

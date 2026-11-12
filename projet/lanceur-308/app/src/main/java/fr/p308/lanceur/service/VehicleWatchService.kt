@@ -110,7 +110,6 @@ class VehicleWatchService : Service(), LocationListener {
                     fr.p308.lanceur.vehicle.TurboCool.tick(Engine.state.value, fr.p308.lanceur.drive.Trip.state.value.currentKmh)
                 if (fr.p308.lanceur.vehicle.CarProfile.HAS_DPF) fr.p308.lanceur.vehicle.FapRegen.tick(Engine.state.value, fr.p308.lanceur.drive.Trip.state.value.currentKmh,
                     Vehicle.state.value.odometerKm)
-                fr.p308.lanceur.sound.SpeedVolume.tick(this@VehicleWatchService, fr.p308.lanceur.drive.Trip.state.value.currentKmh)
                 fr.p308.lanceur.sound.BassAuto.tick(this@VehicleWatchService)
                 voiceAlerts()
                 if (++ticks % 2 == 0) CarPlayWatch.tick(this@VehicleWatchService)

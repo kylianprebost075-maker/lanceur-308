@@ -2,7 +2,7 @@
 
 Lanceur 308 est un écran d'accueil pour autoradio Android : ta voiture en 3D, les portes en direct, la température
 et la batterie, les données du moteur, l'entretien, le réglage du son. Il est gratuit, sans compte et sans publicité.
-Dernière version : **0.31** (11 novembre 2026), nouveautés dans le [journal des versions](CHANGELOG.md).
+Dernière version publiée : **0.31** (11 novembre 2026), nouveautés dans le [journal des versions](CHANGELOG.md).
 
 > **À savoir avant de commencer.** L'appli a été faite et essayée sur **une seule voiture** : une Peugeot 308 de
 > 2007 (1.6 HDi 110) avec un autoradio chinois de marque FYT. Sur une autre voiture ou un autre autoradio, une

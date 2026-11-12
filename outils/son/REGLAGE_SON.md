@@ -34,7 +34,7 @@ Pose le PC ouvert sur le siège conducteur, micro (en haut de l'écran en géné
 Les enregistrements restent dans `outils\son\mesures` (jamais publiés).
 
 ## 4. Options
-- Volume selon la vitesse (Léger / Moyen / Fort) et annonces vocales : Son → Options.
+- Annonces vocales : Son → Options.
 - Piloter le DSP de l'autoradio directement : Son → Options → « Chercher les applis son » → « Copier sur la clé USB »,
   puis rapporter la clé au PC pour étudier les commandes. Rien n'est modifié sur l'autoradio.
 
