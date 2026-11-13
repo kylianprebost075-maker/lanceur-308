@@ -305,7 +305,15 @@ fun SettingsDialog(onDismiss: () -> Unit) {
                     Switch(UiPrefs.fiveDoors, UiPrefs::updateFiveDoors)
                 }
                 // v0.23 : chacun tape sa plaque ; elle est dessinée ici puis posée sur la voiture 3D.
-                SettingRow("Plaque", plateMessage ?: "Affichée sur la voiture ; ne quitte pas l'autoradio") {
+                // v0.36 : si un modèle 3D envoyé par le PC cache la plaque tapée, on le dit et on propose de le retirer.
+                if (UiPrefs.plate.isNotEmpty() && remember(PlateModel.revision) { PlateModel.pushedModel(ctx).exists() }) {
+                    SettingRow("Plaque cachée", "Un modèle 3D envoyé par le PC est affiché à la place de ta plaque") {
+                        Button(onClick = {
+                            plateMessage = if (PlateModel.removePushed(ctx)) "Modèle du PC retiré : ta plaque est posée" else "Suppression impossible"
+                        }) { Text("Retirer") }
+                    }
+                }
+                SettingRow("Plaque", PlateModel.problem ?: plateMessage ?: "Affichée sur la voiture ; ne quitte pas l'autoradio") {
                     androidx.compose.foundation.Image(plateImage, null, Modifier.height(30.dp).padding(end = 8.dp))
                     // Le texte tapé n'est PAS réécrit pendant la frappe (le passer en majuscules ici faisait doubler les mots par le
                     // clavier Android : « clio-3 » devenait « CLIO-CLIO- ») : c'est le clavier qui met les majuscules.

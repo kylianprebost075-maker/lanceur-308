@@ -6,6 +6,10 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Typeface
 import android.net.Uri
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import fr.p308.lanceur.UiPrefs
 import fr.p308.lanceur.vehicle.ObdLog
 import java.io.ByteArrayOutputStream
@@ -108,6 +112,23 @@ object PlateModel {
     const val EXAMPLE = "AB-123-CD"
     /** true si le modèle à plaque personnalisée n'a pas pu s'afficher : on revient au modèle d'origine. */
     private var failed = false
+    /** v0.36 : augmente à chaque « Poser », pour recharger la voiture même si le texte de la plaque n'a pas changé. */
+    var revision by mutableIntStateOf(0)
+        private set
+    /** v0.36 : pourquoi la plaque tapée n'est pas à l'écran (null = tout va bien), affiché dans les Réglages. */
+    var problem by mutableStateOf<String?>(null)
+        private set
+
+    /** Un modèle 3D envoyé par le PC dans le dossier de l'appli passe avant celui à plaque tapée (voir CarModel). */
+    fun pushedModel(ctx: Context) = File(ctx.getExternalFilesDir(null), "car.glb")
+
+    /** Supprime le modèle envoyé par le PC, pour que la plaque des Réglages s'affiche ; true s'il n'y en a plus. */
+    fun removePushed(ctx: Context): Boolean {
+        val f = pushedModel(ctx)
+        val gone = !f.exists() || f.delete()
+        if (gone) { problem = null; revision++; ObdLog.log("PLAQUE", "modèle 3D envoyé par le PC retiré") }
+        return gone
+    }
 
     /** Garde lettres, chiffres, tirets et espaces ; 10 caractères au plus. */
     fun normalize(text: String) = text.uppercase().filter { it in 'A'..'Z' || it in '0'..'9' || it == '-' || it == ' ' }.trim().take(10)
@@ -170,11 +191,18 @@ object PlateModel {
     fun apply(ctx: Context, text: String): String {
         val t = normalize(text)
         failed = false
+        problem = null
         val error = if (t.isEmpty()) { files(ctx).forEach { it.delete() }; null } else build(ctx, t)
-        if (error != null) return error
+        if (error != null) { ObdLog.log("PLAQUE", "échec : $error"); problem = error; return error }
         UiPrefs.updatePlate(t)
+        revision++
         // Le texte de la plaque n'est volontairement pas écrit dans le journal (il part sur la clé USB).
         ObdLog.log("PLAQUE", if (t.isEmpty()) "plaque d'exemple remise" else "plaque personnalisée posée")
+        if (pushedModel(ctx).exists()) {
+            ObdLog.log("PLAQUE", "un modèle 3D envoyé par le PC passe avant la plaque tapée")
+            problem = "Plaque enregistrée, mais un modèle 3D envoyé par le PC est affiché à la place"
+            return problem!!
+        }
         return if (t.isEmpty()) "Plaque d'exemple ($EXAMPLE)" else "Plaque posée sur la voiture"
     }
 
@@ -192,6 +220,7 @@ object PlateModel {
     /** Le modèle personnalisé n'a pas pu s'afficher : noté au journal, et on repasse au modèle d'origine. */
     fun markFailed() {
         failed = true
+        problem = "La voiture avec ta plaque ne s'affiche pas : modèle d'origine remis. Touche « Poser » pour réessayer"
         ObdLog.log("PLAQUE", "le modèle à plaque personnalisée ne s'affiche pas : retour au modèle d'origine")
     }
 }

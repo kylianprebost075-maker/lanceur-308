@@ -181,7 +181,7 @@ fun HomeAndMaintenanceScreen(vs: VehicleState, items: List<MaintenanceItem>, int
     val open = vs.visibleOpen()
     val lightsOn = vs.effectiveHeadlights()
     val ctx = LocalContext.current
-    var model3d by remember(UiPrefs.plate) { mutableStateOf(CarModel.location(ctx)) }
+    var model3d by remember(UiPrefs.plate, PlateModel.revision) { mutableStateOf(CarModel.location(ctx)) }
     val spinCtrl = remember { CarSpinController() }
 
     Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {

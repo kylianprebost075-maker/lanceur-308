@@ -4,6 +4,13 @@ Les versions publiées se téléchargent sur la page
 [Releases](https://github.com/kylianprebost075-maker/lanceur-308/releases). Une mise à jour s'installe par-dessus
 l'ancienne version et garde les réglages. Le détail technique de chaque version est dans le [README](README.md).
 
+## 0.36 — 13 novembre 2026 (pas encore essayée sur l'autoradio)
+- **Voiture 3D** : si tu as tourné la vue au doigt, elle revient toute seule à sa place quand une porte s'ouvre (ou
+  à la marche arrière, ou au départ), pour montrer le bon côté. Avant, seule la voiture pivotait un peu.
+- **Plaque** : « Poser » recharge la voiture même si le texte n'a pas changé ; si la plaque ne peut pas s'afficher,
+  les Réglages disent pourquoi. Quand un modèle 3D envoyé par le PC cache ta plaque, une ligne « Plaque cachée »
+  propose de le retirer.
+
 ## 0.35 — 12 novembre 2026 (version d'essai, pas encore essayée sur l'autoradio)
 - **Essai du micro** (rien de visible dans l'appli) : pour savoir si le Lanceur pourrait baisser la musique quand
   quelqu'un parle, sans la baisser quand on chante, le PC peut enregistrer le micro de l'autoradio quelques minutes

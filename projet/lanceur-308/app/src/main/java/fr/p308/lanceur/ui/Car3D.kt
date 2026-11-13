@@ -45,6 +45,9 @@ import io.github.sceneview.rememberNode
 import io.github.sceneview.rememberView
 import java.io.File
 import kotlin.math.abs
+import kotlin.math.asin
+import kotlin.math.atan2
+import kotlin.math.sqrt
 import kotlin.math.cos
 import kotlin.math.exp
 import kotlin.math.sin
@@ -144,6 +147,9 @@ fun Car3D(
     val extStartPos = remember { arrayOf(CAMERA) }
     var settledExterior by remember { mutableStateOf(!interior) }
     var transitioning by remember { mutableStateOf(false) }
+    // v0.36 : retour de la vue à sa place (voir startRecenter) : avancement 0..1, puis azimut, hauteur et distance de départ.
+    var recenter by remember { mutableStateOf(false) }
+    val rec = remember { FloatArray(4) }
     val parts = remember { CarParts() }
 
     LaunchedEffect(location) {
@@ -335,6 +341,25 @@ fun Car3D(
     fun shortestSpinTo(targetDeg: Float): Float =
         spin[0] + ((targetDeg - spin[0]) % 360f + 540f) % 360f - 180f
 
+    /**
+     * v0.36 : si la vue a été tournée au doigt, la ramène en douceur à sa place d'origine (en tournant autour de la
+     * voiture), pour que la porte qui s'ouvre soit bien montrée. Sans effet si la vue n'a pas bougé.
+     */
+    fun startRecenter() {
+        val p = camera.position
+        if (abs(p.x - CAMERA.x) + abs(p.y - CAMERA.y) + abs(p.z - CAMERA.z) < 0.03f) return
+        val dx = p.x - TARGET.x
+        val dy = p.y - TARGET.y
+        val dz = p.z - TARGET.z
+        val r = sqrt(dx * dx + dy * dy + dz * dz)
+        if (r < 0.01f) return
+        rec[0] = 0f
+        rec[1] = atan2(dx, dz)
+        rec[2] = asin((dy / r).coerceIn(-1f, 1f))
+        rec[3] = r
+        recenter = true
+    }
+
     // Plongée fluide type Tesla entre la vue studio extérieure et le poste de conduite (Entretien).
     LaunchedEffect(interior, car) {
         if (car == null) return@LaunchedEffect
@@ -378,8 +403,9 @@ fun Car3D(
         spin[1] += ctrl.lastBy
     }
 
-    val manipulator = remember(settledExterior) {
-        if (!settledExterior) null else SceneView.createDefaultCameraManipulator(CAMERA, TARGET)
+    // Pendant le retour de la vue, le doigt ne la pilote plus ; après, il repart de la place d'origine.
+    val manipulator = remember(settledExterior, recenter) {
+        if (!settledExterior || recenter) null else SceneView.createDefaultCameraManipulator(CAMERA, TARGET)
     }
     var lastX by remember { mutableFloatStateOf(0f) }
     var lastY by remember { mutableFloatStateOf(0f) }
@@ -401,6 +427,7 @@ fun Car3D(
         if (interior || !settledExterior) return@LaunchedEffect
         if (focus != null) {
             spin[1] = shortestSpinTo(focus)
+            startRecenter()
         }
     }
 
@@ -460,8 +487,33 @@ fun Car3D(
                     // Si la voiture commence à rouler, on la remet dans l'axe 3/4 de conduite.
                     if (driving && !parts.wasDriving && open.isEmpty() && !reverse) {
                         spin[1] = shortestSpinTo(HERO_ANGLE)
+                        startRecenter()
                     }
                     parts.wasDriving = driving
+
+                    // v0.36 : la vue tournée au doigt revient à sa place en 0,7 s, en tournant autour de la voiture.
+                    if (recenter) {
+                        if (interior || !settledExterior) {
+                            recenter = false
+                        } else {
+                            changed = true
+                            rec[0] = (rec[0] + dt / 0.7f).coerceAtMost(1f)
+                            val s = rec[0] * rec[0] * (3f - 2f * rec[0])
+                            val endEl = asin(((CAMERA.y - TARGET.y) / HOME_RADIUS).coerceIn(-1f, 1f))
+                            val az = rec[1] * (1f - s)
+                            val el = rec[2] + (endEl - rec[2]) * s
+                            val r = rec[3] + (HOME_RADIUS - rec[3]) * s
+                            camera.position = Position(
+                                TARGET.x + r * cos(el) * sin(az), TARGET.y + r * sin(el), TARGET.z + r * cos(el) * cos(az),
+                            )
+                            camera.lookAt(TARGET)
+                            if (rec[0] >= 1f) {
+                                camera.position = CAMERA
+                                camera.lookAt(TARGET)
+                                recenter = false
+                            }
+                        }
+                    }
 
                     // Rotation uniquement vers l'angle demandé (aucune rotation continue à l'arrêt !).
                     val spinDiff = spin[1] - spin[0]
@@ -794,6 +846,8 @@ private const val CAMERA_FAR = 14f
 
 private val CAMERA = Position(0f, 1.18f, 3.15f)
 private val TARGET = Position(0f, -0.38f, 0f)
+/** Distance de la caméra d'origine au point visé (retour de la vue, v0.36). */
+private val HOME_RADIUS = sqrt((CAMERA.y - TARGET.y) * (CAMERA.y - TARGET.y) + CAMERA.z * CAMERA.z)
 
 private val EYE = Position(0.325f, 1.08f, -0.14f)
 private val LOOK_AHEAD = Position(0.325f, 0.86f, 1.40f)
