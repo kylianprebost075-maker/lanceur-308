@@ -30,4 +30,38 @@ class TankGaugeTest {
     @Test fun addedLitersNeverExceedTank() {
         assertEquals(FuelRange.TANK_L, TankGauge.detectFill(20, 1500, 9.0, 0)!!.liters, 0.01)
     }
+
+    @Test fun jumpWhileDrivingIsNotAFill() {
+        // 13/11 : 920 → 1020 km sur autoroute, l'ordinateur a recalculé avec une conso plus basse.
+        assertNull(TankGauge.detectFill(920, 1020, 5.5, 0, moving = true))
+        // Le 12/11 à l'arrêt : 90 → 920 km, 830 km × 5,5 L/100 ≈ 45,7 L (et non 60 L à 9,8 L/100).
+        assertEquals(45.65, TankGauge.detectFill(90, 920, 5.5, 0, moving = false)!!.liters, 0.01)
+    }
+}
+
+/** v0.37 : correction de la conso estimée par l'ordinateur de bord. */
+class FuelModelBoardTest {
+    private fun trip(km: Double, rawL: Double) = TripRecord(0, 0, km, km * 60.0, 0f, 0, 0, 0, (km * 60).toInt(), 0, 0, fuelRawL = rawL)
+
+    @Test fun boardConsumptionCorrectsEstimate() {
+        // 100 km estimés à 9,8 L/100, ordinateur de bord à 5,5 : facteur ≈ 0,56.
+        val trips = listOf(trip(60.0, 5.88), trip(40.0, 3.92))
+        FuelModel.recompute(emptyList(), trips, boardL100 = 5.5)
+        assertEquals(5.5 / 9.8, FuelModel.factor, 0.001)
+        assertEquals("ordinateur de bord", FuelModel.source)
+        assertEquals(5.5, trips[0].l100!!, 0.01)
+        FuelModel.recompute(emptyList(), trips, boardL100 = null)
+        assertEquals(1.0, FuelModel.factor, 0.0)
+    }
+
+    @Test fun notEnoughObdKmKeepsNoCorrection() {
+        FuelModel.recompute(emptyList(), listOf(trip(20.0, 2.0)), boardL100 = 5.5)
+        assertEquals(1.0, FuelModel.factor, 0.0)
+    }
+
+    @Test fun boardConsumptionIsUsedForRange() {
+        val (l100, basis) = FuelRange.consumption(emptyList(), emptyList(), boardL100 = 5.5)
+        assertEquals(5.5, l100, 0.0)
+        assertEquals("conso de l'ordinateur de bord", basis)
+    }
 }

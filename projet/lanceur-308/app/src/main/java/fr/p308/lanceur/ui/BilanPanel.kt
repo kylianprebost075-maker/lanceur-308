@@ -117,8 +117,11 @@ fun BilanPanel() {
                     fontSize = 15.sp)
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    if (FuelModel.samples == 0) "Pas encore corrigée par tes pleins : saisis tes pleins complets (Entretien → Pleins), " +
-                        "elle devient plus juste à chaque plein."
+                    if (FuelModel.samples == 0 && FuelModel.source == "ordinateur de bord")
+                        "Corrigée d'après la conso de l'ordinateur de bord (facteur ${"%.2f".format(Locale.FRANCE, FuelModel.factor)}). " +
+                            "Note tes pleins complets pour une mesure encore plus juste."
+                    else if (FuelModel.samples == 0) "Pas encore corrigée : tape la conso de l'ordinateur de bord, ou saisis tes pleins " +
+                        "complets (Entretien → Pleins)."
                     else "Corrigée par ${FuelModel.samples} intervalle(s) entre pleins (facteur ${"%.2f".format(Locale.FRANCE, FuelModel.factor)}).",
                     fontSize = 12.sp, color = C.Sub,
                 )

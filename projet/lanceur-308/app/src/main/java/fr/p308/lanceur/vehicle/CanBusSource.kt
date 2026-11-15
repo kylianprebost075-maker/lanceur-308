@@ -65,6 +65,7 @@ object CanBusSource {
 
             when (module) {
                 MODULE_CANBUS -> {
+                    logUnknown(code, ints)
                     DOORS[code]?.let { opening ->
                         val isOpen = v != 0
                         if (isOpen) CarFeatures.mark(Feature.DOORS, "vu : ${opening.label.lowercase()}")
@@ -104,6 +105,25 @@ object CanBusSource {
         }, log = {}).also {
             it.connect(app, mapOf(MODULE_MAIN to mainCodes, MODULE_CANBUS to canCodes, MODULE_SOUND to listOf(U_SOUND_VOL)))
         }
+    }
+
+    /**
+     * v0.37 : écoute du module 7 pour trouver les autres chiffres de l'ordinateur de bord (conso moyenne et
+     * instantanée). Chaque canal inconnu est écrit au journal ([CAN7]) quand sa valeur change, au plus une fois par
+     * 2 minutes et 600 lignes par allumage : après un trajet, le journal de la clé USB montre quel canal suit la conso.
+     */
+    private val lastLogged = HashMap<Int, Pair<String, Long>>()
+    private var loggedLines = 0
+
+    private fun logUnknown(code: Int, ints: IntArray?) {
+        if (code in DOORS || code == U_DRIVING_MILEAGE || code >= 1000 || ints == null || loggedLines >= 600) return
+        val value = ints.take(6).joinToString(",")
+        val now = android.os.SystemClock.elapsedRealtime()
+        val prev = lastLogged[code]
+        if (prev != null && (prev.first == value || now - prev.second < 120_000)) return
+        lastLogged[code] = value to now
+        loggedLines++
+        ObdLog.log("CAN7", "canal $code : ${prev?.first ?: "—"} → $value")
     }
 
     fun restart(ctx: Context) {

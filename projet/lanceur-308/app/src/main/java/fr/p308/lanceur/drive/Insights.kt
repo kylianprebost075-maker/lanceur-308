@@ -12,7 +12,11 @@ import kotlin.math.roundToInt
  * Consommation ESTIMÉE (la 308 ne donne pas le débit de gazole sur l'OBD normalisé) : un diesel consomme à peu près
  * en proportion de la puissance fournie (≈ 0,27 L par kWh) plus un ralenti (≈ 0,3 L/h). La puissance vient déjà
  * de l'OBD (charge × couple maxi). Le résultat est ensuite corrigé par les vrais pleins : entre deux pleins complets,
- * litres versés / litres estimés donne un facteur (médiane des 5 derniers, borné 0,6 à 1,6).
+ * litres versés / litres estimés donne un facteur (médiane des 5 derniers, borné 0,3 à 1,6).
+ * v0.37 : sur la 308, la « puissance » OBD surestime nettement (9,8 L/100 estimés pour 5,5 à l'ordinateur de bord) :
+ * le facteur part de 1 au lieu de ~0,56 tant qu'il n'y a pas deux pleins complets notés. Sans pleins, la conso de
+ * l'ordinateur de bord (saisie dans Entretien → Pleins) sert de référence : facteur = conso de l'ordinateur / conso
+ * brute estimée sur les derniers trajets suivis par l'OBD.
  */
 object FuelModel {
     fun litersPerHour(powerCh: Int?): Double = 0.30 + 0.27 * (powerCh ?: 0).coerceAtLeast(0) * 0.7355
@@ -26,9 +30,25 @@ object FuelModel {
     var samples: Int = 0
         private set
 
+    /** D'où vient le facteur : « pleins », « ordinateur de bord » ou « aucune correction ». */
+    @Volatile
+    var source: String = "aucune correction"
+        private set
+
     private fun day(ms: Long): LocalDate = Instant.ofEpochMilli(ms).atZone(ZoneId.systemDefault()).toLocalDate()
 
-    fun recompute(fills: List<FuelEntry>, trips: List<TripRecord>) {
+    /** Conso brute (avant correction, L/100) des derniers trajets suivis par l'OBD, s'ils font au moins 50 km. */
+    fun rawL100(trips: List<TripRecord>): Double? {
+        val ok = trips.filter { it.fuelRawL > 0.05 && it.obdS >= it.movingS * 0.6 && it.distanceKm >= 1.0 }.take(20)
+        val km = ok.sumOf { it.distanceKm }
+        return if (km >= 50) ok.sumOf { it.fuelRawL } / km * 100 else null
+    }
+
+    /** Facteur tiré de la conso de l'ordinateur de bord (null s'il manque des trajets OBD). */
+    fun factorFromBoard(boardL100: Double, trips: List<TripRecord>): Double? =
+        rawL100(trips)?.takeIf { it > 0.5 }?.let { (boardL100 / it).coerceIn(0.3, 1.6) }
+
+    fun recompute(fills: List<FuelEntry>, trips: List<TripRecord>, boardL100: Double? = null) {
         val fulls = fills.withIndex().filter { it.value.full }
         val factors = mutableListOf<Double>()
         for (k in 1 until fulls.size) {
@@ -46,7 +66,17 @@ object FuelModel {
         }
         val last = factors.takeLast(5).sorted()
         samples = last.size
-        factor = if (last.isEmpty()) 1.0 else last[last.size / 2].coerceIn(0.6, 1.6)
+        val board = if (last.isEmpty() && boardL100 != null) factorFromBoard(boardL100, trips) else null
+        factor = when {
+            last.isNotEmpty() -> last[last.size / 2].coerceIn(0.3, 1.6)
+            board != null -> board
+            else -> 1.0
+        }
+        source = when {
+            last.isNotEmpty() -> "pleins"
+            board != null -> "ordinateur de bord"
+            else -> "aucune correction"
+        }
     }
 }
 
@@ -75,8 +105,14 @@ object FuelRange {
     val state: kotlinx.coroutines.flow.StateFlow<RangeInfo?> = _state
     private val DAY = java.time.format.DateTimeFormatter.ofPattern("dd/MM")
 
-    /** Consommation à utiliser (L/100) et d'où elle vient : mesurée entre pleins, sinon estimée des trajets, sinon 6. */
-    fun consumption(fills: List<FuelEntry>, trips: List<TripRecord>): Pair<Double, String> {
+    /**
+     * Consommation à utiliser (L/100) et d'où elle vient : mesurée entre pleins, sinon celle de l'ordinateur de bord
+     * (v0.37, saisie), sinon estimée des trajets, sinon 6.
+     */
+    fun consumption(
+        fills: List<FuelEntry>, trips: List<TripRecord>,
+        boardL100: Double? = fr.p308.lanceur.maintenance.Fuel.boardL100.value?.toDouble(),
+    ): Pair<Double, String> {
         val measured = fr.p308.lanceur.maintenance.Fuel.stats(fills).avgL100?.toDouble()
         val recent = trips.filter { it.l100 != null }.take(10)
         val estimated = if (recent.sumOf { it.distanceKm } >= 30) {
@@ -84,10 +120,11 @@ object FuelRange {
         } else null
         val basis = when {
             measured != null -> "conso mesurée entre tes pleins"
+            boardL100 != null -> "conso de l'ordinateur de bord"
             estimated != null -> "conso estimée des derniers trajets"
             else -> "conso moyenne par défaut, pas encore de mesure"
         }
-        return (measured ?: estimated ?: 6.0).coerceIn(3.5, 12.0) to basis
+        return (measured ?: boardL100 ?: estimated ?: 6.0).coerceIn(3.5, 12.0) to basis
     }
 
     fun compute(
@@ -138,18 +175,28 @@ data class GaugeState(val canKm: Int? = null, val liters: Double? = null, val l1
  *   celle, inconnue, que l'ordinateur de bord utilise) ;
  * - un plein : l'autonomie remonte d'un coup d'au moins [FILL_MIN_KM] km entre deux valeurs reçues (y compris d'un
  *   allumage de l'autoradio au suivant, la dernière valeur étant gardée) → litres ajoutés ≈ écart × consommation / 100.
- * En roulant, l'autonomie de l'ordinateur ne remonte que de quelques km (conduite plus douce) : jamais de 100 d'un coup.
+ * v0.37 : en roulant, l'autonomie peut remonter de 100 km d'un coup (le 13/11, 920 → 1020 km sur autoroute, quand
+ * l'ordinateur recalcule avec une conso plus basse) : un plein n'est donc retenu que voiture arrêtée (vitesse GPS ou
+ * OBD sous [STOPPED_KMH]). En roulant, la nouvelle autonomie est gardée comme référence, sans plein.
  * Calculs purs vérifiés par TankGaugeTest.
  */
 object TankGauge {
     const val FILL_MIN_KM = 100
+    const val STOPPED_KMH = 5f
 
     fun litersFromRange(rangeKm: Int, l100: Double): Double = (rangeKm * l100 / 100).coerceIn(0.0, FuelRange.TANK_L)
 
-    fun detectFill(prevKm: Int?, newKm: Int, l100: Double, nowMs: Long): DetectedFill? =
-        if (prevKm != null && newKm - prevKm >= FILL_MIN_KM)
+    fun detectFill(prevKm: Int?, newKm: Int, l100: Double, nowMs: Long, moving: Boolean = false): DetectedFill? =
+        if (!moving && prevKm != null && newKm - prevKm >= FILL_MIN_KM)
             DetectedFill(((newKm - prevKm) * l100 / 100).coerceAtMost(FuelRange.TANK_L), nowMs, prevKm, newKm)
         else null
+
+    /** Voiture en mouvement d'après le GPS ou l'OBD (l'un des deux suffit). */
+    private fun moving(): Boolean {
+        val gps = Trip.state.value.currentKmh
+        val obd = fr.p308.lanceur.vehicle.Engine.state.value.let { if (it.connected) it.speedKmh else null }
+        return gps > STOPPED_KMH || (obd ?: 0) > STOPPED_KMH
+    }
 
     private var prefs: android.content.SharedPreferences? = null
     private val _state = kotlinx.coroutines.flow.MutableStateFlow(GaugeState())
@@ -169,7 +216,10 @@ object TankGauge {
         val p = prefs
         val (l100, _) = FuelRange.consumption(fr.p308.lanceur.maintenance.Fuel.entries.value, TripLog.history.value)
         val prev = _state.value.canKm ?: p?.getInt("gaugeKm", -1)?.takeIf { it >= 0 }
-        val fill = detectFill(prev, km, l100, nowMs)
+        val isMoving = moving()
+        if (isMoving && prev != null && km - prev >= FILL_MIN_KM)
+            fr.p308.lanceur.vehicle.ObdLog.log("PLEIN", "Autonomie $prev → $km km en roulant : pas un plein (recalcul de l'ordinateur)")
+        val fill = detectFill(prev, km, l100, nowMs, isMoving)
         if (prev != km) p?.edit()?.putInt("gaugeKm", km)?.apply()
         if (fill != null) {
             p?.edit()?.putFloat("gaugeFillL", fill.liters.toFloat())?.putLong("gaugeFillMs", fill.atMs)

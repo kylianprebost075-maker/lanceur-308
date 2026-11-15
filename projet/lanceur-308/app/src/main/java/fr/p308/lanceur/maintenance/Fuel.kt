@@ -42,8 +42,21 @@ object Fuel {
     private val _level = MutableStateFlow<TankLevel?>(null)
     val level: StateFlow<TankLevel?> = _level.asStateFlow()
 
+    /**
+     * v0.37 : conso moyenne affichée par l'ordinateur de bord (L/100), saisie à la main. Sert de référence pour
+     * corriger l'estimation OBD et pour déduire les litres de l'autonomie tant qu'il n'y a pas deux pleins complets.
+     */
+    private val _boardL100 = MutableStateFlow<Float?>(null)
+    val boardL100: StateFlow<Float?> = _boardL100.asStateFlow()
+
+    fun setBoardL100(v: Float?) {
+        _boardL100.value = v
+        if (v == null) prefs.edit().remove("boardL100").apply() else prefs.edit().putFloat("boardL100", v).apply()
+    }
+
     fun init(ctx: Context) {
         prefs = ctx.getSharedPreferences("fuel", Context.MODE_PRIVATE)
+        _boardL100.value = if (prefs.contains("boardL100")) prefs.getFloat("boardL100", 0f).takeIf { it in 2f..15f } else null
         _entries.value = decode(prefs.getString("entries", "[]")!!)
         _level.value = if (prefs.contains("levelKm")) runCatching {
             TankLevel(prefs.getFloat("levelL", 0f), prefs.getInt("levelKm", 0), LocalDate.parse(prefs.getString("levelDate", "")))

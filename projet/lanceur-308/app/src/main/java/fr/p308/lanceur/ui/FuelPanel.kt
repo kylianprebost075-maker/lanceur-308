@@ -61,6 +61,8 @@ fun FuelPanel(currentKm: Int?) {
     var prefill by remember { mutableStateOf<Float?>(null) }
     val gauge by fr.p308.lanceur.drive.TankGauge.state.collectAsStateWithLifecycle()
     val range by fr.p308.lanceur.drive.FuelRange.state.collectAsStateWithLifecycle()
+    val board by Fuel.boardL100.collectAsStateWithLifecycle()
+    var boarding by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             StatTile("Conso moyenne", stats.avgL100?.let { "%.1f L/100".format(Locale.FRANCE, it) }, Modifier.weight(1f))
@@ -105,7 +107,12 @@ fun FuelPanel(currentKm: Int?) {
                     }
                 }
             }
-            OutlinedButton(onClick = { leveling = true }) { Text("Niveau du réservoir") }
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp), horizontalAlignment = Alignment.End) {
+                OutlinedButton(onClick = { leveling = true }) { Text("Niveau du réservoir") }
+                OutlinedButton(onClick = { boarding = true }) {
+                    Text(board?.let { "Ordi de bord : %.1f L/100".format(Locale.FRANCE, it) } ?: "Conso de l'ordi de bord")
+                }
+            }
         }
         Tile(Modifier.weight(1f).fillMaxWidth()) {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -135,6 +142,7 @@ fun FuelPanel(currentKm: Int?) {
             }
         }
     }
+    if (boarding) BoardConsoDialog(board) { boarding = false }
     if (leveling) TankLevelDialog(currentKm, range?.liters) { leveling = false }
     if (adding) FuelDialog(null, currentKm, prefill) { adding = false; prefill = null }
     editing?.let { FuelDialog(it, currentKm) { editing = null } }
@@ -203,6 +211,52 @@ private fun TankLevelDialog(currentKm: Int?, estimatedL: Double?, onDismiss: () 
         dismissButton = {
             Row {
                 if (saved != null) TextButton(onClick = { Fuel.clearLevel(); recompute(); onDismiss() }) { Text("Oublier ce niveau", color = C.Red) }
+                TextButton(onClick = onDismiss) { Text("Annuler") }
+            }
+        },
+    )
+}
+
+/**
+ * v0.37 : conso moyenne affichée par l'ordinateur de bord. Elle corrige l'estimation OBD (trop haute sur la 308) et
+ * sert à déduire les litres de l'autonomie, tant qu'il n'y a pas deux pleins complets notés.
+ */
+@Composable
+private fun BoardConsoDialog(saved: Float?, onDismiss: () -> Unit) {
+    var text by remember { mutableStateOf(saved?.let { "%.1f".format(Locale.FRANCE, it) } ?: "") }
+    var error by remember { mutableStateOf<String?>(null) }
+    fun recompute() {
+        val trips = fr.p308.lanceur.drive.TripLog.history.value
+        fr.p308.lanceur.drive.FuelModel.recompute(Fuel.entries.value, trips, Fuel.boardL100.value?.toDouble())
+        fr.p308.lanceur.drive.FuelRange.update(Fuel.entries.value, trips, fr.p308.lanceur.vehicle.Vehicle.state.value.odometerKm)
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+        modifier = Modifier.widthIn(max = 640.dp).padding(16.dp),
+        containerColor = C.Card,
+        title = { Text("Conso de l'ordinateur de bord", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                NoAutoKeyboardInDialog()
+                Text("Tape la consommation moyenne affichée au tableau de bord (L/100 km). Le Lanceur s'en sert pour " +
+                    "corriger sa conso estimée et pour calculer les litres restants. Deux pleins complets notés au carnet " +
+                    "restent la mesure la plus juste : ils passent devant.", fontSize = 13.sp, color = C.Sub)
+                OutlinedTextField(text, { text = it }, Modifier.fillMaxWidth(), singleLine = true, label = { Text("L/100 km") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
+                error?.let { Text(it, color = C.Red) }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                val v = text.replace(',', '.').trim().toFloatOrNull()
+                if (v == null || v !in 2f..15f) error = "Tape une valeur entre 2 et 15 L/100."
+                else { Fuel.setBoardL100(v); recompute(); onDismiss() }
+            }) { Text("Enregistrer") }
+        },
+        dismissButton = {
+            Row {
+                if (saved != null) TextButton(onClick = { Fuel.setBoardL100(null); recompute(); onDismiss() }) { Text("Oublier", color = C.Red) }
                 TextButton(onClick = onDismiss) { Text("Annuler") }
             }
         },

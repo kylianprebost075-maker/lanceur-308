@@ -195,8 +195,10 @@ class VehicleWatchService : Service(), LocationListener {
         }
         scope.launch {
             // Consommation corrigée par les pleins, puis conseil FAP (au plus une alerte tous les 3 jours).
-            combine(fr.p308.lanceur.maintenance.Fuel.entries, TripLog.history) { f, t -> f to t }.collect { (fills, trips) ->
-                fr.p308.lanceur.drive.FuelModel.recompute(fills, trips)
+            combine(fr.p308.lanceur.maintenance.Fuel.entries, TripLog.history, fr.p308.lanceur.maintenance.Fuel.boardL100) { f, t, b ->
+                Triple(f, t, b)
+            }.collect { (fills, trips, board) ->
+                fr.p308.lanceur.drive.FuelModel.recompute(fills, trips, board?.toDouble())
                 fr.p308.lanceur.drive.FuelRange.update(fills, trips, Vehicle.state.value.odometerKm)
                 val fap = if (Vehicle.demo) null else fr.p308.lanceur.drive.FapAdvice.evaluate(trips)
                 fr.p308.lanceur.drive.FapAdvice.current = fap
