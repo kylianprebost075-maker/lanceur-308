@@ -43,6 +43,17 @@ object BatteryWatch {
     const val FYT_CODE = 114
     fun decodeFyt(raw: Int): Float? = ((raw + 4) / 10f).takeIf { it in 6f..17f }
 
+    /** v0.38 : dernière valeur brute reçue du CAN, pour la comparer à l'OBD dans le journal ([COMPARE]). */
+    @Volatile
+    var lastFytRaw: Int? = null
+
+    /** Ligne de journal CAN ↔ OBD (null si l'une des deux manque). */
+    fun compareLine(obdV: Float?, canV: Float?, raw: Int?, engine: String): String? {
+        if (obdV == null || canV == null) return null
+        return "tension $engine : OBD %.2f V, CAN %.1f V (brut %s), écart %+.2f V"
+            .format(Locale.FRANCE, obdV, canV, raw?.toString() ?: "?", canV - obdV)
+    }
+
     /** Palier du rappel (0 = rien, 1 = 20 min, 2 = 40 min…). */
     fun drainStep(engineOffMin: Int?): Int = (engineOffMin ?: 0) / DRAIN_STEP_MIN
 

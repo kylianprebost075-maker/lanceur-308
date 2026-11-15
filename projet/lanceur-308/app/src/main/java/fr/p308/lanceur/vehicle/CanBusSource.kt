@@ -51,6 +51,7 @@ object CanBusSource {
             temp?.let { CarFeatures.mark(Feature.TEMP, "%.0f °C".format(java.util.Locale.FRANCE, it)) }
             // v0.31 : tension de la batterie lue par le boîtier CAN (sans boîtier OBD).
             if (module == BatteryWatch.FYT_MODULE && code == BatteryWatch.FYT_CODE) {
+                ints?.firstOrNull()?.let { BatteryWatch.lastFytRaw = it }
                 val volts = ints?.firstOrNull()?.let(BatteryWatch::decodeFyt)
                 if (volts != null) {
                     CarFeatures.mark(Feature.BATTERY, "%.1f V".format(java.util.Locale.FRANCE, volts))

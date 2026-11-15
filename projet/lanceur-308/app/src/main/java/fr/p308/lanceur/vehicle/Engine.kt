@@ -496,6 +496,8 @@ object Engine {
                 CrankWatch.onSample(volts, rpm, _state.value.coolantC)?.let(::logCrank)
                 // Moteur coupé : une tension par minute suffit au journal (les relevés rapides restent en mémoire).
                 if (n % 120 == 0) ObdLog.log("TENSION", "moteur coupé : ${volts ?: "?"} V")
+                // v0.38 : CAN ↔ OBD côte à côte (≈ 1 fois par minute), pour vérifier le codage de la tension CAN.
+                if (n % 120 == 0) compareVolts(volts, "moteur coupé")
                 val coolant = if (n % 20 == 0) elm.pid("05", minBytes = 1)?.let { it[0] - 40 } else null
                 val volts2 = elm.readBatteryVolts()
                 CrankWatch.onSample(volts2, null, _state.value.coolantC)?.let(::logCrank)
@@ -519,6 +521,7 @@ object Engine {
                 val volts = elm.readBatteryVolts()
                 CrankWatch.onRunningVolts(volts)
                 if (n % 600 == 1) ObdLog.log("TENSION", "moteur tournant : ${volts ?: "?"} V, eau ${coolant ?: "?"} °C, turbo ${boost ?: "?"} bar")
+                if (n % 120 == 1) compareVolts(volts, "moteur tournant")
                 publish(rpm, load, speed, coolant, boost, volts)
             } else if (n % 2 == 1) {
                 // Débit d'air un tour sur deux (≈ 1 fois par seconde) : détection des régénérations du FAP.
@@ -604,6 +607,11 @@ object Engine {
             runCatching { elm.cmd("82", 1500) }
             listOf("ATFCSM0", "ATCRA", "ATSH7DF", "ATST64", "ATAT1").forEach { runCatching { elm.cmd(it, 1500) } }
         }
+    }
+
+    private fun compareVolts(obdV: Float?, engine: String) {
+        BatteryWatch.compareLine(obdV, Vehicle.state.value.batteryV, BatteryWatch.lastFytRaw, engine)
+            ?.let { ObdLog.log("COMPARE", it) }
     }
 
     /** Démarrage noté par CrankWatch → journal (avec ce qui a été saisi ou non). */

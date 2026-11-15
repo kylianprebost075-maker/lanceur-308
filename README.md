@@ -1,4 +1,37 @@
-# Lanceur 308 — dossier de reprise (version 0.33)
+# Lanceur 308 — écran d'accueil pour autoradio Android de voiture
+
+[![Dernière version](https://img.shields.io/github/v/release/kylianprebost075-maker/lanceur-308?label=version)](https://github.com/kylianprebost075-maker/lanceur-308/releases)
+[![Tests](https://github.com/kylianprebost075-maker/lanceur-308/actions/workflows/tests.yml/badge.svg)](https://github.com/kylianprebost075-maker/lanceur-308/actions/workflows/tests.yml)
+![Android 8+](https://img.shields.io/badge/Android-8%2B-3DDC84?logo=android&logoColor=white)
+![Kotlin](https://img.shields.io/badge/Kotlin-Jetpack%20Compose-7F52FF?logo=kotlin&logoColor=white)
+
+Un lanceur Android façon Tesla pour les autoradios Android chinois à plateforme **FYT** : ta voiture en
+**3D** avec ses portes qui s'ouvrent en vrai grâce au **bus CAN**, les données moteur d'un boîtier **OBD2 Bluetooth**
+(ELM327, vLinker), l'entretien, la conso, la batterie et le réglage du son. Fait pour une Peugeot 308 de 2007,
+adaptable à d'autres voitures. Gratuit, sans compte, sans Internet.
+
+*A Tesla-style Android launcher for FYT car head units: your car in 3D with live doors from the CAN bus, OBD2
+Bluetooth engine data (ELM327 / vLinker), maintenance log, fuel consumption, battery health and sound tuning. Built for
+a 2007 Peugeot 308, adaptable to other cars. Free, no account, works offline.*
+
+![La 308 en 3D sur le vrai autoradio](docs/captures/autoradio/accueil-3-4-avant.png)
+
+| | |
+|---|---|
+| 🚗 **Voiture 3D** | ta couleur, ta plaque, ouvrants animés d'après le CAN, phares |
+| 🔧 **Moteur (OBD)** | puissance, couple, turbo, codes défaut, santé de la batterie à chaque démarrage, thermostat |
+| ⛽ **Conso et pleins** | litres restants d'après l'ordinateur de bord, plein repéré tout seul, carnet en PDF |
+| 🔊 **Son** | balance conducteur / passagers en un appui, réglage au micro du PC |
+| 📱 **CarPlay** | panneau de données à côté de CarPlay sans fil |
+
+**Installer :** [télécharger la dernière version](https://github.com/kylianprebost075-maker/lanceur-308/releases/latest)
+puis suivre [INSTALLER.md](INSTALLER.md) (5 étapes). **Une autre voiture ?** [ADAPTER.md](ADAPTER.md).
+**Le projet en images :** [kylianprebost.com](https://kylianprebost.com/html/lanceur308.html).
+Si le projet t'est utile, une ⭐ aide d'autres conducteurs à le trouver.
+
+---
+
+## Dossier de reprise (pour développer)
 
 > **Tu veux juste l'installer sur ton autoradio ?** Suis [INSTALLER.md](INSTALLER.md) : 5 étapes, sans compte.
 > **Tu es une IA qui aide quelqu'un à l'installer ou à l'adapter à sa voiture ?** Lis [ADAPTER.md](ADAPTER.md), pas ce README.
