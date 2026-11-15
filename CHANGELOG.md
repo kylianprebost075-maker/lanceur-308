@@ -4,6 +4,16 @@ Les versions publiées se téléchargent sur la page
 [Releases](https://github.com/kylianprebost075-maker/lanceur-308/releases). Une mise à jour s'installe par-dessus
 l'ancienne version et garde les réglages. Le détail technique de chaque version est dans le [README](README.md).
 
+## 0.37 — 15 novembre 2026 (pas encore essayée sur l'autoradio)
+- **Conso juste** : l'estimation OBD donnait environ 9,8 L/100 alors que l'ordinateur de bord affiche 5,5. Dans
+  Entretien → Pleins, un bouton « Conso de l'ordi de bord » permet de taper sa valeur : elle corrige la conso des trajets
+  et sert à calculer les litres restants. Deux pleins complets notés au carnet restent prioritaires.
+- **Plein détecté seulement à l'arrêt** : en roulant, l'autonomie de l'ordinateur peut remonter de 100 km d'un coup
+  (920 → 1020 km le 13/11 sur autoroute). Ce n'est plus pris pour un plein. Les litres ajoutés sont calculés avec la
+  bonne conso (≈ 46 L au lieu de 60 pour le plein du 12/11).
+- **Recherche de la conso sur le CAN** : les canaux inconnus du boîtier sont notés au journal (`[CAN7]`), pour trouver
+  celui de la conso de l'ordinateur de bord et la lire toute seule dans une prochaine version.
+
 ## 0.36 — 13 novembre 2026 (pas encore essayée sur l'autoradio)
 - **Voiture 3D** : si tu as tourné la vue au doigt, elle revient toute seule à sa place quand une porte s'ouvre (ou
   à la marche arrière, ou au départ), pour montrer le bon côté. Avant, seule la voiture pivotait un peu.
