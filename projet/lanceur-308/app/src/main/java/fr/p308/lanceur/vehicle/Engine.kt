@@ -193,6 +193,22 @@ object Engine {
         start(ctx)
     }
 
+    /** v0.38 : réveil de l'autoradio ou Bluetooth allumé : nouvel essai tout de suite, si la boucle est en pause. */
+    fun wakeUp(ctx: Context? = appCtx) {
+        if (ctx == null || Vehicle.demo || !waiting) return
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (now - lastWakeMs < 20_000L) return // pas plus d'un réveil toutes les 20 s (boîtier absent)
+        lastWakeMs = now
+        silentTries = 0
+        quickRetries = 0
+        reconnectNow(ctx)
+    }
+
+    /** Vrai pendant la pause entre deux essais de connexion (pas pendant un essai en cours). */
+    @Volatile
+    private var waiting = false
+    private var lastWakeMs = -100_000L
+
     fun resetPeak() = _state.update { it.copy(peakCh = 0) }
 
     fun startDemo() {
@@ -267,14 +283,27 @@ object Engine {
 
     private fun prefs(ctx: Context) = ctx.getSharedPreferences("vehicle", Context.MODE_PRIVATE)
 
+    /**
+     * v0.38 : attentes raccourcies pour avoir l'OBD plus vite au démarrage. Bluetooth encore éteint (autoradio qui
+     * se réveille) : nouvel essai toutes les 1,5 s au lieu de 8 s. Coupure : 2 s pour les 3 premiers essais.
+     */
+    private var btOff = false
+    private var quickRetries = 0
+    private var silentTries = 0
+    private var tryStartMs = 0L
+
     private suspend fun connectLoop(ctx: Context) {
         while (currentCoroutineContext().isActive) {
             try {
                 val transport = openTransport(ctx)
                 if (transport == null) {
-                    delay(8_000)
+                    // Boîtier muet depuis ~1 min (contact coupé) : essais espacés à 15 s, pour laisser la puce
+                    // Bluetooth / Wi-Fi à CarPlay. Le réveil de l'autoradio relance tout de suite (wakeUp).
+                    pause(if (btOff) 1_500L else if (silentTries++ < 10) 6_000L else 15_000L)
                     continue
                 }
+                quickRetries = 0
+                silentTries = 0
                 transport.use { session(it) }
             } catch (e: IOException) {
                 status("OBD déconnecté (${e.message ?: "veille"}) — nouvel essai…")
@@ -287,8 +316,13 @@ object Engine {
             _state.update { EngineState(status = it.status, peakCh = it.peakCh) }
             diagRequest = null
             _diag.update { if (it.busy) it.copy(busy = false, status = "OBD déconnecté pendant la lecture : réessaie") else it }
-            delay(6_000)
+            pause(if (quickRetries++ < 3) 2_000L else 6_000L)
         }
+    }
+
+    private suspend fun pause(ms: Long) {
+        waiting = true
+        try { delay(ms) } finally { waiting = false }
     }
 
     @SuppressLint("MissingPermission")
@@ -300,6 +334,8 @@ object Engine {
             return null
         }
         val adapter = ctx.getSystemService(BluetoothManager::class.java)?.adapter
+        btOff = adapter == null || !adapter.isEnabled
+        tryStartMs = android.os.SystemClock.elapsedRealtime()
         if (adapter == null || !adapter.isEnabled) {
             status("Bluetooth Android inactif sur l'autoradio")
             return null
@@ -318,12 +354,25 @@ object Engine {
         }
 
         // 2. Adaptateur déjà appairé dans Android (ex : Android-Vlink en SPP, ou bascule auto en BLE si SPP bloqué par FYT).
+        // v0.38 : le boîtier SPP qui a déjà marché passe en premier. Tant qu'il a marché il y a moins de 30 jours,
+        // pas d'essai BLE ni de recherche BLE quand il ne répond pas (moteur coupé, boîtier en veille) : la recherche
+        // BLE « basse latence » occupait la puce Bluetooth / Wi-Fi, partagée avec CarPlay sans fil.
+        val sppMac = prefs(ctx).getString("obdSppMac", null)
+        val sppRecent = System.currentTimeMillis() - prefs(ctx).getLong("obdSppAt", 0L) < 30 * 86_400_000L
         val bonded = adapter.bondedDevices?.filter { d -> matchesObdName(d.name) }.orEmpty()
+            .sortedByDescending { it.address == sppMac }
         for (dev in bonded) {
             if (dev.type != BluetoothDevice.DEVICE_TYPE_LE) {
                 status("Connexion SPP à ${dev.name ?: dev.address}…")
                 val spp = runCatching { SppTransport.connect(dev) }.getOrNull()
-                if (spp != null) return spp
+                if (spp != null) {
+                    prefs(ctx).edit().putString("obdSppMac", dev.address).putLong("obdSppAt", System.currentTimeMillis()).apply()
+                    return spp
+                }
+                if (sppRecent && dev.address == sppMac) {
+                    status("${dev.name ?: "Boîtier OBD"} ne répond pas (contact coupé ?) — nouvel essai…")
+                    return null
+                }
             }
             status("Connexion BLE à ${dev.name ?: dev.address}…")
             val ble = runCatching { BleTransport.connect(ctx, dev) }.getOrNull()
@@ -400,13 +449,16 @@ object Engine {
         elm.cmd("ATSP6", 1500)
         // Kilométrage du calculateur moteur → kilométrage d'entretien. Demandé AVANT toute question OBD normale,
         // comme le fait l'outil PC qui le lit à coup sûr (v0.18) ; sinon nouveaux essais plus bas, après un silence.
-        var kmRead = tryEcuKm(elm, quiet = false)
+        // v0.38 : lu il y a moins de 3 h → pas relu (1 à 5 s de gagnées à la connexion ; le GPS complète entre-temps).
+        val kmAt = appCtx?.let { prefs(it).getLong("ecuKmAtMs", 0L) } ?: 0L
+        var kmRead = if (System.currentTimeMillis() - kmAt in 0 until 3 * 3_600_000L) true else tryEcuKm(elm, quiet = false)
         if (elm.pid("00", 4000) == null) {
             elm.cmd("ATSP0", 1500)
             if (elm.pid("00", 8000) == null) throw IOException("calculateur muet (mets le contact)")
         }
         status("Connecté à ${elm.name}", connected = true)
-        ObdLog.log("CONNEXION", "tension ${elm.readBatteryVolts() ?: "?"} V à la connexion")
+        ObdLog.log("CONNEXION", "tension ${elm.readBatteryVolts() ?: "?"} V à la connexion, " +
+            "connecté en %.1f s".format(java.util.Locale.FRANCE, (android.os.SystemClock.elapsedRealtime() - tryStartMs) / 1000.0))
         // Kilométrage pas lu à la connexion : 3 nouveaux essais au plus par connexion (chacun coupe la lecture
         // OBD une dizaine de secondes), au lieu d'un toutes les 5 min pendant tout le trajet.
         var kmTriedAt = System.currentTimeMillis()
@@ -580,6 +632,7 @@ object Engine {
             return false
         }
         _diag.update { it.copy(ecuKm = km) }
+        appCtx?.let { prefs(it).edit().putLong("ecuKmAtMs", System.currentTimeMillis()).apply() }
         return true
     }
 

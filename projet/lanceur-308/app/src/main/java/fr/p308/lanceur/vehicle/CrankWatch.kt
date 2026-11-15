@@ -21,8 +21,14 @@ data class CrankRecord(
     val minV: Float?,
     val coolantC: Int?,
     val chargeV: Float? = null,
+    /** v0.38 : température extérieure au démarrage (null si inconnue). */
+    val outsideC: Float? = null,
+    /** v0.38 : « CAN » si mesuré par le boîtier CAN de l'autoradio, « OBD » sinon. */
+    val source: String = "OBD",
 ) {
-    val verdict: CrankVerdict get() = CrankWatch.judge(restV, minV)
+    /** Température de la batterie estimée : l'extérieur, sinon l'eau si le moteur est froid (elle suit l'air). */
+    val batteryTempC: Float? get() = outsideC ?: coolantC?.takeIf { it < 30 }?.toFloat()
+    val verdict: CrankVerdict get() = CrankWatch.judge(restV, minV, batteryTempC)
 }
 
 /**
@@ -60,11 +66,22 @@ object CrankWatch {
         _history.value = decode(p.getString("starts", null))
     }
 
-    /** Seuils classiques d'un test au démarreur (9,6 V mini) avec une marge « à surveiller ». */
-    fun judge(restV: Float, minV: Float?): CrankVerdict = when {
-        (minV != null && minV < 9.6f) || restV < 12.0f -> CrankVerdict.WEAK
-        (minV != null && minV < 10.2f) || restV < 12.3f -> CrankVerdict.FAIR
-        else -> CrankVerdict.GOOD
+    /**
+     * Tension mini acceptable au démarreur selon la température de la batterie (v0.38). Table classique des tests de
+     * charge : 9,6 V à 21 °C et plus, puis environ 0,028 V de moins par degré, jusqu'à 8,5 V à -18 °C. Le froid fait
+     * chuter la tension d'une batterie saine : sans cette correction, un matin d'hiver la jugeait « faible ».
+     */
+    fun crankLimit(tempC: Float?): Float =
+        if (tempC == null) 9.6f else (9.6f - 0.028f * (21f - tempC).coerceAtLeast(0f)).coerceIn(8.5f, 9.6f)
+
+    /** Seuils d'un test au démarreur (corrigés du froid) avec une marge « à surveiller » de 0,6 V. */
+    fun judge(restV: Float, minV: Float?, tempC: Float? = null): CrankVerdict {
+        val limit = crankLimit(tempC)
+        return when {
+            (minV != null && minV < limit) || restV < 12.0f -> CrankVerdict.WEAK
+            (minV != null && minV < limit + 0.6f) || restV < 12.3f -> CrankVerdict.FAIR
+            else -> CrankVerdict.GOOD
+        }
     }
 
     /** Nouvelle connexion OBD : l'état n'est oublié que si la coupure a été longue. */
@@ -101,9 +118,67 @@ object CrankWatch {
         val low = samples.filter { nowMs - it.first <= CRANK_WINDOW_MS }.minOfOrNull { it.second }
         val minV = low?.takeIf { it < CRANK_SEEN_BELOW && it < rest - 0.5f }
         samples.clear()
-        val record = CrankRecord(nowMs, rest, minV, coolantC)
+        val record = CrankRecord(nowMs, rest, minV, coolantC, outsideC = outsideNow())
         store((listOf(record) + _history.value).take(MAX_RECORDS))
         return record
+    }
+
+    private fun outsideNow(): Float? = runCatching { Vehicle.state.value.outsideTempC }.getOrNull()
+
+    /** Tension au-dessus de laquelle l'alternateur charge (moteur tournant). */
+    const val CHARGING_V = 13.3f
+    /** Sous cette tension, l'alternateur ne charge pas : moteur coupé (après [OFF_CONFIRM_MS]). */
+    private const val NOT_CHARGING_V = 13.0f
+    private const val OFF_CONFIRM_MS = 30_000L
+    private var lowSinceMs: Long? = null
+    /** Dernière tension au repos reçue du CAN (moteur coupé, hors chute au démarreur). */
+    private var canRest: Pair<Long, Float>? = null
+
+    /**
+     * v0.38 : tension lue par le boîtier CAN de l'autoradio (dès le contact, sans attendre le boîtier OBD qui met
+     * une dizaine de secondes à se connecter : depuis le 13/11 il arrivait moteur déjà tourné, et plus aucun
+     * démarrage n'était noté). Démarrage = la tension passe au-dessus de [CHARGING_V] (l'alternateur charge) après
+     * des relevés au repos. Si l'OBD l'a déjà noté (ou le note ensuite), il n'y a pas de doublon : l'état
+     * « moteur tournant » est partagé. La chute n'est saisie que si le boîtier CAN envoie la tension assez souvent.
+     */
+    @Synchronized
+    fun onCanVolts(volts: Float, coolantC: Int?, nowMs: Long = System.currentTimeMillis(), outsideC: Float? = outsideNow()): CrankRecord? {
+        lastSeenMs = nowMs
+        if (volts >= CHARGING_V) {
+            lowSinceMs = null
+            if (wasRunning == true) return null
+            // Le service FYT ne prévient que quand la valeur change : la dernière tension au repos peut dater de
+            // plusieurs minutes (contact mis, tension stable). Elle reste valable 30 min.
+            val restSamples = samples.filter { nowMs - it.first <= KEEP_MS && it.second < NOT_CHARGING_V }
+            val lastRest = canRest?.takeIf { nowMs - it.first <= 30 * 60_000L }
+            val wasOff = wasRunning == false
+            wasRunning = true
+            samples.clear()
+            canRest = null
+            // Autoradio allumé moteur déjà tourné (pas de relevé moteur coupé) : rien à mesurer.
+            if (!wasOff || (restSamples.isEmpty() && lastRest == null)) return null
+            val rest = (restSamples.map { it.second } + listOfNotNull(lastRest?.second)).filter { it >= CRANK_SEEN_BELOW }
+                .maxOrNull() ?: return null
+            val low = restSamples.filter { nowMs - it.first <= CRANK_WINDOW_MS + 5_000L }.minOfOrNull { it.second }
+            val minV = low?.takeIf { it < CRANK_SEEN_BELOW && it < rest - 0.5f }
+            val record = CrankRecord(nowMs, rest, minV, coolantC, chargeV = volts, outsideC = outsideC, source = "CAN")
+            store((listOf(record) + _history.value).take(MAX_RECORDS))
+            return record
+        }
+        samples.addLast(nowMs to volts)
+        while (samples.isNotEmpty() && nowMs - samples.first().first > KEEP_MS) samples.removeFirst()
+        if (volts < NOT_CHARGING_V && volts >= CRANK_SEEN_BELOW) canRest = nowMs to volts
+        if (volts < NOT_CHARGING_V) {
+            when (wasRunning) {
+                null -> wasRunning = false
+                true -> {
+                    val since = lowSinceMs ?: nowMs.also { lowSinceMs = it }
+                    if (nowMs - since >= OFF_CONFIRM_MS) { wasRunning = false; lowSinceMs = null }
+                }
+                false -> Unit
+            }
+        }
+        return null
     }
 
     /** Tension moteur tournant : les 3 premières minutes après un démarrage donnent la tension de charge. */
@@ -148,6 +223,7 @@ object CrankWatch {
     private fun encode(list: List<CrankRecord>) = JSONArray(list.map {
         JSONObject().put("t", it.atMs).put("rest", it.restV.toDouble()).put("min", it.minV?.toDouble() ?: -1.0)
             .put("eau", it.coolantC ?: -999).put("charge", it.chargeV?.toDouble() ?: -1.0)
+            .put("ext", it.outsideC?.toDouble() ?: -999.0).put("source", it.source)
     }).toString()
 
     private fun decode(s: String?): List<CrankRecord> {
@@ -161,6 +237,8 @@ object CrankWatch {
                     o.optDouble("min", -1.0).toFloat().takeIf { it > 0f },
                     o.optInt("eau", -999).takeIf { it != -999 },
                     o.optDouble("charge", -1.0).toFloat().takeIf { it > 0f },
+                    o.optDouble("ext", -999.0).toFloat().takeIf { it > -900f },
+                    o.optString("source", "OBD"),
                 )
             }
         }.getOrDefault(emptyList())

@@ -103,6 +103,7 @@ object Warmup {
         val p = ctx.getSharedPreferences("warmup", Context.MODE_PRIVATE)
         prefs = p
         _history.value = decode(p.getString("list", null))
+        Thermostat.init(p)
     }
 
     /** Température qui décide du « moteur froid » : la plus basse de l'eau et de l'huile estimée. */
@@ -160,8 +161,12 @@ object Warmup {
             if (!stalled && noRiseMovingS >= STALL_S && coolant in 50 until TARGET_C) {
                 stalled = true
                 ObdLog.log("CHAUFFE", "l'eau plafonne à $coolant °C après ${elapsedS / 60} min (10 min de roulage sans monter)")
+                if (!demo) Thermostat.onWarmup(coolant, outsideC, nowMs)
             }
-            if (coolMin == null && coolant >= TARGET_C) coolMin = elapsedS / 60f
+            if (coolMin == null && coolant >= TARGET_C) {
+                coolMin = elapsedS / 60f
+                if (!demo && !stalled) Thermostat.onWarmup(null, outsideC, nowMs)
+            }
             if (oilMin == null && (oil ?: 0.0) >= TARGET_C) oilMin = elapsedS / 60f
             if (coolMin != null && oilMin != null) finish()
         }
@@ -311,5 +316,53 @@ object Warmup {
                 )
             }
         }.getOrDefault(emptyList())
+    }
+}
+
+/** Avis sur le thermostat : null = rien à dire. */
+data class ThermostatAdvice(val stalls: Int, val outOf: Int, val typicalC: Int, val text: String)
+
+/**
+ * v0.38 : thermostat resté ouvert. Un moteur chaud se tient vers 85-90 °C ; si l'eau plafonne sous 80 °C en roulant
+ * (Warmup : 10 min à 30 km/h ou plus sans gagner 2 °C), le thermostat laisse sans doute passer l'eau vers le
+ * radiateur trop tôt. Relevés du 13 au 15/11 : 71 à 75 °C à chaque trajet. Une chauffe isolée peut plafonner (froid
+ * et petite vitesse) : l'avis demande 3 plafonds sur les 4 dernières chauffes suivies.
+ * Chaque chauffe suivie donne un résultat : la température du plafond, ou null si l'eau a atteint 80 °C.
+ */
+object Thermostat {
+    private const val KEEP = 6
+    private var prefs: SharedPreferences? = null
+    private val _outcomes = MutableStateFlow<List<Int?>>(emptyList())
+    /** Dernières chauffes, la plus récente d'abord : plafond (°C) ou null (chauffe normale). */
+    val outcomes: StateFlow<List<Int?>> = _outcomes.asStateFlow()
+
+    fun init(p: SharedPreferences) {
+        prefs = p
+        _outcomes.value = decode(p.getString("thermo", null))
+    }
+
+    fun decode(s: String?): List<Int?> =
+        s?.split(',')?.filter { it.isNotBlank() }?.map { it.trim().toIntOrNull() }?.take(KEEP) ?: emptyList()
+
+    fun encode(list: List<Int?>): String = list.joinToString(",") { it?.toString() ?: "n" }
+
+    @Synchronized
+    fun onWarmup(stallC: Int?, outsideC: Float?, nowMs: Long) {
+        val list = (listOf(stallC) + _outcomes.value).take(KEEP)
+        _outcomes.value = list
+        prefs?.edit()?.putString("thermo", encode(list))?.apply()
+        advise(list)?.let { ObdLog.log("THERMOSTAT", it.text) }
+    }
+
+    /** Pur (tests) : avis à partir des dernières chauffes. */
+    fun advise(list: List<Int?>): ThermostatAdvice? {
+        val recent = list.take(4)
+        val stalls = recent.filterNotNull()
+        if (recent.size < 3 || stalls.size < 3) return null
+        val typical = stalls.sorted()[stalls.size / 2]
+        return ThermostatAdvice(stalls.size, recent.size, typical,
+            "L'eau ne dépasse pas $typical °C en roulant (${stalls.size} trajets sur les ${recent.size} derniers), alors " +
+                "qu'un moteur chaud tient 85 à 90 °C : le thermostat reste sans doute ouvert. Fais-le vérifier : un moteur " +
+                "trop froid consomme plus et s'encrasse (vanne EGR, FAP).")
     }
 }

@@ -55,6 +55,19 @@ object CanBusSource {
                 if (volts != null) {
                     CarFeatures.mark(Feature.BATTERY, "%.1f V".format(java.util.Locale.FRANCE, volts))
                     if (!Vehicle.demo && Vehicle.state.value.batteryV != volts) Vehicle.update { s -> s.copy(batteryV = volts) }
+                    // v0.38 : démarrage mesuré par le CAN, dès le contact (l'OBD se connecte trop tard).
+                    if (!Vehicle.demo) {
+                        CrankWatch.onCanVolts(volts, Engine.state.value.coolantC)?.let { r ->
+                            ObdLog.log("DEMARRAGE", "(CAN) repos ${r.restV} V, " +
+                                (r.minV?.let { "mini $it V au démarreur" } ?: "chute au démarreur NON saisie") +
+                                ", charge ${r.chargeV} V, extérieur ${r.outsideC ?: "?"} °C, verdict ${r.verdict.label}")
+                        }
+                        if (volts >= CrankWatch.CHARGING_V) {
+                            CrankWatch.onRunningVolts(volts)
+                            // Moteur qui tourne et OBD pas encore là : nouvel essai de connexion tout de suite.
+                            if (!Engine.state.value.connected) Engine.wakeUp()
+                        }
+                    }
                 }
             }
             if (Vehicle.demo) return@FytBridge

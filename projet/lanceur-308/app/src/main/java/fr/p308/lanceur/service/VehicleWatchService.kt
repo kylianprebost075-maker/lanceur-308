@@ -82,14 +82,29 @@ class VehicleWatchService : Service(), LocationListener {
         overlay = DoorOverlay(this)
         banner = AlertBanner(this)
         perf = PerfOverlay(this) { PerfPanel.armed.value = false }
+        // v0.38 : autoradio qui se réveille (écran allumé) ou Bluetooth qui s'allume → recherche OBD tout de suite,
+        // au lieu d'attendre la fin de la pause entre deux essais (jusqu'à 8 s).
+        ContextCompat.registerReceiver(this, wakeReceiver, android.content.IntentFilter().apply {
+            addAction(Intent.ACTION_SCREEN_ON)
+            addAction(android.bluetooth.BluetoothAdapter.ACTION_STATE_CHANGED)
+        }, ContextCompat.RECEIVER_NOT_EXPORTED)
         scope.launch {
             var wasForeground = AppVisibility.foreground.value
             var wasCarPlay = false
+            var cleanJob: kotlinx.coroutines.Job? = null
             combine(Engine.state, AppVisibility.foreground, PerfPanel.armed) { e, fg, armed -> Triple(e, fg, armed) }
                 .collect { (e, fg, armed) ->
-                    // CarPlay vient de s'ouvrir : on libère la mémoire (applis en arrière-plan seulement).
+                    // CarPlay vient de s'ouvrir : on libère la mémoire (applis en arrière-plan seulement). v0.38 : 20 s
+                    // plus tard, pour ne pas prendre le processeur pendant que le téléphone se connecte.
                     val carPlay = armed && !fg
-                    if (carPlay && !wasCarPlay && !Vehicle.demo) fr.p308.lanceur.optim.Optim.cleanForCarPlay(this@VehicleWatchService)
+                    if (carPlay && !wasCarPlay && !Vehicle.demo) {
+                        cleanJob?.cancel()
+                        cleanJob = scope.launch {
+                            delay(20_000)
+                            if (PerfPanel.armed.value && !AppVisibility.foreground.value)
+                                fr.p308.lanceur.optim.Optim.cleanForCarPlay(this@VehicleWatchService)
+                        }
+                    }
                     wasCarPlay = carPlay
                     // Retour dans le Lanceur : le panneau ne revient qu'au prochain lancement de CarPlay.
                     if (fg && !wasForeground) PerfPanel.armed.value = false
@@ -238,6 +253,28 @@ class VehicleWatchService : Service(), LocationListener {
                 if (last.verdict == CrankVerdict.WEAK) alertWeakStart(last)
             }
         }
+        scope.launch {
+            // v0.38 : thermostat resté ouvert (eau qui plafonne sous 80 °C à plusieurs trajets).
+            fr.p308.lanceur.vehicle.Thermostat.outcomes.collect { list ->
+                if (!Vehicle.demo) fr.p308.lanceur.vehicle.Thermostat.advise(list)?.let(::alertThermostat)
+            }
+        }
+    }
+
+    /** Thermostat : notification + bandeau, au plus une fois par semaine. */
+    private fun alertThermostat(a: fr.p308.lanceur.vehicle.ThermostatAdvice) {
+        val p = getSharedPreferences("alerts", Context.MODE_PRIVATE)
+        val now = System.currentTimeMillis()
+        if (now - p.getLong("thermoAt", 0L) < 7 * 86_400_000L) return
+        p.edit().putLong("thermoAt", now).apply()
+        getSystemService(NotificationManager::class.java).notify(THERMO_NOTIF, NotificationCompat.Builder(this, CH_ALERT)
+            .setSmallIcon(R.drawable.ic_car)
+            .setContentTitle("Thermostat")
+            .setContentText(a.text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(a.text))
+            .setAutoCancel(true)
+            .build())
+        if (!AppVisibility.foreground.value) banner.show("🌡  ${a.text}", 0xE6C77700.toInt(), 15_000)
     }
 
     /** Conseil voie rapide pour le FAP : notification + bandeau, au plus tous les 3 jours (ou si ça s'aggrave). */
@@ -353,7 +390,17 @@ class VehicleWatchService : Service(), LocationListener {
         return START_STICKY
     }
 
+    private val wakeReceiver = object : android.content.BroadcastReceiver() {
+        override fun onReceive(ctx: Context, intent: Intent) {
+            if (Vehicle.demo || Engine.state.value.connected) return
+            val btOn = intent.action != android.bluetooth.BluetoothAdapter.ACTION_STATE_CHANGED ||
+                intent.getIntExtra(android.bluetooth.BluetoothAdapter.EXTRA_STATE, -1) == android.bluetooth.BluetoothAdapter.STATE_ON
+            if (btOn) Engine.wakeUp(ctx)
+        }
+    }
+
     override fun onDestroy() {
+        runCatching { unregisterReceiver(wakeReceiver) }
         if (gpsOn) getSystemService(LocationManager::class.java).run {
             removeUpdates(this@VehicleWatchService)
             unregisterGnssStatusCallback(gnss)
@@ -478,6 +525,7 @@ class VehicleWatchService : Service(), LocationListener {
         private const val HEALTH_NOTIF = 4245
         private const val IMPORT_NOTIF = 4246
         private const val REGEN_NOTIF = 4247
+        private const val THERMO_NOTIF = 4262
 
         fun start(ctx: Context) =
             ContextCompat.startForegroundService(ctx, Intent(ctx, VehicleWatchService::class.java))

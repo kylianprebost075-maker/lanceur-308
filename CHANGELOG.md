@@ -4,6 +4,21 @@ Les versions publiées se téléchargent sur la page
 [Releases](https://github.com/kylianprebost075-maker/lanceur-308/releases). Une mise à jour s'installe par-dessus
 l'ancienne version et garde les réglages. Le détail technique de chaque version est dans le [README](README.md).
 
+## 0.38 — 15 novembre 2026 (pas encore essayée sur l'autoradio)
+- **Démarrages mesurés par le CAN** : depuis le 13/11, le boîtier OBD arrivait moteur déjà tourné et plus aucun
+  démarrage n'était noté. La tension du boîtier CAN de l'autoradio, là dès le contact, sert maintenant à les repérer
+  (repos, chute au démarreur si le boîtier l'envoie assez vite, charge). Journal : `[DEMARRAGE] (CAN)`.
+- **Verdict de la batterie corrigé du froid** : la tension mini acceptable baisse avec la température (9,6 V à 21 °C,
+  8,5 V à -18 °C). Un matin froid ne fait plus passer une batterie saine pour « faible ».
+- **Alerte thermostat** : si l'eau plafonne sous 80 °C en roulant à 3 des 4 dernières chauffes, une alerte dit que
+  le thermostat reste sans doute ouvert (au plus une fois par semaine).
+- **OBD plus rapide** : nouvel essai toutes les 1,5 s tant que le Bluetooth s'allume, tout de suite au réveil de
+  l'autoradio ou quand le CAN voit le moteur démarrer, 2 s après une coupure ; kilométrage moteur relu au plus toutes
+  les 3 h à la connexion. Le journal note le temps de connexion.
+- **Moins de gêne pour CarPlay** : plus de recherche BLE quand le boîtier SPP habituel ne répond pas, essais espacés
+  à 15 s quand il reste muet (voiture garée), nettoyage de la mémoire 20 s après l'ouverture de CarPlay au lieu de
+  pendant la connexion du téléphone.
+
 ## 0.37 — 15 novembre 2026 (pas encore essayée sur l'autoradio)
 - **Conso juste** : l'estimation OBD donnait environ 9,8 L/100 alors que l'ordinateur de bord affiche 5,5. Dans
   Entretien → Pleins, un bouton « Conso de l'ordi de bord » permet de taper sa valeur : elle corrige la conso des trajets
