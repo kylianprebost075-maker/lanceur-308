@@ -1,7 +1,7 @@
 # ADAPTER.md — instructions pour l'IA qui aide quelqu'un à installer Lanceur 308
 
 > **Tu es une IA (Claude, Gemini / Antigravity, ChatGPT, Copilot…) et quelqu'un vient de t'ouvrir ce projet ?**
-> Ce fichier est ta feuille de route (à jour pour la version 0.31). Suis-la dans l'ordre. Ne lis PAS tout le dépôt :
+> Ce fichier est ta feuille de route (à jour pour la version 0.38). Suis-la dans l'ordre. Ne lis PAS tout le dépôt :
 > le `README.md` fait plus de 750 lignes et sert à l'auteur. Tout ce qu'il te faut est ici et dans `CarProfile.kt`.
 
 ## Règles
@@ -58,7 +58,7 @@ CE QUE TU VEUX
 ## Étape 2 — la fiche personnalisée (toujours)
 
 À partir des réponses, écris à la personne une fiche courte : **ce qui marchera, ce qui ne marchera pas, quoi régler**.
-Règles (vérifiées dans le code de la version 0.31) :
+Règles (vérifiées dans le code de la version 0.38) :
 
 | Si… | Alors… |
 |---|---|

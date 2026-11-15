@@ -49,7 +49,7 @@ l'ancienne version et garde les réglages. Le détail technique de chaque versio
 - **Retiré : « Volume selon la vitesse »** (le son qui montait puis redescendait autour de 50, 80 et 110 km/h). Le
   Lanceur ne touche plus au volume en roulant.
 
-## 0.33 — 12 novembre 2026 (pas encore essayée sur l'autoradio)
+## 0.33 — 12 novembre 2026 (essayée sur l'autoradio du 12 au 15/11 : plein détecté, conso trop haute, corrigée en 0.37)
 - **Litres restants lus tout seuls** (autoradios FYT qui transmettent l'autonomie de l'ordinateur de bord) : le
   Lanceur déduit les litres de cette autonomie et les affiche sur l'accueil (« Autonomie · ≈ 31 L ») et dans
   Entretien → Pleins. C'est une estimation : la voiture ne donne son niveau de gazole ni par la prise OBD ni par le

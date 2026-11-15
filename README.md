@@ -37,16 +37,17 @@ Si le projet t'est utile, une ⭐ aide d'autres conducteurs à le trouver.
 > **Tu es une IA qui aide quelqu'un à l'installer ou à l'adapter à sa voiture ?** Lis [ADAPTER.md](ADAPTER.md), pas ce README.
 
 > **À lire en entier avant de toucher à quoi que ce soit.**
-> Ce dossier permet à une IA (ou à un développeur) de reprendre le projet. Dernière version : **0.33 du 12 novembre
+> Ce dossier permet à une IA (ou à un développeur) de reprendre le projet. Dernière version : **0.38 du 15 novembre
 > 2026**. Ordre de lecture : « En bref » juste dessous, puis les notes « Nouveau en v0.x » sous la galerie (de la plus
-> récente à la plus ancienne), puis les sections techniques 0 à 8 (mises à jour le 11/11/2026 pour la 0.31).
+> récente à la plus ancienne), puis les sections techniques 0 à 8 (base du 11/11/2026, version 0.31 ; ce qui a changé
+> depuis est dans les notes 0.32 à 0.38).
 > L'ancien README (version 0.4) est conservé dans `diagnostic/README_ancien_v0.4.md` pour l'historique.
 >
 > **Non publiés dans ce dépôt** (voir `.gitignore`) : les modèles 3D `.glb` (le modèle personnel contient la vraie
 > plaque ; depuis la v0.23 l'appli embarque `car-public.glb`, à plaque d'exemple), `modele-3d/plaque.png`, et
 > `fyt-extraits/` (code décompilé des applis FYT, propriété du fabricant). Pour reconstruire le modèle, voir §5.
 
-## En bref (version 0.36)
+## En bref (version 0.38)
 
 Écran d'accueil pour autoradio Android (Android 8 ou plus), fait pour une Peugeot 308 de 2007 (1.6 HDi 110) avec un
 autoradio FYT, adaptable à une autre voiture ([ADAPTER.md](ADAPTER.md)). Gratuit, sans compte, sans accès à Internet.
@@ -55,8 +56,8 @@ autoradio FYT, adaptable à une autre voiture ([ADAPTER.md](ADAPTER.md)). Gratui
 |---|---|
 | **Accueil** | La voiture en 3D (ta plaque, ta couleur), ouvrants animés, phares, heure, température extérieure, batterie, autonomie, kilométrage, puissance et régime ; bilan « Prêt à partir » au lancement (verglas, batterie, carburant, entretien). |
 | **Véhicule** | État des ouvrants et des radars, GPS (et ses gels sous CarPlay), **Mon autoradio** (ce que l'autoradio transmet vraiment), Diagnostic CAN. |
-| **Moteur** (boîtier OBD) | Puissance, couple, rapport conseillé, eau, turbo ; codes défaut ; **batterie** (tension, santé à chaque démarrage, rappel moteur coupé) ; trajets et score ; chrono ; chauffe ; filtre à particules. |
-| **Entretien** | Échéances, historique, pleins et consommation, **litres restants et plein détecté tout seuls**, carnet en PDF, vue depuis le siège conducteur. |
+| **Moteur** (boîtier OBD) | Puissance, couple, rapport conseillé, eau, turbo ; codes défaut ; **batterie** (tension, santé à chaque démarrage mesurée aussi par le CAN, verdict corrigé du froid, rappel moteur coupé) ; trajets et score ; chrono ; chauffe et **alerte thermostat** ; filtre à particules. |
+| **Entretien** | Échéances, historique, pleins et consommation (**corrigée par la conso de l'ordinateur de bord**), **litres restants et plein détecté tout seuls** (à l'arrêt), carnet en PDF, vue depuis le siège conducteur. |
 | **Son** | Balance **Seul / Passagers** en un appui (et « Passagers » tout seul quand une porte passager s'ouvre), réglage de la croix « Champ » d'après les distances, sons de test et polarité, signaux pour la mesure au micro du PC, basses automatiques selon le volume, annonces vocales. |
 | **Réglages** | Plaque, couleur, 3 ou 5 portes, écran d'accueil, mode démo, panneau à côté de CarPlay, optimisation de l'autoradio, sauvegarde sur clé USB, ADB par le Wi-Fi, droits et crédits. |
 
@@ -116,6 +117,31 @@ de dessus en 2D, celle que l'appli affiche quand la 3D n'est pas disponible. Sur
 | ![Échéances d'entretien](docs/captures/onglets/09-entretien.png) | ![Consommation et coût des pleins](docs/captures/onglets/10-entretien-pleins.png) |
 | **Réglages** | **Panneau à côté de CarPlay (v0.13, alerte FAP v0.14)** |
 | ![Réglages : couleur, 5 portes, Optimiser l'autoradio, kilométrage, température extérieure, thème](docs/captures/onglets/11-reglages.png) | ![Panneau : puissance, rapport conseillé, régime, eau, turbo, batterie](docs/captures/onglets/12-panneau-performances.png) |
+
+**Nouveau en v0.38 : démarrages mesurés par le CAN, batterie et froid, thermostat, OBD plus rapide (15/11, pas encore essayé sur l'autoradio)**
+- Constat sur la clé du 15/11 : plus aucun démarrage noté depuis le 13/11, le vLinker se connectant ≈ 10 s après le
+  contact, moteur déjà tourné. `CrankWatch.onCanVolts` (appelé par `CanBusSource`, code 0/114) repère le démarrage
+  quand la tension passe au-dessus de 13,3 V après des relevés au repos (le dernier repos est gardé 30 min : le service
+  FYT ne prévient qu'aux changements) ; arrêt confirmé après 30 s sous 13,0 V. État « moteur tournant » partagé avec
+  l'OBD : pas de doublon. `CrankRecord` garde `outsideC` et `source` (« CAN » / « OBD »).
+- Verdict : `CrankWatch.crankLimit(t)` = 9,6 V à 21 °C, −0,028 V/°C, plancher 8,5 V (table des tests de charge) ;
+  température = extérieur, sinon eau si moteur froid.
+- `Thermostat` (dans `Warmup.kt`, préférences « warmup », clé « thermo ») : résultat de chaque chauffe (plafond sous
+  80 °C ou normale) ; avis si 3 plafonds sur les 4 dernières → notification une fois par semaine (`VehicleWatchService`).
+- OBD : essais toutes les 1,5 s Bluetooth éteint, 2 s après une coupure (3 fois), 15 s après ≈ 1 min de silence ;
+  `Engine.wakeUp()` au réveil de l'écran, au Bluetooth allumé et quand le CAN voit l'alternateur charger (au plus toutes
+  les 20 s) ; kilométrage moteur relu au plus toutes les 3 h ; temps de connexion au journal. Boîtier SPP connu : plus
+  d'essai ni de recherche BLE (gênait CarPlay sans fil) ; nettoyage mémoire 20 s après l'ouverture de CarPlay.
+- À vérifier sur la clé : lignes `[COMPARE]` (tension CAN contre OBD, codage `(brut + 4) / 10`), `[DEMARRAGE] (CAN)`
+  (la chute est-elle saisie ?), `[CONNEXION] … connecté en x s`. Tests : `CrankThermoTest` (87 tests en tout).
+
+**Nouveau en v0.37 : conso corrigée par l'ordinateur de bord, plein seulement à l'arrêt (15/11)**
+- L'estimation OBD (puissance × 0,27 L/kWh) donnait 9,8 L/100 pour 5,5 à l'ordinateur de bord, sans correction faute
+  de pleins notés. `Fuel.boardL100` (saisi dans Entretien → Pleins) : `FuelModel` en tire le facteur (borné 0,3 à 1,6)
+  et `FuelRange.consumption` s'en sert pour les litres ; deux pleins complets restent prioritaires.
+- `TankGauge` : un saut d'autonomie en roulant (920 → 1020 km le 13/11 sur autoroute) n'est plus un plein.
+- `CanBusSource` note au journal (`[CAN7]`) les canaux inconnus du module 7 quand ils changent : à lire pour trouver
+  la conso de l'ordinateur de bord. Tests : `FuelModelBoardTest`, `TankGaugeTest`.
 
 **Nouveau en v0.33 : litres restants lus tout seuls, plein détecté, autonomie recalculée (12/11, pas encore essayé sur l'autoradio)**
 - Demande : les litres restants calculés par le système ou lus par le CAN ou l'OBD, affichés, et les litres ajoutés
@@ -637,7 +663,7 @@ lanceur-308/
 ## 3. Compiler l'appli
 
 ### Tests des calculs (depuis le 10/11/2026)
-`.\gradlew.bat testDebugUnitTest --no-daemon` (≈ 1 min, sans autoradio ni émulateur) lance **76 tests** (v0.33) dans
+`.\gradlew.bat testDebugUnitTest --no-daemon` (≈ 1 min, sans autoradio ni émulateur) lance **87 tests** (v0.38) dans
 `app/src/test/java/fr/p308/lanceur/` :
 - `vehicle/` : `DtcAndPowerTest` (codes défaut, puissance du DV6), `GearTest` (rapport engagé, conseil, étagement
   appris), `FapRegenTest` (régénérations), `CarProfileTest` (valeurs possibles), `OutsideTempTest` (canal FYT 0/40),
@@ -862,7 +888,7 @@ Simule ouvrants, phares, marche arrière, batterie faible, accélérations ; les
    effacement 04 sur demande, onglet Moteur → Diagnostic). Rien à ajouter.
 10. Suite de la revue de code du 10/11/2026 (avis extérieur, vérifié dans le code) : sortir les calculs de chaque
    seconde du fil de l'écran (`Dispatchers.Main` dans `VehicleWatchService` et `Vehicle`) après mesure en séance
-   ADB ; **tests JUnit** (63 en v0.31, voir §3) : restent la chauffe (`Warmup`), le score des trajets (`TripLog`) et
+   ADB ; **tests JUnit** (87 en v0.38, voir §3) : restent la chauffe (`Warmup`), le score des trajets (`TripLog`) et
    la santé de la batterie au démarrage (`CrankWatch`) ; plus tard seulement, découper `VehicleWatchService` (cadences
    en « ticks % n »). Constantes de la voiture regroupées dans `CarProfile.kt` : **fait** (v0.24).
 11. Projets voisins regardés le 10/11/2026 (pages GitHub lues, code non étudié en détail) :
