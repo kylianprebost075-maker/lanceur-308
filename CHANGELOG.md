@@ -4,6 +4,15 @@ Les versions publiées se téléchargent sur la page
 [Releases](https://github.com/kylianprebost075-maker/lanceur-308/releases). Une mise à jour s'installe par-dessus
 l'ancienne version et garde les réglages. Le détail technique de chaque version est dans le [README](README.md).
 
+## 0.41 — 16 novembre 2026 (pas encore essayée sur l'autoradio)
+- **FAP : la détection n'est plus aveugle avec un thermostat ouvert.** Elle ignorait toutes les mesures sous 75 °C
+  d'eau ; le seuil suit maintenant la cible de chauffe (4 °C dessous, 60 °C au moins).
+- **FAP : deuxième indice, le gazole en trop (post-injection).** La post-injection ne se lit pas sur ce calculateur,
+  mais c'est du gazole brûlé sans effort moteur : la conso instantanée de l'ordinateur de bord × la vitesse est
+  comparée à la normale apprise par régime et charge. Ce signal confirme le débit d'air (détection plus tôt quand les
+  deux sont d'accord) ; seul, il est noté au journal sans compter comme régénération, le temps de le vérifier sur une
+  vraie régénération.
+
 ## 0.40 — 16 novembre 2026 (pas encore essayée sur l'autoradio)
 - **Chauffe réparée avec un thermostat ouvert** : l'eau plafonnant vers 75-77 °C, la chauffe n'atteignait jamais
   80 °C, restait « en cours » tout le trajet et n'était jamais enregistrée. Maintenant, quand l'eau plafonne, la

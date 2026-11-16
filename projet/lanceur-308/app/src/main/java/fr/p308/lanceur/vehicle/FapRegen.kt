@@ -47,6 +47,40 @@ object FapRegen {
     private const val WINDOW = 120
     private const val MIN_REGEN_MS = 4 * 60_000L
 
+    /**
+     * v0.41 : deuxième indice, la post-injection. Elle ne se lit pas (12 PID seulement, service 21 sans mesure en
+     * direct), mais c'est du gazole brûlé sans effort moteur : la conso instantanée de l'ordinateur de bord (CAN
+     * 7/102, v0.39) × la vitesse donne des litres par heure, comparés à la normale apprise par case régime × charge
+     * (toutes les charges, 0 à 99 %). Pas encore vérifié sur une vraie régénération : ce signal seul ne déclenche
+     * rien, il confirme le débit d'air (seuils plus bas quand les deux sont d'accord) et il est noté au journal.
+     */
+    private const val FUEL_LOAD_CELLS = 10
+    private const val FUEL_HIGH = 1.25f
+    private const val FUEL_MIN_KMH = 25f
+    private val fuelBase = FloatArray(RPM_CELLS * FUEL_LOAD_CELLS)
+    private val fuelCount = IntArray(RPM_CELLS * FUEL_LOAD_CELLS)
+    private val fuelWindow = ArrayDeque<Int>()
+    private var lastInst: Float? = null
+    private var instChanges = 0
+    private var fuelAloneLogMs = 0L
+
+    /** Litres par heure d'après la conso instantanée (L/100) et la vitesse ; null à basse vitesse ou sans valeur. */
+    fun fuelLph(instL100: Float?, kmh: Float): Float? =
+        if (instL100 == null || kmh < FUEL_MIN_KMH) null else instL100 * kmh / 100f
+
+    /**
+     * v0.41 : eau minimale pour apprendre et détecter. 75 °C normalement ; avec un thermostat resté ouvert l'eau
+     * plafonne vers 71-77 °C et la moitié des mesures étaient ignorées : 4 °C sous la cible de chauffe, 60 au moins.
+     */
+    fun warmMinC(target: Int = Warmup.effectiveTarget()): Int = (target - 4).coerceIn(60, 75)
+
+    private fun fuelCell(rpm: Int, load: Int): Int? {
+        val r = (rpm - RPM_MIN) / RPM_STEP
+        val l = load / 10
+        if (rpm < RPM_MIN || r !in 0 until RPM_CELLS || l !in 0 until FUEL_LOAD_CELLS) return null
+        return r * FUEL_LOAD_CELLS + l
+    }
+
     private val _state = MutableStateFlow(FapRegenState())
     val state: StateFlow<FapRegenState> = _state.asStateFlow()
 
@@ -72,6 +106,12 @@ object FapRegen {
             val (b, c) = s.split(':').let { (it.getOrNull(0)?.toFloatOrNull() ?: 0f) to (it.getOrNull(1)?.toIntOrNull() ?: 0) }
             base[i] = b
             count[i] = c
+        }
+        p.getString("fuelBase", null)?.split(';')?.forEachIndexed { i, s ->
+            if (i >= fuelBase.size) return@forEachIndexed
+            val f = s.split(':')
+            fuelBase[i] = f.getOrNull(0)?.toFloatOrNull() ?: 0f
+            fuelCount[i] = f.getOrNull(1)?.toIntOrNull() ?: 0
         }
         val records = p.getString("records", null)?.split(';')?.mapNotNull(::decode).orEmpty()
         _state.value = FapRegenState(learnPct = learnPct(), records = records)
@@ -122,6 +162,7 @@ object FapRegen {
             }
             wasRunning = false
             window.clear()
+            fuelWindow.clear()
             return
         }
         wasRunning = true
@@ -131,37 +172,68 @@ object FapRegen {
         val load = e.loadPct ?: return
         val coolant = e.coolantC ?: return
         // Moteur froid : l'EGR est fermée de toute façon. Décélération (charge ≈ 0) : injection coupée.
-        if (coolant < 75 || load < 8) return
-        val c = cell(rpm, load) ?: return
-        val expected = base[c].takeIf { count[c] >= SAMPLES_PER_CELL }
+        if (coolant < warmMinC() || load < 8) return
+        // Débit d'air : seulement là où l'EGR est normalement ouverte (charge sous 70 %, régime sous 3 250).
+        val c = cell(rpm, load)
+        val expected = c?.let { base[it].takeIf { _ -> count[it] >= SAMPLES_PER_CELL } }
         val ratio = expected?.let { maf / it }
         if (ratio != null) {
             window.addLast(if (ratio >= HIGH) 1 else 0)
             while (window.size > WINDOW) window.removeFirst()
         }
         val highShare = if (window.size >= 40) window.sum().toFloat() / window.size else 0f
+        // v0.41 : gazole en trop (post-injection), à toutes les charges.
+        val inst = Vehicle.state.value.instantL100
+        if (inst != lastInst) { lastInst = inst; instChanges++ }
+        val lph = fuelLph(inst, kmh)
+        val fc = fuelCell(rpm, load)
+        val fuelExpected = fc?.let { fuelBase[it].takeIf { _ -> fuelCount[it] >= SAMPLES_PER_CELL } }
+        val fuelRatio = if (lph != null && fuelExpected != null && fuelExpected > 0.2f) lph / fuelExpected else null
+        if (fuelRatio != null) {
+            fuelWindow.addLast(if (fuelRatio >= FUEL_HIGH) 1 else 0)
+            while (fuelWindow.size > WINDOW) fuelWindow.removeFirst()
+        }
+        val fuelShare = if (fuelWindow.size >= 40) fuelWindow.sum().toFloat() / fuelWindow.size else 0f
         // Apprentissage lent, jamais pendant une régénération (ni quand elle semble commencer).
-        if (startMs == 0L && highShare < 0.3f && (ratio == null || ratio < HIGH)) {
+        val calm = startMs == 0L && highShare < 0.3f && fuelShare < 0.3f
+        if (c != null && calm && (ratio == null || ratio < HIGH)) {
             val n = count[c]
             base[c] = if (n == 0) maf else base[c] + (maf - base[c]) * (if (n < SAMPLES_PER_CELL) 1f / (n + 1) else 0.02f)
             count[c] = (n + 1).coerceAtMost(10_000)
         }
-        if (startMs == 0L && learnPct() >= 100 && window.size >= 60 && highShare >= 0.7f) {
+        if (fc != null && lph != null && calm && (fuelRatio == null || fuelRatio < FUEL_HIGH)) {
+            val n = fuelCount[fc]
+            fuelBase[fc] = if (n == 0) lph else fuelBase[fc] + (lph - fuelBase[fc]) * (if (n < SAMPLES_PER_CELL) 1f / (n + 1) else 0.02f)
+            fuelCount[fc] = (n + 1).coerceAtMost(10_000)
+        }
+        // Départ : débit d'air seul (comme avant), ou les deux indices d'accord avec des seuils plus bas.
+        val airAlone = window.size >= 60 && highShare >= 0.7f
+        val both = window.size >= 40 && fuelWindow.size >= 40 && highShare >= 0.4f && fuelShare >= 0.6f
+        if (startMs == 0L && learnPct() >= 100 && (airAlone || both)) {
             startMs = nowMs - 60_000L
             startKm = odometerKm
             calmSince = 0L
-            ObdLog.log("FAP", "régénération probable : débit d'air ${fmt(maf)} g/s au lieu de ${fmt(expected)} g/s " +
+            ObdLog.log("FAP", "régénération probable (${if (airAlone) "débit d'air" else "débit d'air + gazole en trop"}) : " +
+                "air ${fmt(maf)} g/s au lieu de ${fmt(expected)}, gazole ${fmt(lph)} L/h au lieu de ${fmt(fuelExpected)} " +
                 "($rpm tr/min, charge $load %, eau $coolant °C)")
         } else if (startMs > 0L) {
-            if (highShare < 0.3f) {
+            if (highShare < 0.3f && fuelShare < 0.5f) {
                 if (calmSince == 0L) calmSince = nowMs
                 if (nowMs - calmSince >= 30_000L) finish(calmSince - 60_000L, interrupted = false)
             } else calmSince = 0L
+        } else if (fuelWindow.size >= 60 && fuelShare >= 0.7f && nowMs - fuelAloneLogMs >= 10 * 60_000L) {
+            // Gazole en trop sans débit d'air haut : noté pour caler le signal, pas compté comme régénération.
+            fuelAloneLogMs = nowMs
+            ObdLog.log("FAP", "gazole en trop sans débit d'air haut (non compté) : ${fmt(lph)} L/h au lieu de " +
+                "${fmt(fuelExpected)} ($rpm tr/min, charge $load %, air ${fmt(maf)} / ${fmt(expected)} g/s)")
         }
         if (nowMs - lastLogMs >= 10 * 60_000L) {
             lastLogMs = nowMs
             ObdLog.log("FAP", "débit d'air ${fmt(maf)} g/s, normal ${fmt(expected)} g/s ($rpm tr/min, charge $load %), " +
-                "apprentissage ${learnPct()} %")
+                "apprentissage ${learnPct()} % ; gazole ${fmt(lph)} L/h, normal ${fmt(fuelExpected)} L/h, " +
+                "${fuelCount.count { it >= SAMPLES_PER_CELL }} cases apprises, conso instantanée changée $instChanges fois en 10 min ; " +
+                "parts hautes air ${(highShare * 100).roundToInt()} %, gazole ${(fuelShare * 100).roundToInt()} %")
+            instChanges = 0
         }
         if (nowMs - lastSaveMs >= 5 * 60_000L) save(nowMs)
         _state.value = _state.value.copy(
@@ -174,6 +246,7 @@ object FapRegen {
         startMs = 0L
         calmSince = 0L
         window.clear()
+        fuelWindow.clear()
         val dur = endMs - s
         if (dur < MIN_REGEN_MS && !interrupted) {
             ObdLog.log("FAP", "débit haut pendant ${dur / 60_000L} min seulement : ignoré")
@@ -192,6 +265,7 @@ object FapRegen {
         lastSaveMs = nowMs
         prefs?.edit()
             ?.putString("base", base.indices.joinToString(";") { "${"%.2f".format(java.util.Locale.US, base[it])}:${count[it]}" })
+            ?.putString("fuelBase", fuelBase.indices.joinToString(";") { "${"%.2f".format(java.util.Locale.US, fuelBase[it])}:${fuelCount[it]}" })
             ?.putString("records", _state.value.records.joinToString(";", transform = ::encode))
             ?.apply()
     }

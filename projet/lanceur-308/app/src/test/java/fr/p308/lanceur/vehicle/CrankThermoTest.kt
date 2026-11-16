@@ -71,6 +71,18 @@ class CrankThermoTest {
         assertEquals(60, Warmup.effectiveTarget(listOf(55, 52, 54)))
     }
 
+    @Test fun fapWarmThresholdFollowsThermostat() {
+        assertEquals(75, FapRegen.warmMinC(80)) // thermostat normal : comme avant
+        assertEquals(68, FapRegen.warmMinC(72)) // eau qui plafonne vers 75 °C : mesures gardées dès 68 °C
+        assertEquals(60, FapRegen.warmMinC(60))
+    }
+
+    @Test fun fapFuelFlowFromInstantConsumption() {
+        assertEquals(4.95f, FapRegen.fuelLph(5.5f, 90f)!!, 0.001f) // 5,5 L/100 à 90 km/h = 4,95 L/h
+        assertNull(FapRegen.fuelLph(5.5f, 10f)) // trop lent : L/100 × vitesse ne veut plus rien dire
+        assertNull(FapRegen.fuelLph(null, 90f))
+    }
+
     @Test fun thermostatHistoryRoundTrips() {
         val list = listOf(74, null, 73)
         assertEquals(list, Thermostat.decode(Thermostat.encode(list)))

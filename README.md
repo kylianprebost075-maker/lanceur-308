@@ -118,6 +118,19 @@ de dessus en 2D, celle que l'appli affiche quand la 3D n'est pas disponible. Sur
 | **Réglages** | **Panneau à côté de CarPlay (v0.13, alerte FAP v0.14)** |
 | ![Réglages : couleur, 5 portes, Optimiser l'autoradio, kilométrage, température extérieure, thème](docs/captures/onglets/11-reglages.png) | ![Panneau : puissance, rapport conseillé, régime, eau, turbo, batterie](docs/captures/onglets/12-panneau-performances.png) |
 
+**Nouveau en v0.41 : FAP, seuil d'eau et indice « gazole en trop » (16/11, pas encore essayé sur l'autoradio)**
+- Constat : `FapRegen.tick` rejetait tout sous 75 °C d'eau, or l'eau plafonne à 71-77 °C (thermostat) ; aucune
+  régénération notée depuis le 08/11, alors que le 14/11 vers 1 h le débit d'air est resté à plus du double de la normale
+  10 min. `warmMinC()` = cible de chauffe − 4 °C (60 à 75).
+- Post-injection : pas lisible (12 PID ; service 21 : 24 identifiants, aucun en direct). Indice indirect :
+  `fuelLph` = conso instantanée CAN (7/102) × vitesse / 100, apprise par case régime × charge (`fuelBase`, 10 cases de
+  charge, 0 à 99 %, préférences « fap » clé « fuelBase »). Départ d'une régénération : débit d'air seul (70 % de la
+  fenêtre, comme avant) ou air ≥ 40 % et gazole ≥ 60 %. Gazole seul : ligne `[FAP] gazole en trop … (non compté)`.
+- Les cases de charge du débit d'air restent sous 70 % : au-delà l'EGR est fermée de toute façon.
+- À vérifier sur la clé : ligne `[FAP]` toutes les 10 min (gazole mesuré / normal, cases apprises, nombre de
+  changements de la conso instantanée en 10 min, parts hautes) ; que l'ordinateur de bord compte bien la
+  post-injection. Tests : 92.
+
 **Nouveau en v0.40 : chauffe avec un thermostat ouvert (16/11)**
 - `Warmup` : le thermostat est jugé à chaque trajet (`thermoDone`, `tripStallC`), plus seulement pendant la chauffe ;
   un plafond termine la chauffe (enregistrée `stalled`, écartée des prévisions) ; `effectiveTarget()` = 80 °C, ou
