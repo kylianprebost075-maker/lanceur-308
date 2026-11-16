@@ -4,6 +4,13 @@ Les versions publiées se téléchargent sur la page
 [Releases](https://github.com/kylianprebost075-maker/lanceur-308/releases). Une mise à jour s'installe par-dessus
 l'ancienne version et garde les réglages. Le détail technique de chaque version est dans le [README](README.md).
 
+## 0.40 — 16 novembre 2026 (pas encore essayée sur l'autoradio)
+- **Chauffe réparée avec un thermostat ouvert** : l'eau plafonnant vers 75-77 °C, la chauffe n'atteignait jamais
+  80 °C, restait « en cours » tout le trajet et n'était jamais enregistrée. Maintenant, quand l'eau plafonne, la
+  chauffe s'arrête là (« Moteur aussi chaud qu'il peut ») ; et si le thermostat est jugé ouvert, la cible passe à 3 °C
+  sous le plafond habituel (affiché), puis revient à 80 °C une fois le thermostat réparé.
+- Le thermostat est surveillé à chaque trajet, même sans chauffe en cours.
+
 ## 0.39 — 16 novembre 2026 (pas encore essayée sur l'autoradio)
 - **Conso lue sur l'ordinateur de bord** (autoradios FYT, boîtier CAN PSA) : la conso moyenne (canal 7/99) est lue
   toute seule, plus besoin de la taper ; la conso de chaque trajet vient de la conso instantanée de la voiture

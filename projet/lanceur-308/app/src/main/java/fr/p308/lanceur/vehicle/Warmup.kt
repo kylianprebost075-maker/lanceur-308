@@ -49,6 +49,8 @@ data class WarmState(
     val basis: String = "",
     /** v0.17 : l'eau plafonne à cette température en roulant (thermostat ?), sinon null. */
     val stalledC: Int? = null,
+    /** v0.39 : température visée pour « moteur chaud » (80 °C, abaissée si le thermostat reste ouvert). */
+    val targetC: Int = Warmup.TARGET_C,
 )
 
 /**
@@ -92,6 +94,11 @@ object Warmup {
     private var stallRefC = 0
     private var noRiseMovingS = 0.0
     private var stalled = false
+    /** v0.39 : cible de la chauffe en cours (80 °C, ou moins si le thermostat est jugé ouvert). */
+    private var target = TARGET_C
+    /** v0.39 : thermostat déjà jugé pendant ce trajet ; plafond de l'eau sur ce trajet (null s'il n'y en a pas). */
+    private var thermoDone = false
+    private var tripStallC: Int? = null
     /** 10 min de roulage (30 km/h ou plus) sans que l'eau gagne 2 °C, sous 80 °C : plafond. */
     private const val STALL_S = 600.0
 
@@ -132,6 +139,7 @@ object Warmup {
             pendingStart = true
             idleS = 0; movingS = 0; meters = 0.0; coolMin = null; oilMin = null; active = false
             noRiseMovingS = 0.0; stalled = false
+            thermoDone = false; tripStallC = null
         }
         wasRunning = true
         val coolant = e.coolantC
@@ -147,28 +155,41 @@ object Warmup {
             startC = coolant
             startOutside = outsideC
             stallRefC = coolant
+            target = effectiveTarget()
         }
         val kw = (e.powerCh ?: 0) * 0.7355
         val o = (oil ?: coolant.toDouble())
         oil = (o + ((coolant - o) / TAU_S + POWER_GAIN * kw) * dt).coerceIn(-40.0, 140.0)
 
         val elapsedS = ((nowMs - startMs) / 1000).toInt()
-        if (active) {
-            if (kmh < 3f) idleS += dt.toInt().coerceAtLeast(1) else movingS += dt.toInt().coerceAtLeast(1)
-            meters += kmh / 3.6 * dt
+        // v0.39 : surveillance du thermostat à chaque trajet, chauffe en cours ou non (avant, elle n'avait lieu que
+        // pendant la chauffe : avec la cible abaissée, plus aucun résultat n'aurait été noté).
+        if (!thermoDone) {
             if (coolant >= stallRefC + 2) { stallRefC = coolant; noRiseMovingS = 0.0 }
             else if (kmh >= 30f) noRiseMovingS += dt
-            if (!stalled && noRiseMovingS >= STALL_S && coolant in 50 until TARGET_C) {
-                stalled = true
+            if (coolant >= TARGET_C) {
+                thermoDone = true
+                if (!demo) Thermostat.onWarmup(null, outsideC, nowMs)
+            } else if (noRiseMovingS >= STALL_S && coolant >= 50) {
+                thermoDone = true
+                tripStallC = coolant
                 ObdLog.log("CHAUFFE", "l'eau plafonne à $coolant °C après ${elapsedS / 60} min (10 min de roulage sans monter)")
                 if (!demo) Thermostat.onWarmup(coolant, outsideC, nowMs)
             }
-            if (coolMin == null && coolant >= TARGET_C) {
+        }
+        if (active) {
+            if (kmh < 3f) idleS += dt.toInt().coerceAtLeast(1) else movingS += dt.toInt().coerceAtLeast(1)
+            meters += kmh / 3.6 * dt
+            if (coolMin == null && coolant >= target) coolMin = elapsedS / 60f
+            if (oilMin == null && (oil ?: 0.0) >= target) oilMin = elapsedS / 60f
+            // v0.39 : l'eau plafonne sous la cible : la chauffe s'arrête là (enregistrée comme anormale, écartée des
+            // prévisions) au lieu de rester « en cours » tout le trajet.
+            if (coolMin == null && tripStallC != null) {
+                stalled = true
                 coolMin = elapsedS / 60f
-                if (!demo && !stalled) Thermostat.onWarmup(null, outsideC, nowMs)
+                finish()
             }
-            if (oilMin == null && (oil ?: 0.0) >= TARGET_C) oilMin = elapsedS / 60f
-            if (coolMin != null && oilMin != null) finish()
+            if (active && coolMin != null && oilMin != null) finish()
         }
         if (++ticks % 30 == 0) saveOil(nowMs)
         _state.value = live(coolant, elapsedS)
@@ -177,30 +198,39 @@ object Warmup {
     private fun live(coolant: Int, elapsedS: Int): WarmState {
         val o = oil?.toFloat()
         if (!active) {
-            return WarmState(oilC = o, coolantC = coolant, running = true, oilRemainingMin = oilRemaining(coolant, null))
+            return WarmState(oilC = o, coolantC = coolant, running = true, oilRemainingMin = oilRemaining(coolant, null),
+                stalledC = tripStallC, targetC = target)
         }
         val (total, basis) = predict(startC)
         val elapsedMin = elapsedS / 60f
-        val remaining = if (coolant >= TARGET_C) 0f else {
+        val remaining = if (coolant >= target) 0f else {
             val planned = (total - elapsedMin).coerceAtLeast(0.5f)
             val gained = coolant - startC
             if (elapsedS >= 120 && gained >= 4) {
                 val liveRate = gained / elapsedMin
-                ((TARGET_C - coolant) / liveRate + planned) / 2f
+                ((target - coolant) / liveRate + planned) / 2f
             } else planned
         }
         return WarmState(oilC = o, coolantC = coolant, running = true, active = true, startC = startC, elapsedS = elapsedS,
             remainingMin = remaining, oilRemainingMin = oilRemaining(coolant, remaining), basis = basis,
-            stalledC = if (stalled) coolant else null)
+            stalledC = tripStallC, targetC = target)
     }
+
+    /**
+     * v0.39 : température visée pour dire « moteur chaud ». 80 °C normalement ; si le thermostat est jugé ouvert
+     * (l'eau plafonne vers 75-77 °C), 3 °C sous ce plafond : sinon la chauffe ne se terminait jamais (relevés du 13
+     * au 16/11) et aucune n'était enregistrée.
+     */
+    fun effectiveTarget(outcomes: List<Int?> = Thermostat.outcomes.value): Int =
+        Thermostat.advise(outcomes)?.let { (it.typicalC - 3).coerceIn(60, TARGET_C) } ?: TARGET_C
 
     /** Minutes avant que l'huile atteigne 80 °C : retard appris après l'eau, ou vitesse actuelle du modèle. */
     private fun oilRemaining(coolant: Int, waterRemaining: Float?): Float? {
         val o = oil ?: return null
-        if (o >= TARGET_C) return 0f
+        if (o >= target) return 0f
         if (waterRemaining != null && waterRemaining > 0f) return waterRemaining + oilLag()
         val perMin = ((coolant - o) / TAU_S) * 60
-        return if (perMin > 0.05) ((TARGET_C - o) / perMin).toFloat().coerceAtMost(60f) else null
+        return if (perMin > 0.05) ((target - o) / perMin).toFloat().coerceAtMost(60f) else null
     }
 
     private fun oilLag(): Float =

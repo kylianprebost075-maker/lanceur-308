@@ -118,6 +118,12 @@ de dessus en 2D, celle que l'appli affiche quand la 3D n'est pas disponible. Sur
 | **Réglages** | **Panneau à côté de CarPlay (v0.13, alerte FAP v0.14)** |
 | ![Réglages : couleur, 5 portes, Optimiser l'autoradio, kilométrage, température extérieure, thème](docs/captures/onglets/11-reglages.png) | ![Panneau : puissance, rapport conseillé, régime, eau, turbo, batterie](docs/captures/onglets/12-panneau-performances.png) |
 
+**Nouveau en v0.40 : chauffe avec un thermostat ouvert (16/11)**
+- `Warmup` : le thermostat est jugé à chaque trajet (`thermoDone`, `tripStallC`), plus seulement pendant la chauffe ;
+  un plafond termine la chauffe (enregistrée `stalled`, écartée des prévisions) ; `effectiveTarget()` = 80 °C, ou
+  médiane des plafonds − 3 °C (60 à 80) si `Thermostat.advise` répond. `WarmState.targetC` sert à l'écran Chauffe.
+  Seul un trajet où l'eau atteint vraiment 80 °C compte comme chauffe normale pour le thermostat. Tests : 90.
+
 **Nouveau en v0.39 : conso de l'ordinateur de bord lue sur le CAN (16/11)**
 - Journal `[CAN7]` du 16/11 (trajet de 42 km), module 7 du boîtier Raise PSA : **99** = conso moyenne (54-55, en
   dixièmes de L/100 : 5,4-5,5, la valeur du tableau de bord) ; **102** = conso instantanée (dixièmes de L/100, 65535 à

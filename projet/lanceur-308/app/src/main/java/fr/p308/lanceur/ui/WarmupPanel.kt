@@ -78,7 +78,7 @@ fun WarmupPanel() {
             val start = w.startC
             val cool = w.coolantC
             if (w.active && start != null && cool != null) {
-                val f = ((cool - start).toFloat() / (Warmup.TARGET_C - start)).coerceIn(0f, 1f)
+                val f = ((cool - start).toFloat() / (w.targetC - start).coerceAtLeast(1)).coerceIn(0f, 1f)
                 LinearProgressIndicator(
                     progress = { f }, color = if (f >= 1f) C.Green else C.Orange, trackColor = C.Bg,
                     modifier = Modifier.fillMaxWidth().height(10.dp).clip(RoundedCornerShape(5.dp)),
@@ -88,12 +88,15 @@ fun WarmupPanel() {
             val (main, sub) = when {
                 w.running && w.active -> {
                     val r = w.remainingMin ?: 0f
-                    (if (r <= 0f) "Eau chaude (80 °C)" else "Moteur chaud dans ≈ ${mins(r)}") to
+                    (if (r <= 0f) "Eau chaude (${w.targetC} °C)" else "Moteur chaud dans ≈ ${mins(r)}") to
                         listOfNotNull(
                             w.oilRemainingMin?.takeIf { it > 0f }?.let { "huile chaude dans ≈ ${mins(it)}" },
                             "chauffe en cours depuis ${w.elapsedS / 60} min, ${w.basis}",
                         ).joinToString(" · ")
                 }
+                // v0.39 : l'eau a plafonné sous 80 °C : le moteur est aussi chaud qu'il peut l'être avec ce thermostat.
+                w.running && w.stalledC != null -> "Moteur aussi chaud qu'il peut (≈ ${w.stalledC} °C)" to
+                    "l'eau n'atteint pas 80 °C : thermostat sans doute ouvert"
                 w.running -> {
                     val o = w.oilRemainingMin
                     if (o != null && o > 0f) "Eau chaude, huile chaude dans ≈ ${mins(o)}" to "estimation d'après l'eau et la puissance demandée"
@@ -106,6 +109,12 @@ fun WarmupPanel() {
             }
             Text(main, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = if (main.startsWith("Moteur et huile") || main.startsWith("Eau chaude (")) C.Green else Color.White)
             Text(sub, fontSize = 13.sp, color = C.Sub)
+            if (w.targetC < Warmup.TARGET_C && w.stalledC == null) {
+                Spacer(Modifier.height(6.dp))
+                Text("Cible abaissée à ${w.targetC} °C : ton eau plafonne sous 80 °C (thermostat), la chauffe est jugée " +
+                    "finie un peu sous ce plafond. Elle repassera à 80 °C quand le thermostat sera réparé.",
+                    fontSize = 13.sp, color = C.Orange)
+            }
             w.stalledC?.let { c ->
                 Spacer(Modifier.height(6.dp))
                 Text("L'eau plafonne à $c °C alors que tu roules depuis 10 min : le thermostat reste peut-être ouvert " +

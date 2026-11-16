@@ -64,6 +64,13 @@ class CrankThermoTest {
         assertTrue(a.text.contains("thermostat"))
     }
 
+    @Test fun warmupTargetFollowsThermostat() {
+        assertEquals(80, Warmup.effectiveTarget(listOf(null, null, 74, null)))
+        // Plafonds à 75, 77, 73 : cible 75 - 3 = 72 °C (médiane des plafonds moins 3).
+        assertEquals(72, Warmup.effectiveTarget(listOf(75, 77, null, 73)))
+        assertEquals(60, Warmup.effectiveTarget(listOf(55, 52, 54)))
+    }
+
     @Test fun thermostatHistoryRoundTrips() {
         val list = listOf(74, null, 73)
         assertEquals(list, Thermostat.decode(Thermostat.encode(list)))
