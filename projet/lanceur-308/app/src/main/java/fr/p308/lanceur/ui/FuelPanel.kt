@@ -110,7 +110,8 @@ fun FuelPanel(currentKm: Int?) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp), horizontalAlignment = Alignment.End) {
                 OutlinedButton(onClick = { leveling = true }) { Text("Niveau du réservoir") }
                 OutlinedButton(onClick = { boarding = true }) {
-                    Text(board?.let { "Ordi de bord : %.1f L/100".format(Locale.FRANCE, it) } ?: "Conso de l'ordi de bord")
+                    Text(board?.let { "Ordi de bord : %.1f L/100".format(Locale.FRANCE, it) + if (Fuel.boardFromCan) " (lu)" else "" }
+                        ?: "Conso de l'ordi de bord")
                 }
             }
         }
@@ -239,6 +240,8 @@ private fun BoardConsoDialog(saved: Float?, onDismiss: () -> Unit) {
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 NoAutoKeyboardInDialog()
+                if (Fuel.boardFromCan) Text("Lue toute seule sur le CAN de l'autoradio : elle se met à jour en roulant et " +
+                    "remplace la valeur tapée.", fontSize = 13.sp, color = C.Green)
                 Text("Tape la consommation moyenne affichée au tableau de bord (L/100 km). Le Lanceur s'en sert pour " +
                     "corriger sa conso estimée et pour calculer les litres restants. Deux pleins complets notés au carnet " +
                     "restent la mesure la plus juste : ils passent devant.", fontSize = 13.sp, color = C.Sub)

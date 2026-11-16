@@ -54,6 +54,19 @@ object Fuel {
         if (v == null) prefs.edit().remove("boardL100").apply() else prefs.edit().putFloat("boardL100", v).apply()
     }
 
+    /**
+     * v0.39 : conso moyenne lue toute seule sur le CAN (7/99). Elle remplace la valeur tapée à la main ; enregistrée
+     * seulement quand elle change (elle bouge de 0,1 de temps en temps).
+     */
+    @Volatile
+    var boardFromCan = false
+        private set
+
+    fun onCanBoardL100(v: Float) {
+        boardFromCan = true
+        if (_boardL100.value != v && ::prefs.isInitialized) setBoardL100(v)
+    }
+
     fun init(ctx: Context) {
         prefs = ctx.getSharedPreferences("fuel", Context.MODE_PRIVATE)
         _boardL100.value = if (prefs.contains("boardL100")) prefs.getFloat("boardL100", 0f).takeIf { it in 2f..15f } else null

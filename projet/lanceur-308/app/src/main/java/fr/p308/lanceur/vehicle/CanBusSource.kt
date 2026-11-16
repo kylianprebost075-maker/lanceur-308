@@ -19,6 +19,14 @@ object CanBusSource {
     private const val U_LAMPLET = 4
     private const val U_BACKCAR = 12
     private const val U_DRIVING_MILEAGE = 103
+    /** v0.39 : conso moyenne et instantanée de l'ordinateur de bord, en dixièmes de L/100 (journal [CAN7] du 16/11). */
+    private const val U_AVG_CONSO = 99
+    private const val U_INSTANT_CONSO = 102
+    /** Compteurs des trajets 1 et 2 de l'ordinateur de bord (km) et leur conso moyenne : notés, pas encore utilisés. */
+    private val TRIP_CODES = setOf(100, 101, 104, 105, 106, 107, 108, 109, 110)
+
+    /** Conso moyenne plausible (2 à 15 L/100), sinon null. */
+    fun decodeConso(raw: Int): Float? = (raw / 10f).takeIf { raw != 65535 && it in 2f..15f }
     /** Nom du boîtier CAN (« PSA-RZ-15-0127-B1 » chez l'auteur). */
     private const val U_CANBOX_NAME = 1005
 
@@ -61,7 +69,8 @@ object CanBusSource {
                         CrankWatch.onCanVolts(volts, Engine.state.value.coolantC)?.let { r ->
                             ObdLog.log("DEMARRAGE", "(CAN) repos ${r.restV} V, " +
                                 (r.minV?.let { "mini $it V au démarreur" } ?: "chute au démarreur NON saisie") +
-                                ", charge ${r.chargeV} V, extérieur ${r.outsideC ?: "?"} °C, verdict ${r.verdict.label}")
+                                ", charge ${r.chargeV} V, extérieur ${r.outsideC ?: "?"} °C, verdict ${r.verdict.label}" +
+                                if (r.minV == null) " (d'après le repos seul)" else "")
                         }
                         if (volts >= CrankWatch.CHARGING_V) {
                             CrankWatch.onRunningVolts(volts)
@@ -94,6 +103,17 @@ object CanBusSource {
                     }
                     if (code == U_DRIVING_MILEAGE && v in 15..1999 && Vehicle.state.value.fuelRangeKm != v) {
                         Vehicle.update { s -> s.copy(fuelRangeKm = v, source = "CAN (FYT)") }
+                    }
+                    // v0.39 : ordinateur de bord (relevé du 16/11) : 99 = conso moyenne, 102 = conso instantanée,
+                    // en dixièmes de L/100 ; 65535 = pas de valeur (voiture à l'arrêt).
+                    if (code == U_AVG_CONSO) decodeConso(v)?.let { l ->
+                        CarFeatures.mark(Feature.RANGE, "conso moyenne %.1f L/100".format(java.util.Locale.FRANCE, l))
+                        if (Vehicle.state.value.boardAvgL100 != l) Vehicle.update { s -> s.copy(boardAvgL100 = l) }
+                        fr.p308.lanceur.maintenance.Fuel.onCanBoardL100(l)
+                    }
+                    if (code == U_INSTANT_CONSO) {
+                        val l = if (v == 65535) null else v / 10f
+                        if (Vehicle.state.value.instantL100 != l) Vehicle.update { s -> s.copy(instantL100 = l?.takeIf { it <= 50f }) }
                     }
                 }
                 MODULE_MAIN -> when (code) {
@@ -130,7 +150,10 @@ object CanBusSource {
     private var loggedLines = 0
 
     private fun logUnknown(code: Int, ints: IntArray?) {
-        if (code in DOORS || code == U_DRIVING_MILEAGE || code >= 1000 || ints == null || loggedLines >= 600) return
+        // v0.39 : canaux de l'ordinateur de bord identifiés : plus notés (sauf les trajets, à confirmer).
+        if (code in DOORS || code == U_DRIVING_MILEAGE || code == U_AVG_CONSO || code == U_INSTANT_CONSO ||
+            code >= 1000 || ints == null || loggedLines >= 600) return
+        if (code in 6..98 && code !in TRIP_CODES) return // climatisation et réglages : sans intérêt pour la conso
         val value = ints.take(6).joinToString(",")
         val now = android.os.SystemClock.elapsedRealtime()
         val prev = lastLogged[code]

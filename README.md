@@ -118,7 +118,20 @@ de dessus en 2D, celle que l'appli affiche quand la 3D n'est pas disponible. Sur
 | **Réglages** | **Panneau à côté de CarPlay (v0.13, alerte FAP v0.14)** |
 | ![Réglages : couleur, 5 portes, Optimiser l'autoradio, kilométrage, température extérieure, thème](docs/captures/onglets/11-reglages.png) | ![Panneau : puissance, rapport conseillé, régime, eau, turbo, batterie](docs/captures/onglets/12-panneau-performances.png) |
 
-**Nouveau en v0.38 : démarrages mesurés par le CAN, batterie et froid, thermostat, OBD plus rapide (15/11, pas encore essayé sur l'autoradio)**
+**Nouveau en v0.39 : conso de l'ordinateur de bord lue sur le CAN (16/11)**
+- Journal `[CAN7]` du 16/11 (trajet de 42 km), module 7 du boîtier Raise PSA : **99** = conso moyenne (54-55, en
+  dixièmes de L/100 : 5,4-5,5, la valeur du tableau de bord) ; **102** = conso instantanée (dixièmes de L/100, 65535 à
+  l'arrêt, 0 au frein moteur) ; **105** et **108** = compteurs des trajets 1 et 2 (km, +42 sur le trajet) ; **106** et
+  **109** = leur conso moyenne (59 et 58) ; **101** ≈ vitesse moyenne (70-71) ; 100, 104 (6553), 107, 110 à préciser.
+- `CanBusSource` : 99 → `Fuel.onCanBoardL100` (remplace la valeur tapée), 102 → `VehicleState.instantL100`.
+  `TripLog.tick` cumule `canFuelL` += conso instantanée × km de la seconde, et `canKm` ; `TripRecord.fuelL` les prend
+  si le CAN couvre 60 % du trajet. Fin de trajet : ligne `[CONSO]` (CAN contre OBD). Tests : 89.
+- Relevés 0.38 du 16/11 : tension CAN = OBD à 0,0 V moteur coupé, +0,1 V en moyenne moteur tournant (codage
+  `(brut + 4) / 10` confirmé) ; démarrage repéré par le CAN (repos 12,6 V, charge 14,3 V, chute non saisie : le service
+  FYT n'envoie pas la tension assez vite) ; OBD connecté en 5,1 s (14,5 s quand le vLinker se réveille au contact) ;
+  eau plafonnée à 77 °C.
+
+**Nouveau en v0.38 : démarrages mesurés par le CAN, batterie et froid, thermostat, OBD plus rapide (15/11)**
 - Constat sur la clé du 15/11 : plus aucun démarrage noté depuis le 13/11, le vLinker se connectant ≈ 10 s après le
   contact, moteur déjà tourné. `CrankWatch.onCanVolts` (appelé par `CanBusSource`, code 0/114) repère le démarrage
   quand la tension passe au-dessus de 13,3 V après des relevés au repos (le dernier repos est gardé 30 min : le service

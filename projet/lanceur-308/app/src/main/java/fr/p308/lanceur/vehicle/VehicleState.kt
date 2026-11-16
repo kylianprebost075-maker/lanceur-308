@@ -24,6 +24,10 @@ data class VehicleState(
     val outsideTempEstimated: Boolean = false,
     val batteryV: Float? = null,
     val fuelRangeKm: Int? = null,
+    /** v0.39 : conso instantanée de l'ordinateur de bord (L/100, CAN 7/102), null à l'arrêt ou inconnue. */
+    val instantL100: Float? = null,
+    /** v0.39 : conso moyenne de l'ordinateur de bord (L/100, CAN 7/99). */
+    val boardAvgL100: Float? = null,
     val reverse: Boolean = false,
     val fogLights: Boolean = false,
     /** Feux allumés (null tant que le CAN ne le fournit pas) : sert au thème nuit automatique. */

@@ -4,7 +4,13 @@ Les versions publiées se téléchargent sur la page
 [Releases](https://github.com/kylianprebost075-maker/lanceur-308/releases). Une mise à jour s'installe par-dessus
 l'ancienne version et garde les réglages. Le détail technique de chaque version est dans le [README](README.md).
 
-## 0.38 — 15 novembre 2026 (pas encore essayée sur l'autoradio)
+## 0.39 — 16 novembre 2026 (pas encore essayée sur l'autoradio)
+- **Conso lue sur l'ordinateur de bord** (autoradios FYT, boîtier CAN PSA) : la conso moyenne (canal 7/99) est lue
+  toute seule, plus besoin de la taper ; la conso de chaque trajet vient de la conso instantanée de la voiture
+  (7/102) × km parcourus, au lieu de l'estimation OBD. Journal : `[CONSO]` en fin de trajet, les deux côte à côte.
+- Démarrage noté par le CAN sans la chute au démarreur : le journal précise que le verdict vient du repos seul.
+
+## 0.38 — 15 novembre 2026 (essayée sur l'autoradio le 16/11 : tension CAN juste à 0,1 V près, démarrage repéré par le CAN, OBD connecté en 5 s)
 - **Démarrages mesurés par le CAN** : depuis le 13/11, le boîtier OBD arrivait moteur déjà tourné et plus aucun
   démarrage n'était noté. La tension du boîtier CAN de l'autoradio, là dès le contact, sert maintenant à les repérer
   (repos, chute au démarreur si le boîtier l'envoie assez vite, charge). Journal : `[DEMARRAGE] (CAN)`.

@@ -59,6 +59,22 @@ class FuelModelBoardTest {
         assertEquals(1.0, FuelModel.factor, 0.0)
     }
 
+    @Test fun canInstantConsumptionWinsWhenItCoversTheTrip() {
+        // 40 km, dont 36 suivis par la conso instantanée du CAN à 5,5 L/100 : 1,98 L → 2,2 L sur 40 km.
+        val t = TripRecord(0, 0, 40.0, 2400.0, 0f, 0, 0, 0, 2400, 0, 0, fuelRawL = 3.9, canFuelL = 1.98, canKm = 36.0)
+        assertEquals(true, t.fuelFromCan)
+        assertEquals(5.5, t.l100!!, 0.01)
+        // Couverture trop faible (10 km sur 40) : on revient à l'estimation OBD.
+        val u = t.copy(canFuelL = 0.55, canKm = 10.0)
+        assertEquals(false, u.fuelFromCan)
+    }
+
+    @Test fun canConsumptionDecoding() {
+        assertEquals(5.4f, fr.p308.lanceur.vehicle.CanBusSource.decodeConso(54)!!, 0.001f)
+        assertNull(fr.p308.lanceur.vehicle.CanBusSource.decodeConso(65535))
+        assertNull(fr.p308.lanceur.vehicle.CanBusSource.decodeConso(0))
+    }
+
     @Test fun boardConsumptionIsUsedForRange() {
         val (l100, basis) = FuelRange.consumption(emptyList(), emptyList(), boardL100 = 5.5)
         assertEquals(5.5, l100, 0.0)

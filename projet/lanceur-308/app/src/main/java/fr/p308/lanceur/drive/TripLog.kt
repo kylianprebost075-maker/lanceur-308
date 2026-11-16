@@ -42,9 +42,21 @@ data class TripRecord(
     val fuelRawL: Double = 0.0,
     /** Secondes à 70 km/h ou plus (voie rapide : le FAP peut se régénérer). -1 = trajet d'avant la v0.12. */
     val fastS: Int = -1,
+    /** v0.39 : gazole d'après la conso instantanée de l'ordinateur de bord (CAN), et km couverts par cette mesure. */
+    val canFuelL: Double = 0.0,
+    val canKm: Double = 0.0,
 ) {
-    /** Litres estimés, corrigés par les pleins (null sans OBD sur la majeure partie du trajet). */
-    val fuelL: Double? get() = if (fuelRawL > 0.05 && obdS >= movingS * 0.6) fuelRawL * FuelModel.factor else null
+    /**
+     * Litres du trajet. v0.39 : d'abord l'ordinateur de bord (conso instantanée × km, si elle couvre au moins 60 % du
+     * trajet ; le reste au même rythme), sinon l'estimation OBD corrigée (null sans OBD sur la majeure partie).
+     */
+    val fuelL: Double? get() = when {
+        canKm >= 1.0 && canKm >= distanceKm * 0.6 && canFuelL > 0.01 -> canFuelL * distanceKm / canKm
+        fuelRawL > 0.05 && obdS >= movingS * 0.6 -> fuelRawL * FuelModel.factor
+        else -> null
+    }
+    /** Vrai si la conso vient de l'ordinateur de bord (CAN). */
+    val fuelFromCan: Boolean get() = canKm >= 1.0 && canKm >= distanceKm * 0.6 && canFuelL > 0.01
     val l100: Double? get() = fuelL?.takeIf { distanceKm >= 1.0 }?.let { it / distanceKm * 100 }
     val avgKmh: Double get() = if (movingS > 1) distanceKm * 3600 / movingS else 0.0
     val overRevPct: Int get() = if (obdS > 0) (overRevS * 100f / obdS).roundToInt() else 0
@@ -185,9 +197,14 @@ object TripLog {
         val moving = lastKmh > 5f
         // Gazole (moteur tournant, même à l'arrêt) et temps sur voie rapide, avant le détail OBD ci-dessous.
         val engineOn = e.connected && (e.rpm ?: 0) > 400
+        // v0.39 : conso instantanée de l'ordinateur de bord (L/100) × km parcourus dans la seconde.
+        val inst = if (moving) fr.p308.lanceur.vehicle.Vehicle.state.value.instantL100 else null
+        val kmThisSecond = lastKmh / 3600.0
         val base = t.copy(
             fuelRawL = t.fuelRawL + if (engineOn) FuelModel.litersPerHour(e.powerCh) / 3600.0 else 0.0,
             fastS = t.fastS.coerceAtLeast(0) + if (lastKmh >= 70f) 1 else 0,
+            canFuelL = t.canFuelL + (inst?.let { it / 100.0 * kmThisSecond } ?: 0.0),
+            canKm = t.canKm + if (inst != null) kmThisSecond else 0.0,
         )
         _current.value = if (moving && e.connected && e.rpm != null) {
             val t = base
@@ -276,6 +293,12 @@ object TripLog {
         lastMoveMs = 0L
         prefs?.edit()?.remove("current")?.apply()
         if (demo || t.distanceKm < MIN_KM) return
+        // v0.39 : conso du trajet au journal, ordinateur de bord (CAN) et estimation OBD côte à côte.
+        val can = if (t.canKm >= 1.0) "%.1f L/100 sur %.1f km".format(java.util.Locale.FRANCE, t.canFuelL / t.canKm * 100, t.canKm) else "—"
+        val obd = if (t.fuelRawL > 0.05 && t.distanceKm >= 1.0)
+            "%.1f L/100".format(java.util.Locale.FRANCE, t.fuelRawL * FuelModel.factor / t.distanceKm * 100) else "—"
+        fr.p308.lanceur.vehicle.ObdLog.log("CONSO", "trajet de %.1f km : ordinateur de bord %s, estimation OBD %s"
+            .format(java.util.Locale.FRANCE, t.distanceKm, can, obd))
         _history.value = (listOf(t) + _history.value).take(MAX_TRIPS)
         prefs?.edit()?.putString("list", encodeList(_history.value))?.apply()
     }
@@ -311,12 +334,14 @@ object TripLog {
         .put("obd", t.obdS).put("haut", t.overRevS).put("froid", t.coldRevS)
         .put("passages", t.shifts).put("tard", t.lateShifts).put("tot", t.earlyShifts).put("rpmPassages", t.shiftRpmSum)
         .put("peine", t.lugS).put("gazole", t.fuelRawL).put("rapide", t.fastS)
+        .put("gazoleCan", t.canFuelL).put("kmCan", t.canKm)
 
     private fun decode(o: JSONObject) = TripRecord(
         o.getLong("s"), o.getLong("e"), o.getDouble("km"), o.getDouble("mv"), o.getDouble("max").toFloat(),
         o.optInt("ch"), o.optInt("acc"), o.optInt("frein"), o.optInt("obd"), o.optInt("haut"), o.optInt("froid"),
         o.optInt("passages", -1), o.optInt("tard"), o.optInt("tot"), o.optLong("rpmPassages"), o.optInt("peine"),
         o.optDouble("gazole", 0.0), o.optInt("rapide", -1),
+        o.optDouble("gazoleCan", 0.0), o.optDouble("kmCan", 0.0),
     )
 
     private fun encodeList(list: List<TripRecord>) = JSONArray(list.map(::encode)).toString()
