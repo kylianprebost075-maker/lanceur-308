@@ -116,6 +116,7 @@ object Backup {
         fr.p308.lanceur.vehicle.Vehicle.reloadOdometer()
         fr.p308.lanceur.maintenance.History.init(ctx)
         fr.p308.lanceur.vehicle.FapRegen.init(ctx)
+        fr.p308.lanceur.vehicle.FapEcu.init(ctx)
         fr.p308.lanceur.sound.SoundPrefs.init(ctx)
         fr.p308.lanceur.optim.Optim.init(ctx)
         fr.p308.lanceur.vehicle.OutsideTemp.init(ctx)

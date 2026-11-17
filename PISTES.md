@@ -38,6 +38,22 @@ Tests : 100 (8 nouveaux).
 puis lire la ligne `[CONSO]` du journal. Elle donne la conso selon l'ordinateur de bord (« trajet 2 : X L/100 sur N
 km ») en face des deux lectures de la valeur 102 : celle qui colle est la bonne.
 
+## 1 ter. FAP lu dans le calculateur (0.44), d'après PSA-RE
+
+[PSA-RE](https://github.com/prototux/PSA-RE) (Apache 2.0) décrit les identifiants de diagnostic des calculateurs PSA.
+Pour le moteur EDC16C3 des 308 T7 (`diag/AEE2004.ev/CMM/EDC16C3`) : **21 CA** = température aval catalyseur,
+pression différentielle, charge du FAP, distance moyenne entre régénérations, km depuis la dernière ; **21 D1** =
+masse d'additif dans le FAP (format différent de celui de cette voiture : 59 octets contre 27, pas décodé).
+
+Le 09/11, 21 CA a été refusé (`7F 21 12`) dans le dialogue ouvert par `81`. PSA-RE donne la session PSA `10 C0`,
+envoyée seule le 08/11 (refusée) mais jamais après `81`. La 0.44 essaie `81` → `10 C0` → `21 CA` à chaque
+connexion. À lire à la prochaine clé : lignes `[FAP-CMM]`.
+- **Si ça marche** : la charge du FAP et les km depuis la dernière régénération remplacent la détection au débit
+  d'air et au gazole, qui ne servira plus que de secours.
+- **Si c'est refusé** : la ligne donne les trois réponses exactes. Pistes suivantes : `27 83` (accès sécurisé, clé
+  connue dans PSA-RE) — **à ne faire qu'avec l'accord de l'auteur**, c'est hors de la lecture simple ; ou le
+  calculateur d'additif par le câble des broches 3 et 8.
+
 ## 2. À vérifier dans la voiture
 
 Les versions 0.39 à 0.42 n'ont jamais tourné sur l'autoradio. À la prochaine clé USB, regarder dans `journal/` :

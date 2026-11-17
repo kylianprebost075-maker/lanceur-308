@@ -285,6 +285,20 @@ object FapRegen {
         )
     }
 
+    /**
+     * v0.44 : régénération terminée selon le calculateur (21 CA : km depuis la dernière repassés près de zéro). C'est
+     * la mesure sûre : notée comme régénération complète, sauf si le débit d'air vient déjà d'en noter une (2 h).
+     */
+    @Synchronized
+    fun onEcuRegenDone(nowMs: Long, odometerKm: Int?) {
+        if (Vehicle.demo) return
+        val list = _state.value.records
+        if (list.any { !it.interrupted && nowMs - it.endMs in 0..2 * 3_600_000L }) return
+        val r = RegenRecord(startMs = nowMs - 10 * 60_000L, endMs = nowMs, km = odometerKm, interrupted = false)
+        _state.value = _state.value.copy(records = (listOf(r) + list).take(30))
+        save(nowMs)
+    }
+
     /** Fin de la dernière régénération complète (sert au conseil voie rapide). */
     fun lastCompleteEndMs(): Long? = _state.value.records.firstOrNull { !it.interrupted }?.endMs
 

@@ -164,7 +164,23 @@ private fun Line(label: String, cur: String, prev: String, delta: Double?, highe
 private fun RegenBlock() {
     val r by fr.p308.lanceur.vehicle.FapRegen.state.collectAsStateWithLifecycle()
     val vs by Vehicle.state.collectAsStateWithLifecycle()
+    val ecu by fr.p308.lanceur.vehicle.FapEcu.last.collectAsStateWithLifecycle()
     val now = System.currentTimeMillis()
+    // v0.44 : lu dans le calculateur moteur (21 CA) : la mesure sûre, avant la détection au débit d'air.
+    ecu?.let { e ->
+        val age = ((now - e.atMs) / 60_000L).toInt()
+        val ageTxt = when {
+            age < 2 -> "à l'instant"
+            age < 120 -> "il y a $age min"
+            else -> "il y a ${age / 60} h"
+        }
+        Text("FAP chargé à ${e.loadPct} %", fontSize = 18.sp, fontWeight = FontWeight.Bold,
+            color = when { e.loadPct >= 80 -> C.Orange; else -> C.Text })
+        Text("${fmtKmShort(e.kmSinceRegen)} km depuis la dernière régénération" +
+            (if (e.avgKmBetween > 0) " (en moyenne tous les ${fmtKmShort(e.avgKmBetween)} km)" else "") +
+            ", pression différentielle ${e.pressureMbar} mbar", fontSize = 13.sp)
+        Text("Lu dans le calculateur moteur $ageTxt", fontSize = 11.sp, color = C.Sub)
+    }
     when {
         r.active -> {
             val min = r.activeSinceMs?.let { ((now - it) / 60_000L).toInt() } ?: 0

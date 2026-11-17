@@ -4,6 +4,16 @@ Les versions publiées se téléchargent sur la page
 [Releases](https://github.com/kylianprebost075-maker/lanceur-308/releases). Une mise à jour s'installe par-dessus
 l'ancienne version et garde les réglages. Le détail technique de chaque version est dans le [README](README.md).
 
+## 0.44 — 17 novembre 2026 (pas encore essayée sur l'autoradio)
+- **FAP lu dans le calculateur moteur** : charge du filtre (%), pression différentielle, km depuis la dernière
+  régénération et distance moyenne entre deux, comme les applis de diagnostic. Décodage tiré de
+  [PSA-RE](https://github.com/prototux/PSA-RE) (licence Apache 2.0). Lu à chaque connexion du boîtier OBD, puis toutes
+  les 15 min moteur tournant ; affiché dans Moteur → Bilan. Quand les km depuis la dernière régénération repassent
+  à zéro, la régénération est notée (mesure sûre, en plus de la détection au débit d'air).
+- **À confirmer dans la voiture** : le 09/11 le calculateur avait refusé cette lecture ; elle est maintenant
+  demandée dans la session de diagnostic PSA (« 10 C0 »), jamais essayée jusqu'ici. En cas de refus, les réponses
+  exactes sont écrites au journal (`[FAP-CMM]`) et l'appli ne réessaie que le lendemain.
+
 ## 0.43 — 17 novembre 2026 (pas encore essayée sur l'autoradio)
 - **Batterie : une bonne chute vue par l'autoradio ne compte plus.** L'autoradio envoie la tension trop lentement
   pour voir le vrai creux au démarreur : le 17/11, il a vu 10,6 V le soir (« Bonne ») quand l'OBD mesurait 8,9 V le

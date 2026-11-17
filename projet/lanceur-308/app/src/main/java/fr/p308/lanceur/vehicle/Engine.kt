@@ -514,6 +514,9 @@ object Engine {
         // v0.38 : lu il y a moins de 3 h → pas relu (1 à 5 s de gagnées à la connexion ; le GPS complète entre-temps).
         val kmAt = appCtx?.let { prefs(it).getLong("ecuKmAtMs", 0L) } ?: 0L
         var kmRead = if (System.currentTimeMillis() - kmAt in 0 until 3 * 3_600_000L) true else tryEcuKm(elm, quiet = false)
+        // v0.44 : FAP lu dans le calculateur (21 CA), aussi avant toute question OBD normale.
+        tryFapEcu(elm, quiet = false)
+        var fapAt = System.currentTimeMillis()
         if (elm.pid("00", 4000) == null) {
             elm.cmd("ATSP0", 1500)
             if (elm.pid("00", 8000) == null) throw IOException("calculateur muet (mets le contact)")
@@ -534,6 +537,11 @@ object Engine {
                 diagRequest = null
                 runDiag(elm, req)
                 if (_diag.value.ecuKm != null) kmRead = true
+            }
+            // v0.44 : FAP relu toutes les 15 min moteur tournant (chaque lecture coupe l'OBD ≈ 5 s).
+            if (!engineOff && System.currentTimeMillis() - fapAt > 15 * 60_000L) {
+                tryFapEcu(elm, quiet = true)
+                fapAt = System.currentTimeMillis()
             }
             if (!kmRead && kmRounds < 3) {
                 val wait = if (engineOff) 60_000L else 5 * 60_000L
@@ -694,6 +702,40 @@ object Engine {
             "repos ${r.restV} V, " + (r.minV?.let { "mini $it V au démarreur" } ?: "chute au démarreur NON saisie") +
                 ", eau ${r.coolantC ?: "?"} °C, verdict ${r.verdict.label}",
         )
+    }
+
+    /**
+     * v0.44 : FAP lu dans le calculateur moteur (voir FapEcu) : 81 → 10 C0 → 21 CA, puis 82 et retour à l'adressage
+     * OBD normal. [quiet] : 3 s de silence avant (le calculateur ignore le diagnostic pendant un dialogue OBD). Vrai si
+     * la lecture a réussi. Rien n'est tenté après un refus du jour, ni sur une autre voiture qu'une PSA EDC16.
+     */
+    private fun tryFapEcu(elm: ElmTransport, quiet: Boolean): Boolean {
+        if (!CarProfile.PSA_ECU_ODOMETER || !CarProfile.HAS_DPF || Vehicle.demo) return false
+        if (System.currentTimeMillis() < FapEcu.refusedUntilMs) return false
+        fun shown(s: String) = s.trim().replace(Regex("[\\r\\n]+"), " | ").ifEmpty { "(vide)" }
+        try {
+            listOf("ATSH6A8", "ATCRA688", "ATFCSH6A8", "ATFCSD300000", "ATFCSM1").forEach { elm.cmd(it, 1500) }
+            if (quiet) Thread.sleep(3_000)
+            val open = elm.cmd("81", 2500)
+            val session = elm.cmd("10C0", 2500)
+            val raw = elm.cmd("21CA", 3000)
+            val data = FapEcu.kwpData(raw, 0xCA)
+            val reading = data?.let { FapEcu.decodeCA(it, System.currentTimeMillis()) }
+            if (reading != null) {
+                FapEcu.onReading(reading, Vehicle.state.value.odometerKm)
+                return true
+            }
+            FapEcu.onRefused("81 → « ${shown(open)} », 10C0 → « ${shown(session)} », 21CA → « ${shown(raw)} »")
+            return false
+        } catch (e: IOException) {
+            throw e
+        } catch (e: Exception) {
+            ObdLog.log("FAP-CMM", "erreur : ${e.message ?: e.javaClass.simpleName}")
+            return false
+        } finally {
+            runCatching { elm.cmd("82", 1500) }
+            listOf("ATFCSM0", "ATCRA", "ATSH7DF", "ATST64", "ATAT1").forEach { runCatching { elm.cmd(it, 1500) } }
+        }
     }
 
     /** Lit le kilométrage moteur ; vrai s'il a été obtenu. Une coupure Bluetooth remonte (IOException). */
