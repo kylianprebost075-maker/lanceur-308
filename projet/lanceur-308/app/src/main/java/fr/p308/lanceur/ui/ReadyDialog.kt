@@ -41,7 +41,8 @@ fun readyLinesNow(): List<ReadyLine> {
     return ReadyCheck.lines(
         outsideC = vs.outsideTempC, outsideEstimated = vs.outsideTempEstimated,
         battery = BatteryWatch.state.value,
-        lastCrank = CrankWatch.history.value.maxByOrNull { it.atMs },
+        // v0.42 : le dernier démarrage dont la chute a été mesurée, pas un démarrage noté sans elle.
+        lastCrank = CrankWatch.forVerdict(CrankWatch.history.value),
         // L'autonomie de l'ordinateur de bord (CAN) si l'autoradio la donne, sinon celle calculée d'après les pleins.
         range = vs.fuelRangeKm?.let { fr.p308.lanceur.drive.RangeInfo(it, 0.0, 0.0, "ordinateur de bord") } ?: FuelRange.state.value,
         dues = Maintenance.items.value.map { it.name to it.due(vs.odometerKm) },

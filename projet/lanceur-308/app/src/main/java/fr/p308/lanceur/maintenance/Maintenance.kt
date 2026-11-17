@@ -153,7 +153,8 @@ object Maintenance {
                 everyKm = o.optInt("everyKm"),
                 everyMonths = o.optInt("everyMonths"),
                 lastKm = o.optInt("lastKm", -1).takeIf { it >= 0 },
-                lastDate = o.optString("lastDate").takeIf { it.isNotEmpty() }?.let(LocalDate::parse),
+                // Une date illisible (sauvegarde abîmée) ne doit pas empêcher l'appli de démarrer.
+                lastDate = o.optString("lastDate").takeIf { it.isNotEmpty() }?.let { runCatching { LocalDate.parse(it) }.getOrNull() },
                 note = o.optString("note"),
             )
         }

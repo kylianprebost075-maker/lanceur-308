@@ -37,8 +37,8 @@ Si le projet t'est utile, une ⭐ aide d'autres conducteurs à le trouver.
 > **Tu es une IA qui aide quelqu'un à l'installer ou à l'adapter à sa voiture ?** Lis [ADAPTER.md](ADAPTER.md), pas ce README.
 
 > **À lire en entier avant de toucher à quoi que ce soit.**
-> Ce dossier permet à une IA (ou à un développeur) de reprendre le projet. Dernière version : **0.40 du 16 novembre
-> 2026**. Ordre de lecture : « En bref » juste dessous, puis les notes « Nouveau en v0.x » sous la galerie (de la plus
+> Ce dossier permet à une IA (ou à un développeur) de reprendre le projet. Dernière version du code : **0.42 du
+> 17 novembre 2026** (dernière publiée : 0.40). Ce qui reste à vérifier et à faire : [PISTES.md](PISTES.md). Ordre de lecture : « En bref » juste dessous, puis les notes « Nouveau en v0.x » sous la galerie (de la plus
 > récente à la plus ancienne), puis les sections techniques 0 à 8 (base du 11/11/2026, version 0.31 ; ce qui a changé
 > depuis est dans les notes 0.32 à 0.38).
 > L'ancien README (version 0.4) est conservé dans `diagnostic/README_ancien_v0.4.md` pour l'historique.
@@ -117,6 +117,20 @@ de dessus en 2D, celle que l'appli affiche quand la 3D n'est pas disponible. Sur
 | ![Échéances d'entretien](docs/captures/onglets/09-entretien.png) | ![Consommation et coût des pleins](docs/captures/onglets/10-entretien-pleins.png) |
 | **Réglages** | **Panneau à côté de CarPlay (v0.13, alerte FAP v0.14)** |
 | ![Réglages : couleur, 5 portes, Optimiser l'autoradio, kilométrage, température extérieure, thème](docs/captures/onglets/11-reglages.png) | ![Panneau : puissance, rapport conseillé, régime, eau, turbo, batterie](docs/captures/onglets/12-panneau-performances.png) |
+
+**Nouveau en v0.42 : relecture du code, fiche d'entretien, batterie, puissance (17/11, pas encore essayé sur l'autoradio)**
+- Liste complète des défauts trouvés, de ce qu'il faut vérifier sur la clé et de la suite : **[PISTES.md](PISTES.md)**.
+- `ui/MaintenanceDetail.kt` : fiche en lecture seule ouverte en touchant une case (`MaintenancePanel` : `viewingId`).
+  `maintenance/Related.kt` : `relatedHistory` rapproche un entretien des interventions de l'historique par les mots
+  du nom (parties séparées par « + », mots entiers, pluriel compris).
+- `CrankWatch.forVerdict` : dernier démarrage mesuré (chute lue) de moins de 21 jours, sinon le plus récent ;
+  `CrankRecord.verdictLabel` = « Repos correct » sans mesure. Utilisé par `BatteryPanel`, `ReadyDialog`, `Export`.
+- `IdleLoad` (dans `Engine.kt`, préférences « vehicle », clé « idleLoadPct ») : charge de ralenti apprise (60 relevés
+  à l'arrêt, 650-950 tr/min, eau ≥ 60 °C) ; `netLoadPct` et `estimate(rpm, charge, ralenti)`. À l'apprentissage,
+  `TripLog.rescaleFuel(facteur)` ramène le gazole estimé des anciens trajets à l'échelle réelle (le facteur de
+  `FuelModel` repart de 1). Ligne `[PUISSANCE]` au journal.
+- `PerfOverlay` : conso instantanée du CAN en roulant. `Import` : repère vide. `CanBusSource.logUnknown` : valeurs
+  nulles et compteurs de trajet (105, 108) plus écrits. Tests : 100.
 
 **Nouveau en v0.41 : FAP, seuil d'eau et indice « gazole en trop » (16/11, pas encore essayé sur l'autoradio)**
 - Constat : `FapRegen.tick` rejetait tout sous 75 °C d'eau, or l'eau plafonne à 71-77 °C (thermostat) ; aucune

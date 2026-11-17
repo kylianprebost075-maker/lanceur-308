@@ -70,7 +70,10 @@ object Import {
         json.optJSONArray("items")?.let { arr ->
             for (i in 0 until arr.length()) {
                 val o = arr.getJSONObject(i)
-                val match = o.optString("match").lowercase()
+                // v0.42 : sans mot « match », le nom sert de repère. Avant, un « match » vide correspondait à tout et
+                // mettait à jour le premier entretien de la liste (la vidange) à la place du bon.
+                val match = o.optString("match").trim().lowercase().ifEmpty { o.optString("name").trim().lowercase() }
+                if (match.isEmpty()) continue
                 val date = o.optString("lastDate").takeIf { it.isNotEmpty() }?.let(LocalDate::parse)
                 val km = o.optInt("lastKm", -1).takeIf { it >= 0 }
                 val existing = Maintenance.items.value.firstOrNull { it.name.lowercase().contains(match) }

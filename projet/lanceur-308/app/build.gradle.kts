@@ -12,8 +12,8 @@ android {
         applicationId = "fr.p308.lanceur"
         minSdk = 26
         targetSdk = 33 // l'autoradio est trÃ¨s probablement en API 33
-        versionCode = 47
-        versionName = "0.41"
+        versionCode = 48
+        versionName = "0.42"
         ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
     }
     buildTypes {

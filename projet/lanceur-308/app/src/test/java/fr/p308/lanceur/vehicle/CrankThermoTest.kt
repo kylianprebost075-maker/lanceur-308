@@ -83,6 +83,44 @@ class CrankThermoTest {
         assertNull(FapRegen.fuelLph(null, 90f))
     }
 
+    @Test fun verdictComesFromLastMeasuredStart() {
+        val now = 30_000_000_000L
+        val hour = 3_600_000L
+        val morning = CrankRecord(now - 9 * hour, 12.5f, 8.6f, 13)                       // mesuré : faible
+        val evening = CrankRecord(now, 12.6f, null, 17, 14.3f, 12f, "CAN")               // noté sans la chute
+        assertEquals("Repos correct", evening.verdictLabel)
+        assertEquals(morning, CrankWatch.forVerdict(listOf(evening, morning), now))
+        // Le plus récent est mesuré : c'est lui.
+        val measured = CrankRecord(now + hour, 12.6f, 10.4f, 40)
+        assertEquals(measured, CrankWatch.forVerdict(listOf(measured, evening, morning), now + hour))
+        // Sans la chute mais déjà mauvais au repos : on le montre.
+        val flat = CrankRecord(now + 2 * hour, 11.7f, null, 20, source = "CAN")
+        assertEquals(flat, CrankWatch.forVerdict(listOf(flat, morning), now + 2 * hour))
+        // Mesure trop ancienne (plus de 21 jours) : il ne reste que le démarrage récent.
+        val old = morning.copy(atMs = now - 30L * 24 * hour)
+        assertEquals(evening, CrankWatch.forVerdict(listOf(evening, old), now))
+        assertNull(CrankWatch.forVerdict(emptyList(), now))
+    }
+
+    @Test fun idleLoadIsLearnedAndRemovedFromPower() {
+        IdleLoad.init(null)
+        assertEquals(0f, IdleLoad.pct, 0f)
+        // En roulant, moteur froid ou hors ralenti : rien n'est appris.
+        assertEquals(false, IdleLoad.feed(820, 36, 30, 80))
+        assertEquals(false, IdleLoad.feed(820, 36, 0, 40))
+        assertEquals(false, IdleLoad.feed(1500, 36, 0, 80))
+        repeat(IdleLoad.MIN_SAMPLES - 1) { assertEquals(false, IdleLoad.feed(820, 35, 0, 75)) }
+        assertEquals(true, IdleLoad.feed(820, 35, 0, 75))
+        assertEquals(35f, IdleLoad.pct, 0.01f)
+        // Au ralenti : plus de couple ni de puissance affichés. À pleine charge : rien ne change.
+        assertEquals(0 to 0, estimate(820, 35, IdleLoad.pct))
+        assertEquals(estimate(4000, 100), estimate(4000, 100, IdleLoad.pct))
+        assertEquals(50f, netLoadPct(68, 36f), 0.01f)
+        assertEquals(60f, netLoadPct(60, 0f), 0f) // pas encore apprise : pas de correction
+        IdleLoad.init(null)
+        assertEquals(0f, IdleLoad.pct, 0f)
+    }
+
     @Test fun thermostatHistoryRoundTrips() {
         val list = listOf(74, null, 73)
         assertEquals(list, Thermostat.decode(Thermostat.encode(list)))

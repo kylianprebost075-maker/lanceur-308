@@ -51,10 +51,13 @@ object ReadyCheck {
             alarm != null -> add(ReadyLine(ReadyLevel.ALERT, "Batterie", alarm))
             crank != null -> {
                 val detail = crank.minV?.let { "${v(it)} au démarreur" } ?: "${v(crank.restV)} au repos"
-                add(when (crank.verdict) {
-                    CrankVerdict.WEAK -> ReadyLine(ReadyLevel.ALERT, "Batterie", "Faible au dernier démarrage ($detail)")
-                    CrankVerdict.FAIR -> ReadyLine(ReadyLevel.WARN, "Batterie", "À surveiller ($detail)")
-                    CrankVerdict.GOOD -> ReadyLine(ReadyLevel.OK, "Batterie", "Bonne ($detail)")
+                add(when {
+                    // v0.42 : sans la chute au démarreur, la tension au repos ne permet pas de dire « bonne ».
+                    !crank.measured && crank.verdict == CrankVerdict.GOOD ->
+                        ReadyLine(ReadyLevel.OK, "Batterie", "${v(crank.restV)} au repos (chute au démarreur non mesurée)")
+                    crank.verdict == CrankVerdict.WEAK -> ReadyLine(ReadyLevel.ALERT, "Batterie", "Faible au dernier démarrage ($detail)")
+                    crank.verdict == CrankVerdict.FAIR -> ReadyLine(ReadyLevel.WARN, "Batterie", "À surveiller ($detail)")
+                    else -> ReadyLine(ReadyLevel.OK, "Batterie", "Bonne ($detail)")
                 })
             }
             battery.volts != null -> add(ReadyLine(ReadyLevel.OK, "Batterie", v(battery.volts)))

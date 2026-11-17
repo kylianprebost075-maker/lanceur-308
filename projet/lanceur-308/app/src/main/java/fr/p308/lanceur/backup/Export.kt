@@ -38,13 +38,16 @@ object Export {
             dir, "trajets.csv",
             listOf("Date", "Départ", "Arrivée", "Distance (km)", "Roulage (min)", "Moyenne (km/h)", "Maxi (km/h)",
                 "Puissance maxi (ch)", "Gazole estimé (L)", "Conso (L/100 km)", "Score", "Accélérations fortes",
-                "Freinages forts", "Passages de vitesse", "Bons passages (%)", "Minutes à 70 km/h ou plus"),
+                "Freinages forts", "Passages de vitesse", "Bons passages (%)", "Minutes à 70 km/h ou plus",
+                "Origine de la conso"),
             TripLog.history.value.reversed().map { t ->
                 listOf(
                     dateFmt.format(Date(t.startMs)), timeFmt.format(Date(t.startMs)), timeFmt.format(Date(t.endMs)),
                     n(t.distanceKm), n(t.movingS / 60, 0), n(t.avgKmh, 0), t.maxKmh.toInt(), t.peakCh.takeIf { it > 0 },
                     n(t.fuelL, 2), n(t.l100), t.score, t.harshAccel, t.harshBrake, t.shifts.takeIf { it >= 0 },
                     t.goodShiftPct.takeIf { t.shifts > 0 }, t.fastS.takeIf { it >= 0 }?.let { n(it / 60.0, 0) },
+                    // v0.42 : d'où vient la conso du trajet (la voiture elle-même, ou l'estimation à partir de l'OBD).
+                    when { t.fuelL == null -> ""; t.fuelFromCan -> "ordinateur de bord"; else -> "estimation OBD" },
                 )
             },
         )
@@ -61,10 +64,10 @@ object Export {
         write(
             dir, "demarrages.csv",
             listOf("Date", "Heure", "Tension au repos (V)", "Tension mini au démarreur (V)", "Tension de charge (V)",
-                "Eau (°C)", "Verdict"),
+                "Eau (°C)", "Verdict", "Extérieur (°C)", "Relevé par"),
             CrankWatch.history.value.reversed().map { r ->
                 listOf(dateFmt.format(Date(r.atMs)), timeFmt.format(Date(r.atMs)), n(r.restV, 2), n(r.minV, 2),
-                    n(r.chargeV, 2), r.coolantC, r.verdict.label)
+                    n(r.chargeV, 2), r.coolantC, r.verdictLabel, n(r.outsideC, 0), r.source)
             },
         )
         write(
@@ -80,10 +83,10 @@ object Export {
         write(
             dir, "chauffes.csv",
             listOf("Date", "Heure", "Eau au départ (°C)", "Extérieur (°C)", "Durée eau à 80 °C (min)",
-                "Durée huile (min)", "Part au ralenti (%)", "Vitesse moyenne (km/h)"),
+                "Durée huile (min)", "Part au ralenti (%)", "Vitesse moyenne (km/h)", "Eau plafonnée sous 80 °C"),
             Warmup.history.value.reversed().map { w ->
                 listOf(dateFmt.format(Date(w.startMs)), timeFmt.format(Date(w.startMs)), w.startC, n(w.outsideC, 0),
-                    n(w.minutes), n(w.oilMinutes), w.idlePct, w.avgKmh)
+                    n(w.minutes), n(w.oilMinutes), w.idlePct, w.avgKmh, if (w.stalled) "oui" else "non")
             },
         )
         write(

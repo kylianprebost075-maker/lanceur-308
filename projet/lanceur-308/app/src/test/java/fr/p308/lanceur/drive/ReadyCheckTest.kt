@@ -40,6 +40,15 @@ class ReadyCheckTest {
         assertEquals(ReadyLevel.ALERT, alarm.level)
     }
 
+    @Test fun sansLaChuteAuDemarreurOnNeDitPasBonne() {
+        val l = lines(crank = crank(12.6f, null)).single()
+        assertEquals(ReadyLevel.OK, l.level)
+        assertTrue(l.text.contains("non mesurée"))
+        assertTrue(!l.text.contains("Bonne"))
+        // Au repos sous 12 V : faible, même sans la chute.
+        assertEquals(ReadyLevel.ALERT, lines(crank = crank(11.8f, null)).single().level)
+    }
+
     @Test fun carburant() {
         assertEquals(ReadyLevel.ALERT, lines(rangeKm = 30).single().level)
         assertEquals(ReadyLevel.WARN, lines(rangeKm = 80).single().level)

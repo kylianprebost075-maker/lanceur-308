@@ -29,6 +29,10 @@ data class CrankRecord(
     /** Température de la batterie estimée : l'extérieur, sinon l'eau si le moteur est froid (elle suit l'air). */
     val batteryTempC: Float? get() = outsideC ?: coolantC?.takeIf { it < 30 }?.toFloat()
     val verdict: CrankVerdict get() = CrankWatch.judge(restV, minV, batteryTempC)
+    /** Vrai si la chute au démarreur a été lue : sans elle, la tension au repos seule ne dit pas si la batterie tient. */
+    val measured: Boolean get() = minV != null
+    /** v0.42 : texte du verdict. « Bonne » n'est jamais dit sans la chute au démarreur. */
+    val verdictLabel: String get() = if (!measured && verdict == CrankVerdict.GOOD) "Repos correct" else verdict.label
 }
 
 /**
@@ -82,6 +86,21 @@ object CrankWatch {
             (minV != null && minV < limit + 0.6f) || restV < 12.3f -> CrankVerdict.FAIR
             else -> CrankVerdict.GOOD
         }
+    }
+
+    /** Âge maxi d'un démarrage pour juger la batterie d'aujourd'hui. */
+    const val VERDICT_MAX_AGE_MS = 21L * 24 * 3600 * 1000
+
+    /**
+     * v0.42 : démarrage à montrer pour juger la batterie. Le plus récent si sa chute au démarreur a été lue (ou s'il
+     * est déjà mauvais au repos) ; sinon le dernier démarrage mesuré de moins de 21 jours. Le 16/11, un démarrage du
+     * soir noté par le CAN sans la chute (repos 12,6 V → « Bonne ») masquait celui du matin, mesuré à 8,6 V au
+     * démarreur (« Faible »).
+     */
+    fun forVerdict(list: List<CrankRecord>, nowMs: Long = System.currentTimeMillis()): CrankRecord? {
+        val newest = list.maxByOrNull { it.atMs } ?: return null
+        if (newest.measured || newest.verdict != CrankVerdict.GOOD) return newest
+        return list.filter { it.measured && nowMs - it.atMs in 0..VERDICT_MAX_AGE_MS }.maxByOrNull { it.atMs } ?: newest
     }
 
     /** Nouvelle connexion OBD : l'état n'est oublié que si la coupure a été longue. */

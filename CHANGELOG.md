@@ -4,6 +4,22 @@ Les versions publiées se téléchargent sur la page
 [Releases](https://github.com/kylianprebost075-maker/lanceur-308/releases). Une mise à jour s'installe par-dessus
 l'ancienne version et garde les réglages. Le détail technique de chaque version est dans le [README](README.md).
 
+## 0.42 — 17 novembre 2026 (pas encore essayée sur l'autoradio)
+Relecture complète du code ; le détail et la suite sont dans [PISTES.md](PISTES.md).
+- **Entretien : fiche de chaque case.** Toucher un entretien ouvre une fiche à lire (état, dernière fois, km
+  parcourus depuis, intervalle, prochaine échéance, note entière, interventions de l'historique liées). Le bouton
+  « Modifier » ouvre le formulaire, qui s'ouvrait avant directement.
+- **Batterie : plus de « Bonne » sans mesure.** Un démarrage noté sans la chute au démarreur affichait « Bonne »
+  d'après la seule tension au repos, et masquait un démarrage mesuré « Faible » le matin même. Le verdict vient
+  maintenant du dernier démarrage mesuré ; sans mesure, l'écran dit « Repos correct ».
+- **Puissance et couple plus justes.** La charge lue par l'OBD comprend les frottements (35 % au ralenti sur ce
+  moteur) : elle est apprise au ralenti puis retirée. Au ralenti, la puissance affichée tombe à 0 ; à pleine charge
+  rien ne change. L'estimation de conso par l'OBD devient plus juste elle aussi.
+- **Conso à côté de CarPlay** : en roulant, c'est la conso instantanée de l'ordinateur de bord qui est affichée.
+- Import de factures : un élément sans mot repère ne modifie plus la vidange à la place du bon entretien.
+- Journal allégé (lignes `[CAN7]` et `[COMPARE]`), tableaux Excel complétés (origine de la conso, température et
+  origine du relevé des démarrages, eau plafonnée), restauration d'une sauvegarde plus sûre.
+
 ## 0.41 — 16 novembre 2026 (pas encore essayée sur l'autoradio)
 - **FAP : la détection n'est plus aveugle avec un thermostat ouvert.** Elle ignorait toutes les mesures sous 75 °C
   d'eau ; le seuil suit maintenant la cible de chauffe (4 °C dessous, 60 °C au moins).

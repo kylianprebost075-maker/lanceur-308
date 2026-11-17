@@ -451,6 +451,8 @@ fun MaintenanceScreen(vs: VehicleState, items: List<MaintenanceItem>) {
 @Composable
 private fun MaintenancePanel(vs: VehicleState, items: List<MaintenanceItem>) {
     var editing by remember { mutableStateOf<MaintenanceItem?>(null) }
+    // v0.42 : toucher une case ouvre d'abord la fiche (lecture seule) ; « Modifier » ouvre le formulaire.
+    var viewingId by remember { mutableStateOf<String?>(null) }
     var adding by remember { mutableStateOf(false) }
     var editingKm by remember { mutableStateOf(false) }
 
@@ -478,7 +480,7 @@ private fun MaintenancePanel(vs: VehicleState, items: List<MaintenanceItem>) {
             Spacer(Modifier.height(6.dp))
         }
         LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            items(items, key = { it.id }) { item -> MaintenanceRow(item, vs.odometerKm) { editing = item } }
+            items(items, key = { it.id }) { item -> MaintenanceRow(item, vs.odometerKm) { viewingId = item.id } }
             item {
                 Row(
                     Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).clickable { adding = true }.padding(12.dp),
@@ -493,6 +495,9 @@ private fun MaintenancePanel(vs: VehicleState, items: List<MaintenanceItem>) {
                 }
             }
         }
+    }
+    items.firstOrNull { it.id == viewingId }?.let { item ->
+        MaintenanceDetailDialog(item, vs.odometerKm, onEdit = { viewingId = null; editing = item }, onDismiss = { viewingId = null })
     }
     editing?.let { MaintenanceDialog(it, vs.odometerKm) { editing = null } }
     if (adding) MaintenanceDialog(null, vs.odometerKm) { adding = false }

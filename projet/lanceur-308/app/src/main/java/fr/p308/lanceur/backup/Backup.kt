@@ -106,6 +106,7 @@ object Backup {
         UiPrefs.init(ctx)
         Maintenance.init(ctx)
         Fuel.init(ctx)
+        fr.p308.lanceur.drive.TankGauge.init(ctx) // v0.42 : dernier plein détecté relu lui aussi
         Chrono.init(ctx)
         Vehicle.init(ctx)
         fr.p308.lanceur.drive.TripLog.init(ctx)

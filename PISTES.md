@@ -1,0 +1,83 @@
+# Pistes d'amélioration — Lanceur 308
+
+Relecture du 17 novembre 2026 (version 0.42). Ce fichier dit ce qui a été corrigé pendant la relecture, ce qu'il
+reste à vérifier dans la voiture, et ce qu'il faudrait faire ensuite, du plus utile au moins utile.
+
+Ce qui a été relu : toute la logique (dossiers `vehicle/`, `drive/`, `maintenance/`, `backup/`, le service de
+surveillance) et les écrans Entretien, Batterie et Chauffe. Pas relus en détail : la scène 3D (`Car3D.kt`,
+`LightScene.kt`), l'onglet Son, l'optimisation de l'autoradio et les réglages.
+
+## 1. Corrigé pendant la relecture (v0.42)
+
+| Défaut trouvé | Preuve | Correction |
+|---|---|---|
+| **Batterie dite « Bonne » à tort.** Un démarrage noté sans la chute au démarreur (relevé du CAN) était jugé sur la seule tension au repos. | 16/11 : matin mesuré à 8,6 V au démarreur (« Faible »), soir noté par le CAN à 12,6 V au repos → l'écran et le bilan « Prêt à partir » affichaient « Bonne ». | Le verdict vient du dernier démarrage **mesuré** (moins de 21 jours). Sans mesure : « Repos correct », en gris, jamais « Bonne ». |
+| **Puissance et couple surestimés à charge partielle.** La charge OBD (PID 04) comprend les frottements. | Au ralenti moteur chaud, elle lit déjà 35-36 % (journaux du 9 au 16/11) alors que le moteur ne fournit rien. C'est aussi ce qui donnait 9,8 L/100 estimés pour 5,5 réels. | La charge de ralenti est apprise toute seule (arrêt, 650-950 tr/min, eau ≥ 60 °C) puis retirée : charge utile = (charge − ralenti) / (100 − ralenti). La pleine charge ne change pas. |
+| **Conso affichée à côté de CarPlay : une estimation**, alors que la voiture donne la vraie. | Le canal CAN 7/102 (conso instantanée) est lu depuis la 0.39 mais le panneau ne s'en servait pas. | En roulant, le panneau affiche la conso instantanée de l'ordinateur de bord. |
+| **Entretien : impossible de simplement lire une case.** Toucher ouvrait le formulaire de modification ; la note et l'intervalle étaient coupés. | Capture de l'onglet : « tous les 1… ». | Toucher une case ouvre une **fiche** : état, dernière fois, km parcourus depuis, intervalle, prochaine échéance, note entière, interventions de l'historique liées. « Modifier » ouvre le formulaire. |
+| **Import de factures : mauvais entretien mis à jour.** | Un élément sans mot « match » correspondait à tout : le premier de la liste (la vidange) était modifié. | Sans « match », c'est le nom qui sert de repère. |
+| **Journal trop bavard.** | 16/11 : 356 lignes `[CAN7]` pour un trajet (presque toutes « — → 0 ») et 45 lignes `[COMPARE]`. | Valeurs nulles au départ et compteurs de trajet plus écrits ; `[COMPARE]` toutes les 5 à 10 min (le codage de la tension est confirmé). |
+| Restauration d'une sauvegarde : dernier plein détecté pas relu ; date d'entretien illisible = plantage au démarrage. | Lecture du code. | `TankGauge.init` ajouté ; date illisible ignorée. |
+| Tableaux Excel incomplets. | Lecture du code. | Colonnes ajoutées : origine de la conso (ordinateur de bord ou estimation), température extérieure et origine du relevé des démarrages, eau plafonnée. |
+
+Tests : 100 (8 nouveaux).
+
+## 2. À vérifier dans la voiture (rien de ceci n'a encore roulé)
+
+Les versions 0.39 à 0.42 n'ont jamais tourné sur l'autoradio. À la prochaine clé USB, regarder dans `journal/` :
+
+1. `[PUISSANCE] charge au ralenti apprise : NN %` : doit sortir après 20 à 30 s de ralenti à l'arrêt, moteur chaud,
+   avec une valeur proche de 35 %. Ensuite, puissance et couple doivent tomber à 0 au ralenti.
+2. `[CONSO] trajet de N km : ordinateur de bord X, estimation OBD Y` : X doit être proche du tableau de bord (≈ 5,5).
+   Avec la charge de ralenti apprise, Y devrait s'approcher de X sans correction.
+3. `[FAP] … conso instantanée changée N fois en 10 min` : si N est petit (moins de 20), le canal 102 est trop lent
+   pour repérer la post-injection et le signal « gazole en trop » ne servira pas.
+4. Chauffe : « Moteur aussi chaud qu'il peut » quand l'eau plafonne, et les chauffes de nouveau enregistrées.
+5. Alerte thermostat après 3 plafonds sur 4 chauffes.
+6. Fiche d'entretien : lisible sur l'écran 1280 × 720, et les interventions liées sont les bonnes.
+
+## 3. À faire ensuite, par ordre d'utilité
+
+### Sur la voiture elle-même (l'appli a déjà trouvé les pannes)
+- **Thermostat** : l'eau plafonne à 71-77 °C à chaque trajet. Pièce peu chère ; un moteur trop froid consomme plus
+  et encrasse la vanne EGR et le FAP.
+- **Batterie** : 8,6 à 9,2 V au démarreur par 10 à 15 °C. À faire tester avant l'hiver.
+
+### Méthode (le vrai point faible du projet)
+- **Une version = un essai dans la voiture.** Neuf versions en cinq jours, dont six jamais essayées : la 0.33
+  annonçait 9,8 L/100 pendant trois jours sans que personne le voie. Ne publier une release qu'après un trajet.
+- **Écrire dans le CHANGELOG le résultat de l'essai** (comme pour la 0.38), pas seulement ce que la version fait.
+
+### Mesures
+- **FAP** : caler le signal « gazole en trop » sur une vraie régénération (noter l'heure quand le ralenti monte ou
+  que le ventilateur tourne après l'arrêt). Tant que ce n'est pas fait, il ne déclenche rien seul.
+- **Niveau de gazole** : les canaux CAN 105 et 108 sont les compteurs des trajets 1 et 2, 106 et 109 leur conso
+  moyenne. Avec le câble adaptateur (broches 3 et 8, voir `outils/obd/SEANCE_OBD_2.md`), le BSI donnerait la vraie
+  jauge et l'additif du FAP.
+- **Chute au démarreur par le CAN** : l'autoradio n'envoie pas la tension assez vite. Seule solution sans OBD :
+  rien. Avec l'OBD : il est connecté en 5 s quand le boîtier est réveillé, 14 s sinon. Laisser 15 s entre le
+  contact et le démarrage donne une mesure à chaque fois.
+- **Score de conduite et huile estimée** : ils utilisaient la puissance surestimée. À recaler après quelques
+  trajets en 0.42 (l'huile montera un peu moins vite).
+
+### Code
+- **`Engine.kt` (plus de 850 lignes)** mélange le Bluetooth (SPP et BLE), le dialogue OBD, le diagnostic et le
+  kilométrage. À couper en trois fichiers : transports, boucle de lecture, diagnostic.
+- **`VehicleWatchService.kt` (plus de 500 lignes)** : toutes les alertes au même endroit, avec des noms de classes
+  écrits en entier partout. Sortir les alertes dans un fichier à part.
+- **État global** : presque tout est dans des `object` avec un état modifiable. Les tests se partagent cet état (il
+  faut remettre à zéro à la main). À terme : des classes créées par test.
+- **Tests manquants** sur les parties qui gardent un état dans le temps : `Warmup.tick`, `TripLog.tick`,
+  `FapRegen.tick` avec les deux signaux, `TankGauge.onCanRange`.
+- **Deux corrections du froid pour la batterie** : `CrankWatch.crankLimit` (température) et
+  `BatteryHealthModel.corrected` (paliers sur l'eau). À unifier.
+- **`ObdLog`** coupe les lignes à 300 caractères et deux écritures peuvent se croiser. Sans gravité, à surveiller si
+  les lignes s'allongent.
+
+### Présentation et diffusion
+- **README de plus de 950 lignes** : c'est un journal de développement. Garder la vitrine et « En bref », déplacer
+  le reste dans `docs/` (attention : `CLAUDE.md`, `AGENTS.md` et `GEMINI.md` y renvoient).
+- **Captures** : celles des onglets datent de la 0.16 (émulateur, vue de dessus). Les refaire sur l'autoradio.
+- **Licence** : « tous droits réservés » freine les étoiles et les contributions. Décision de l'auteur.
+- **Releases** : joindre l'APK à chaque release (la 0.38 n'en a pas).
+- **Anglais** : l'appli est en français seulement ; une traduction ouvrirait le projet aux forums étrangers.

@@ -22,8 +22,8 @@ object CanBusSource {
     /** v0.39 : conso moyenne et instantanée de l'ordinateur de bord, en dixièmes de L/100 (journal [CAN7] du 16/11). */
     private const val U_AVG_CONSO = 99
     private const val U_INSTANT_CONSO = 102
-    /** Compteurs des trajets 1 et 2 de l'ordinateur de bord (km) et leur conso moyenne : notés, pas encore utilisés. */
-    private val TRIP_CODES = setOf(100, 101, 104, 105, 106, 107, 108, 109, 110)
+    /** Distances des trajets 1 et 2 de l'ordinateur de bord (km, relevé du 16/11) : notées au départ, pas utilisées. */
+    private val TRIP_KM_CODES = setOf(105, 108)
 
     /** Conso moyenne plausible (2 à 15 L/100), sinon null. */
     fun decodeConso(raw: Int): Float? = (raw / 10f).takeIf { raw != 65535 && it in 2f..15f }
@@ -153,12 +153,16 @@ object CanBusSource {
         // v0.39 : canaux de l'ordinateur de bord identifiés : plus notés (sauf les trajets, à confirmer).
         if (code in DOORS || code == U_DRIVING_MILEAGE || code == U_AVG_CONSO || code == U_INSTANT_CONSO ||
             code >= 1000 || ints == null || loggedLines >= 600) return
-        if (code in 6..98 && code !in TRIP_CODES) return // climatisation et réglages : sans intérêt pour la conso
+        if (code in 6..98) return // climatisation et réglages : sans intérêt pour la conso
         val value = ints.take(6).joinToString(",")
         val now = android.os.SystemClock.elapsedRealtime()
         val prev = lastLogged[code]
         if (prev != null && (prev.first == value || now - prev.second < 120_000)) return
         lastLogged[code] = value to now
+        // v0.42 : journal allégé (le 16/11 : 356 lignes [CAN7] pour un seul trajet, presque toutes « — → 0 »). Une
+        // première valeur nulle n'est plus écrite, et les compteurs de trajet (km qui avancent) seulement au départ.
+        if (prev == null && ints.all { it == 0 }) return
+        if (prev != null && code in TRIP_KM_CODES) return
         loggedLines++
         ObdLog.log("CAN7", "canal $code : ${prev?.first ?: "—"} → $value")
     }

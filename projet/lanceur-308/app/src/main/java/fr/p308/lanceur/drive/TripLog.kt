@@ -303,6 +303,19 @@ object TripLog {
         prefs?.edit()?.putString("list", encodeList(_history.value))?.apply()
     }
 
+    /**
+     * v0.42 : remet à l'échelle le gazole estimé (OBD) des trajets enregistrés. Appelé une fois, quand la charge de
+     * ralenti vient d'être apprise (IdleLoad) : les nouveaux trajets sont estimés sans les frottements, les anciens
+     * sont ramenés à l'échelle réelle par le facteur connu, et la correction repart de 1.
+     */
+    @Synchronized
+    fun rescaleFuel(k: Double) {
+        if (demo || k <= 0.0 || abs(k - 1.0) < 0.01) return
+        _current.value = _current.value?.let { it.copy(fuelRawL = it.fuelRawL * k) }
+        _history.value = _history.value.map { it.copy(fuelRawL = it.fuelRawL * k) }
+        prefs?.edit()?.putString("list", encodeList(_history.value))?.apply()
+    }
+
     private fun saveCurrent() {
         if (demo) return
         _current.value?.let { prefs?.edit()?.putString("current", encode(it).toString())?.apply() }

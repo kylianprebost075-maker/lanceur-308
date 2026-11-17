@@ -110,11 +110,72 @@ fun maxTorqueNm(rpm: Int): Float {
     return t1 + (t2 - t1) * (rpm - r1).toFloat() / (r2 - r1)
 }
 
-/** Puissance estimée : charge calculée (PID 04) × couple maxi au régime courant. */
-fun estimate(rpm: Int, loadPct: Int): Pair<Int, Int> {
-    val torque = maxTorqueNm(rpm) * loadPct / 100f
+/**
+ * v0.42 : charge utile. La charge calculée (PID 04) comprend les frottements et les accessoires : au ralenti moteur
+ * chaud elle vaut déjà ≈ 35 % sur l'EDC16C34 (journaux du 9 au 16/11 : 35, 36, 36 % entre 750 et 825 tr/min) alors
+ * que le moteur ne fournit rien aux roues. Le couple utile est compté au-dessus de cette charge de ralenti :
+ * (charge − ralenti) / (100 − ralenti), ce qui laisse 100 % à pleine charge. Sans cela, la puissance était surestimée
+ * à charge partielle (d'où 9,8 L/100 estimés pour 5,5 réels). [idleLoadPct] = 0 : pas encore apprise, pas de correction.
+ */
+fun netLoadPct(loadPct: Int, idleLoadPct: Float): Float =
+    if (idleLoadPct <= 0f) loadPct.toFloat().coerceIn(0f, 100f)
+    else ((loadPct - idleLoadPct) / (100f - idleLoadPct) * 100f).coerceIn(0f, 100f)
+
+/** Puissance estimée : charge utile (PID 04 moins la charge de ralenti) × couple maxi au régime courant. */
+fun estimate(rpm: Int, loadPct: Int, idleLoadPct: Float = 0f): Pair<Int, Int> {
+    val torque = maxTorqueNm(rpm) * netLoadPct(loadPct, idleLoadPct) / 100f
     val kw = torque * rpm * 2 * PI / 60_000
     return torque.roundToInt() to (kw * 1.35962).roundToInt()
+}
+
+/**
+ * v0.42 : charge lue au ralenti, apprise toute seule (voiture à l'arrêt, 650 à 950 tr/min, eau à 60 °C ou plus) :
+ * moyenne des 60 premiers relevés, puis suivi lent. Bornée à [MAX_PCT] : au-delà, la lecture n'est pas un ralenti.
+ * Gardée dans les préférences « vehicle » (donc sauvegardée). Calcul pur vérifié par IdleLoadTest.
+ */
+object IdleLoad {
+    const val MIN_SAMPLES = 60
+    const val MAX_PCT = 45f
+    private var prefs: android.content.SharedPreferences? = null
+    private var sum = 0.0
+    private var n = 0
+    private var sinceSave = 0
+
+    /** 0 tant qu'elle n'est pas apprise. */
+    @Volatile
+    var pct: Float = 0f
+        private set
+
+    @Synchronized
+    fun init(ctx: Context?) {
+        val p = ctx?.getSharedPreferences("vehicle", Context.MODE_PRIVATE)
+        prefs = p
+        val stored = (p?.getFloat("idleLoadPct", 0f) ?: 0f).coerceIn(0f, MAX_PCT)
+        // Appelé à chaque (re)lancement de la boucle OBD : l'apprentissage en cours n'est remis à zéro que si la
+        // valeur gardée a changé (restauration d'une sauvegarde).
+        if (stored != pct) { sum = 0.0; n = 0 }
+        pct = stored
+    }
+
+    /** Un relevé de la boucle OBD. Renvoie vrai au moment où la charge de ralenti vient d'être apprise. */
+    @Synchronized
+    fun feed(rpm: Int, loadPct: Int, kmh: Int?, coolantC: Int?): Boolean {
+        if (kmh != 0 || rpm !in 650..950 || (coolantC ?: 0) < 60 || loadPct !in 5..60) return false
+        if (pct > 0f) {
+            pct = (pct + (loadPct - pct) * 0.005f).coerceIn(1f, MAX_PCT)
+            if (++sinceSave >= 200) { sinceSave = 0; save() }
+            return false
+        }
+        sum += loadPct
+        if (++n < MIN_SAMPLES) return false
+        pct = (sum / n).toFloat().coerceIn(1f, MAX_PCT)
+        save()
+        return true
+    }
+
+    private fun save() {
+        prefs?.edit()?.putFloat("idleLoadPct", pct)?.apply()
+    }
 }
 
 /**
@@ -181,6 +242,7 @@ object Engine {
 
     fun start(ctx: Context) {
         appCtx = ctx.applicationContext
+        IdleLoad.init(ctx.applicationContext)
         if (job?.isActive == true) return
         job = scope.launch { connectLoop(ctx.applicationContext) }
     }
@@ -246,7 +308,7 @@ object Engine {
         maf: Float? = null,
     ) {
         _state.update { s ->
-            val (torque, power) = if (rpm != null && load != null) estimate(rpm, load) else (null to null)
+            val (torque, power) = if (rpm != null && load != null) estimate(rpm, load, IdleLoad.pct) else (null to null)
             val r = rpm ?: s.rpm
             val l = load ?: s.loadPct
             val v = speed ?: s.speedKmh
@@ -496,8 +558,9 @@ object Engine {
                 CrankWatch.onSample(volts, rpm, _state.value.coolantC)?.let(::logCrank)
                 // Moteur coupé : une tension par minute suffit au journal (les relevés rapides restent en mémoire).
                 if (n % 120 == 0) ObdLog.log("TENSION", "moteur coupé : ${volts ?: "?"} V")
-                // v0.38 : CAN ↔ OBD côte à côte (≈ 1 fois par minute), pour vérifier le codage de la tension CAN.
-                if (n % 120 == 0) compareVolts(volts, "moteur coupé")
+                // v0.38 : CAN ↔ OBD côte à côte, pour vérifier le codage de la tension CAN. v0.42 : codage confirmé le
+                // 16/11 (écart 0,0 à 0,2 V sur 45 relevés) : une ligne toutes les 5 min environ suffit désormais.
+                if (n % 600 == 0) compareVolts(volts, "moteur coupé")
                 val coolant = if (n % 20 == 0) elm.pid("05", minBytes = 1)?.let { it[0] - 40 } else null
                 val volts2 = elm.readBatteryVolts()
                 CrankWatch.onSample(volts2, null, _state.value.coolantC)?.let(::logCrank)
@@ -514,6 +577,16 @@ object Engine {
             }
             // Régime et vitesse du même tour : sert à apprendre l'étagement réel de la boîte.
             if (rpm != null && speed != null) GearCalib.feed(rpm, speed)
+            // v0.42 : charge de ralenti (frottements), retirée ensuite de la charge pour estimer la puissance utile.
+            if (rpm != null && load != null && IdleLoad.feed(rpm, load, speed ?: _state.value.speedKmh, _state.value.coolantC)) {
+                // Les trajets déjà enregistrés gardent leur gazole estimé sur l'ancienne échelle : il est ramené une
+                // fois à l'échelle réelle par le facteur connu, pour que la correction reparte de 1.
+                val k = fr.p308.lanceur.drive.FuelModel.factor
+                fr.p308.lanceur.drive.TripLog.rescaleFuel(k)
+                ObdLog.log("PUISSANCE", "charge au ralenti apprise : %.0f %% (retirée de la charge pour la puissance et le couple) ; "
+                    .format(java.util.Locale.FRANCE, IdleLoad.pct) + "gazole estimé des anciens trajets multiplié par %.2f"
+                    .format(java.util.Locale.FRANCE, k))
+            }
             if (n % 10 == 1) {
                 val coolant = elm.pid("05", minBytes = 1)?.let { it[0] - 40 }
                 val boost = elm.pid("0B", minBytes = 1)?.let { (it[0] - baro) / 100f }
@@ -521,7 +594,7 @@ object Engine {
                 val volts = elm.readBatteryVolts()
                 CrankWatch.onRunningVolts(volts)
                 if (n % 600 == 1) ObdLog.log("TENSION", "moteur tournant : ${volts ?: "?"} V, eau ${coolant ?: "?"} °C, turbo ${boost ?: "?"} bar")
-                if (n % 120 == 1) compareVolts(volts, "moteur tournant")
+                if (n % 1200 == 1) compareVolts(volts, "moteur tournant")
                 publish(rpm, load, speed, coolant, boost, volts)
             } else if (n % 2 == 1) {
                 // Débit d'air un tour sur deux (≈ 1 fois par seconde) : détection des régénérations du FAP.

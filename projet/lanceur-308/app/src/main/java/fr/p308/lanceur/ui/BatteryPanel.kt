@@ -44,6 +44,9 @@ private fun verdictColor(v: CrankVerdict): Color = when (v) {
     CrankVerdict.WEAK -> C.Red
 }
 
+/** Gris quand la chute au démarreur n'a pas été lue et que le repos est correct : ni bon ni mauvais (v0.42). */
+private fun crankColor(r: CrankRecord): Color = if (!r.measured && r.verdict == CrankVerdict.GOOD) C.Sub else verdictColor(r.verdict)
+
 /** Onglet Moteur → Batterie : tension actuelle, santé mesurée à chaque démarrage, tendance. */
 @Composable
 fun BatteryPanel() {
@@ -81,24 +84,34 @@ fun BatteryPanel() {
                 )
                 Spacer(Modifier.height(6.dp))
             }
-            Text("Dernier démarrage", fontSize = 12.sp, color = C.Sub)
-            if (last == null) {
+            // v0.42 : le verdict affiché est celui du dernier démarrage MESURÉ (chute au démarreur lue). Un démarrage
+            // noté sans la chute (autoradio allumé trop tard, relevé du CAN) ne permet pas de dire « bonne ».
+            val shown = CrankWatch.forVerdict(list)
+            val dayFmt = SimpleDateFormat("EEE d MMM à HH:mm", Locale.FRANCE)
+            Text(if (shown != null && last != null && shown.atMs != last.atMs) "Dernier démarrage mesuré (${dayFmt.format(Date(shown.atMs))})"
+                else "Dernier démarrage", fontSize = 12.sp, color = C.Sub)
+            if (shown == null) {
                 Text("Pas encore mesuré", fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
             } else {
-                Text(last.verdict.label, fontSize = 26.sp, fontWeight = FontWeight.Bold, color = verdictColor(last.verdict))
+                Text(shown.verdictLabel, fontSize = 26.sp, fontWeight = FontWeight.Bold, color = crankColor(shown))
                 Text(
-                    last.minV?.let { "Repos ${volts(last.restV)} → mini ${volts(it)} au démarreur" }
-                        ?: "Repos ${volts(last.restV)} · chute au démarreur non saisie",
+                    shown.minV?.let { "Repos ${volts(shown.restV)} → mini ${volts(it)} au démarreur" }
+                        ?: "Repos ${volts(shown.restV)} · chute au démarreur non lue",
                     fontSize = 15.sp,
                 )
-                last.chargeV?.let { Text("Charge ${volts(it)} : ${CrankWatch.chargeText(it)}", fontSize = 15.sp) }
+                shown.chargeV?.let { Text("Charge ${volts(it)} : ${CrankWatch.chargeText(it)}", fontSize = 15.sp) }
                 Text(when {
-                    last.minV == null && last.verdict == CrankVerdict.GOOD ->
-                        "Bonne tension au repos. La connexion a coupé pendant le démarreur : la chute n'a pas pu être lue."
-                    last.verdict == CrankVerdict.GOOD -> "La batterie tient bien la charge du démarreur."
-                    last.verdict == CrankVerdict.FAIR -> "Elle faiblit : surveille, surtout quand il fait froid."
+                    !shown.measured && shown.verdict == CrankVerdict.GOOD ->
+                        "Tension au repos correcte, mais la chute au démarreur n'a pas été lue : ce démarrage ne dit pas " +
+                            "si la batterie tient. Mets le contact, attends « ✓ Prêt », puis démarre."
+                    shown.verdict == CrankVerdict.GOOD -> "La batterie tient bien la charge du démarreur."
+                    shown.verdict == CrankVerdict.FAIR -> "Elle faiblit : surveille, surtout quand il fait froid."
                     else -> "Fais-la tester (contrôle gratuit chez la plupart des centres auto)."
                 }, fontSize = 13.sp, color = C.Sub)
+                if (last != null && shown.atMs != last.atMs) {
+                    Text("Démarrage suivant (${dayFmt.format(Date(last.atMs))}) : repos ${volts(last.restV)}, chute non lue.",
+                        fontSize = 12.sp, color = C.Sub)
+                }
             }
             // Santé dans le temps (tous les démarrages, froid pris en compte), sinon la simple tendance.
             val health = fr.p308.lanceur.maintenance.BatteryHealthModel.evaluate(list)
@@ -151,11 +164,13 @@ private fun CrankRow(r: CrankRecord) {
         Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(C.Field.copy(0.5f)).padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.width(10.dp).height(10.dp).clip(RoundedCornerShape(5.dp)).background(verdictColor(r.verdict)))
+        Box(Modifier.width(10.dp).height(10.dp).clip(RoundedCornerShape(5.dp)).background(crankColor(r)))
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
             Text(SimpleDateFormat("EEE d MMM · HH:mm", Locale.FRANCE).format(Date(r.atMs)), fontSize = 14.sp)
-            r.coolantC?.let { Text(if (it < 30) "moteur froid ($it °C)" else "moteur chaud ($it °C)", fontSize = 11.sp, color = C.Sub) }
+            val temp = r.coolantC?.let { if (it < 30) "moteur froid ($it °C)" else "moteur chaud ($it °C)" }
+            val how = if (!r.measured) "chute non lue" + (if (r.source == "CAN") " (relevé de l'autoradio)" else "") else null
+            listOfNotNull(temp, how).takeIf { it.isNotEmpty() }?.let { Text(it.joinToString(" · "), fontSize = 11.sp, color = C.Sub) }
         }
         Text("${volts(r.restV)} · ${r.minV?.let(::volts) ?: "—"}", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
     }
