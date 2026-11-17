@@ -4,7 +4,17 @@ Les versions publiées se téléchargent sur la page
 [Releases](https://github.com/kylianprebost075-maker/lanceur-308/releases). Une mise à jour s'installe par-dessus
 l'ancienne version et garde les réglages. Le détail technique de chaque version est dans le [README](README.md).
 
-## 0.42 — 17 novembre 2026 (pas encore essayée sur l'autoradio)
+## 0.43 — 17 novembre 2026 (pas encore essayée sur l'autoradio)
+- **Batterie : une bonne chute vue par l'autoradio ne compte plus.** L'autoradio envoie la tension trop lentement
+  pour voir le vrai creux au démarreur : le 17/11, il a vu 10,6 V le soir (« Bonne ») quand l'OBD mesurait 8,9 V le
+  matin. Une chute vue par l'autoradio n'est prise en compte que si elle est déjà mauvaise.
+- **Conso : vérification contre l'ordinateur de bord.** La conso instantanée lue sur l'autoradio donnait des chiffres
+  trop bas (4,4 L/100 le matin, 3,8 en ville moteur froid). Le journal note maintenant, à chaque fin de trajet, la
+  conso calculée en lisant cette valeur en L/100 et en L/h, l'estimation OBD, et la conso du trajet selon les
+  compteurs 1 et 2 de l'ordinateur de bord. **Pour une mesure exacte : remettre à zéro le trajet 2 du tableau de bord
+  au départ.**
+
+## 0.42 — 17 novembre 2026 (essayée le 17/11 : fiche d'entretien, charge de ralenti apprise à 40 % puis 36 %, alerte thermostat sortie, chauffe terminée à la cible abaissée)
 Relecture complète du code ; le détail et la suite sont dans [PISTES.md](PISTES.md).
 - **Entretien : fiche de chaque case.** Toucher un entretien ouvre une fiche à lire (état, dernière fois, km
   parcourus depuis, intervalle, prochaine échéance, note entière, interventions de l'historique liées). Le bouton

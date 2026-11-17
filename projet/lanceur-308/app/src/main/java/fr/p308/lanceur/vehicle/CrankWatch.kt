@@ -29,10 +29,21 @@ data class CrankRecord(
     /** Température de la batterie estimée : l'extérieur, sinon l'eau si le moteur est froid (elle suit l'air). */
     val batteryTempC: Float? get() = outsideC ?: coolantC?.takeIf { it < 30 }?.toFloat()
     val verdict: CrankVerdict get() = CrankWatch.judge(restV, minV, batteryTempC)
-    /** Vrai si la chute au démarreur a été lue : sans elle, la tension au repos seule ne dit pas si la batterie tient. */
-    val measured: Boolean get() = minV != null
+    /**
+     * Vrai si la chute au démarreur a été lue de façon fiable. v0.43 : l'autoradio (CAN) n'envoie la tension que toutes
+     * les quelques centaines de ms et rate le creux. Le 17/11, il a vu 10,6 V le soir quand l'OBD mesurait 8,9 V le
+     * matin. Une chute vue par le CAN ne compte donc que si elle est déjà mauvaise ; sinon, elle ne prouve rien.
+     */
+    val measured: Boolean get() = minV != null && (source != "CAN" || CrankWatch.judge(restV, minV, batteryTempC) != CrankVerdict.GOOD)
     /** v0.42 : texte du verdict. « Bonne » n'est jamais dit sans la chute au démarreur. */
     val verdictLabel: String get() = if (!measured && verdict == CrankVerdict.GOOD) "Repos correct" else verdict.label
+
+    /** Texte de la tension au démarreur, honnête sur ce qui a été vu (v0.43). */
+    val crankText: String get() = when {
+        minV == null -> "chute au démarreur non lue"
+        !measured -> "au moins %.1f V vu par l'autoradio (trop lent pour le vrai creux)".format(java.util.Locale.FRANCE, minV)
+        else -> "mini %.1f V au démarreur".format(java.util.Locale.FRANCE, minV)
+    }
 }
 
 /**

@@ -102,6 +102,20 @@ class CrankThermoTest {
         assertNull(CrankWatch.forVerdict(emptyList(), now))
     }
 
+    @Test fun canCrankDipIsOnlyTrustedWhenBad() {
+        // 17/11 : le CAN a vu 10,6 V le soir, l'OBD 8,9 V le matin. Une bonne chute vue par le CAN ne prouve rien.
+        val can = CrankRecord(0, 12.6f, 10.6f, 18, 14.4f, 15f, "CAN")
+        assertEquals(false, can.measured)
+        assertEquals("Repos correct", can.verdictLabel)
+        assertTrue(can.crankText.contains("au moins"))
+        val canBad = CrankRecord(0, 12.4f, 8.8f, 14, 14.5f, 13f, "CAN")
+        assertEquals(true, canBad.measured)
+        assertEquals(CrankVerdict.WEAK, canBad.verdict)
+        val obd = CrankRecord(0, 12.6f, 10.6f, 18, 14.4f, 15f, "OBD")
+        assertEquals(true, obd.measured)
+        assertEquals("Bonne", obd.verdictLabel)
+    }
+
     @Test fun idleLoadIsLearnedAndRemovedFromPower() {
         IdleLoad.init(null)
         assertEquals(0f, IdleLoad.pct, 0f)

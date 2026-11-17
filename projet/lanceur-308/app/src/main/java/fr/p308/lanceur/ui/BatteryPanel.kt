@@ -94,22 +94,18 @@ fun BatteryPanel() {
                 Text("Pas encore mesuré", fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
             } else {
                 Text(shown.verdictLabel, fontSize = 26.sp, fontWeight = FontWeight.Bold, color = crankColor(shown))
-                Text(
-                    shown.minV?.let { "Repos ${volts(shown.restV)} → mini ${volts(it)} au démarreur" }
-                        ?: "Repos ${volts(shown.restV)} · chute au démarreur non lue",
-                    fontSize = 15.sp,
-                )
+                Text("Repos ${volts(shown.restV)} · ${shown.crankText}", fontSize = 15.sp)
                 shown.chargeV?.let { Text("Charge ${volts(it)} : ${CrankWatch.chargeText(it)}", fontSize = 15.sp) }
                 Text(when {
                     !shown.measured && shown.verdict == CrankVerdict.GOOD ->
-                        "Tension au repos correcte, mais la chute au démarreur n'a pas été lue : ce démarrage ne dit pas " +
-                            "si la batterie tient. Mets le contact, attends « ✓ Prêt », puis démarre."
+                        "Tension au repos correcte, mais la vraie chute au démarreur n'a pas été lue : ce démarrage ne dit " +
+                            "pas si la batterie tient. Mets le contact, attends « ✓ Prêt » (boîtier OBD), puis démarre."
                     shown.verdict == CrankVerdict.GOOD -> "La batterie tient bien la charge du démarreur."
                     shown.verdict == CrankVerdict.FAIR -> "Elle faiblit : surveille, surtout quand il fait froid."
                     else -> "Fais-la tester (contrôle gratuit chez la plupart des centres auto)."
                 }, fontSize = 13.sp, color = C.Sub)
                 if (last != null && shown.atMs != last.atMs) {
-                    Text("Démarrage suivant (${dayFmt.format(Date(last.atMs))}) : repos ${volts(last.restV)}, chute non lue.",
+                    Text("Démarrage suivant (${dayFmt.format(Date(last.atMs))}) : repos ${volts(last.restV)}, ${last.crankText}.",
                         fontSize = 12.sp, color = C.Sub)
                 }
             }

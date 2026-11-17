@@ -82,7 +82,7 @@ object Export {
         )
         write(
             dir, "chauffes.csv",
-            listOf("Date", "Heure", "Eau au départ (°C)", "Extérieur (°C)", "Durée eau à 80 °C (min)",
+            listOf("Date", "Heure", "Eau au départ (°C)", "Extérieur (°C)", "Durée jusqu'au moteur chaud (min)",
                 "Durée huile (min)", "Part au ralenti (%)", "Vitesse moyenne (km/h)", "Eau plafonnée sous 80 °C"),
             Warmup.history.value.reversed().map { w ->
                 listOf(dateFmt.format(Date(w.startMs)), timeFmt.format(Date(w.startMs)), w.startC, n(w.outsideC, 0),

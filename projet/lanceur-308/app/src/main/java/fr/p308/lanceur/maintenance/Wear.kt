@@ -14,7 +14,8 @@ object BatteryHealthModel {
     private const val DAY = 86_400_000L
 
     /** Tension mini au démarreur ramenée à un moteur tiède : le froid la fait baisser sans que la batterie soit en cause. */
-    private fun corrected(r: CrankRecord): Float? = r.minV?.let { v ->
+    // v0.43 : une chute vue par l'autoradio (CAN) seulement si elle est fiable (voir CrankRecord.measured).
+    private fun corrected(r: CrankRecord): Float? = r.minV?.takeIf { r.measured }?.let { v ->
         val c = r.coolantC ?: 20
         v + when {
             c < 0 -> 0.5f

@@ -25,6 +25,24 @@ object CanBusSource {
     /** Distances des trajets 1 et 2 de l'ordinateur de bord (km, relevé du 16/11) : notées au départ, pas utilisées. */
     private val TRIP_KM_CODES = setOf(105, 108)
 
+    /**
+     * v0.43 : trajets 1 et 2 de l'ordinateur de bord (relevé du 16/11) : 105 / 108 = km, 106 / 109 = conso moyenne en
+     * dixièmes de L/100. Gazole du trajet selon la voiture = km × moyenne / 1 000. Comparer ce gazole au début et à la
+     * fin d'un de nos trajets donne la vraie conso, précise si le compteur a été remis à zéro au départ (sinon, l'arrondi
+     * de la moyenne à 0,1 L/100 sur des centaines de km fausse tout).
+     */
+    private val TRIP_BC_CODES = setOf(105, 106, 108, 109)
+    val tripComputer = java.util.concurrent.ConcurrentHashMap<Int, Int>()
+
+    /** Gazole (L) cumulé selon l'ordinateur de bord pour le trajet 1 ou 2, et la distance (km) ; null si inconnu. */
+    fun boardTrip(trip: Int): Pair<Double, Int>? {
+        val (kmCode, avgCode) = if (trip == 1) 105 to 106 else 108 to 109
+        val km = tripComputer[kmCode] ?: return null
+        val avg = tripComputer[avgCode] ?: return null
+        if (km !in 0..99_999 || avg !in 0..300) return null
+        return km * avg / 1000.0 to km
+    }
+
     /** Conso moyenne plausible (2 à 15 L/100), sinon null. */
     fun decodeConso(raw: Int): Float? = (raw / 10f).takeIf { raw != 65535 && it in 2f..15f }
     /** Nom du boîtier CAN (« PSA-RZ-15-0127-B1 » chez l'auteur). */
@@ -67,10 +85,8 @@ object CanBusSource {
                     // v0.38 : démarrage mesuré par le CAN, dès le contact (l'OBD se connecte trop tard).
                     if (!Vehicle.demo) {
                         CrankWatch.onCanVolts(volts, Engine.state.value.coolantC)?.let { r ->
-                            ObdLog.log("DEMARRAGE", "(CAN) repos ${r.restV} V, " +
-                                (r.minV?.let { "mini $it V au démarreur" } ?: "chute au démarreur NON saisie") +
-                                ", charge ${r.chargeV} V, extérieur ${r.outsideC ?: "?"} °C, verdict ${r.verdict.label}" +
-                                if (r.minV == null) " (d'après le repos seul)" else "")
+                            ObdLog.log("DEMARRAGE", "(CAN) repos ${r.restV} V, ${r.crankText}, charge ${r.chargeV} V, " +
+                                "extérieur ${r.outsideC ?: "?"} °C, verdict ${r.verdictLabel}")
                         }
                         if (volts >= CrankWatch.CHARGING_V) {
                             CrankWatch.onRunningVolts(volts)
@@ -111,6 +127,8 @@ object CanBusSource {
                         if (Vehicle.state.value.boardAvgL100 != l) Vehicle.update { s -> s.copy(boardAvgL100 = l) }
                         fr.p308.lanceur.maintenance.Fuel.onCanBoardL100(l)
                     }
+                    // v0.43 : trajets 1 et 2 de l'ordinateur de bord (km et conso moyenne), pour vérifier la conso.
+                    if (code in TRIP_BC_CODES) tripComputer[code] = v
                     if (code == U_INSTANT_CONSO) {
                         val l = if (v == 65535) null else v / 10f
                         if (Vehicle.state.value.instantL100 != l) Vehicle.update { s -> s.copy(instantL100 = l?.takeIf { it <= 50f }) }

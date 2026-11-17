@@ -2,6 +2,7 @@ package fr.p308.lanceur.drive
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** Jauge automatique : litres déduits de l'autonomie de l'ordinateur de bord, plein repéré (v0.33). */
@@ -67,6 +68,16 @@ class FuelModelBoardTest {
         // Couverture trop faible (10 km sur 40) : on revient à l'estimation OBD.
         val u = t.copy(canFuelL = 0.55, canKm = 10.0)
         assertEquals(false, u.fuelFromCan)
+    }
+
+    @Test fun boardTripComparison() {
+        // Compteur 2 remis à zéro au départ : 0 km, puis 42 km à 5,4 L/100 → 2,268 L.
+        val start = mapOf(1 to (685 * 59 / 1000.0 to 685), 2 to (0.0 to 0))
+        val end = mapOf(1 to (727 * 59 / 1000.0 to 727), 2 to (42 * 54 / 1000.0 to 42))
+        val t = TripLog.boardTripText(start, end)
+        assertTrue(t.contains("trajet 1 : compteur à 727 km"))
+        assertTrue(t.contains("trajet 2 : 5,4 L/100 sur 42 km"))
+        assertEquals("ordinateur de bord : —", TripLog.boardTripText(emptyMap(), end))
     }
 
     @Test fun canConsumptionDecoding() {

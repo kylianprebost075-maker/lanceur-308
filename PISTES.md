@@ -22,7 +22,23 @@ surveillance) et les écrans Entretien, Batterie et Chauffe. Pas relus en détai
 
 Tests : 100 (8 nouveaux).
 
-## 2. À vérifier dans la voiture (rien de ceci n'a encore roulé)
+## 1 bis. Résultats de l'essai du 17/11 (0.42) et corrections de la 0.43
+
+| Point | Résultat | Suite |
+|---|---|---|
+| Charge de ralenti | Apprise à 9 h 44 : 40 %, puis suivie lentement jusqu'à 36,5 % le soir. Anciens trajets ramenés à l'échelle (× 0,57). | OK. |
+| Alerte thermostat | Sortie à 9 h 35 (« l'eau ne dépasse pas 73 °C, 3 trajets sur 3 »). Plafonds gardés : 73, 72, 77. | OK. Le thermostat est à changer. |
+| Chauffe | Le soir, moteur chaud en 8,3 min avec la cible abaissée à 70 °C (avant : jamais). | OK. |
+| Batterie | Matin : 8,9 V au démarreur par 13 °C (OBD) → Faible, comme le 16/11 (8,6 V). Soir : le CAN a vu 10,6 V → « Bonne ». | **Faux bon verdict** : le CAN rate le creux. Corrigé en 0.43. Batterie à faire tester. |
+| Conso (CAN 102 lu en L/100) | 4,4 L/100 le matin (42 km), 3,8 L/100 sur les 11 premiers km du soir, moteur froid en ville. Ordinateur de bord : 5,5 en moyenne. | **Invraisemblable** : un diesel froid en ville consomme plus. La valeur est peut-être en L/h. La 0.43 note les deux lectures et la conso du trajet selon les compteurs de l'ordinateur de bord. |
+| Rafraîchissement de la conso instantanée | 175 à 296 changements en 10 min moteur chaud (toutes les 2 à 3 s). | Assez rapide pour l'indice « gazole en trop » du FAP. |
+| Connexion OBD | 7,8 s et 6,9 s (boîtier qui se réveille), 2,3 s quand il est déjà réveillé. | OK. |
+
+**Test à faire pour trancher la conso** : remettre à zéro le **trajet 2** du tableau de bord au départ d'un trajet,
+puis lire la ligne `[CONSO]` du journal. Elle donne la conso selon l'ordinateur de bord (« trajet 2 : X L/100 sur N
+km ») en face des deux lectures de la valeur 102 : celle qui colle est la bonne.
+
+## 2. À vérifier dans la voiture
 
 Les versions 0.39 à 0.42 n'ont jamais tourné sur l'autoradio. À la prochaine clé USB, regarder dans `journal/` :
 
