@@ -17,7 +17,7 @@ import java.io.File
  */
 object Backup {
     private const val FILE = "sauvegarde-308.json"
-    private val PREFS = listOf("maintenance", "vehicle", "ui", "fuel", "chrono", "trips", "battery", "gears", "warmup", "history", "fap", "sound", "optim", "can")
+    private val PREFS = listOf("maintenance", "vehicle", "ui", "fuel", "chrono", "trips", "battery", "gears", "warmup", "history", "fap", "sound", "optim", "can", "power")
 
     /** Nombre de clés USB / cartes SD branchées (pour sauvegarder dès qu'une clé arrive). */
     fun usbCount(ctx: Context): Int = volumes(ctx).count { it.second }
@@ -108,6 +108,7 @@ object Backup {
         Fuel.init(ctx)
         fr.p308.lanceur.drive.TankGauge.init(ctx) // v0.42 : dernier plein détecté relu lui aussi
         Chrono.init(ctx)
+        fr.p308.lanceur.drive.PowerRun.init(ctx)
         Vehicle.init(ctx)
         fr.p308.lanceur.drive.TripLog.init(ctx)
         fr.p308.lanceur.vehicle.CrankWatch.init(ctx)

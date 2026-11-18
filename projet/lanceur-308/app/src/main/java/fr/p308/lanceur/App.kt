@@ -20,6 +20,7 @@ class App : Application() {
         Fuel.init(this)
         fr.p308.lanceur.drive.TankGauge.init(this)
         Chrono.init(this)
+        fr.p308.lanceur.drive.PowerRun.init(this)
         GpsMonitor.init(this)
         // Après Vehicle.init : le mode démo est déjà connu, le trajet en cours peut être repris.
         TripLog.init(this)

@@ -37,6 +37,24 @@ object CarProfile {
     const val TANK_L = 60.0
     const val RESERVE_L = 6.0
 
+    /**
+     * Données pour la mesure de puissance par l'accélération (banc de puissance maison, v0.46). Pendant une
+     * accélération à fond sur route plate, la puissance aux roues = force × vitesse, où la force sert à accélérer la
+     * masse et à vaincre l'air et le roulement. Ces quatre valeurs décrivent la voiture ; une estimation à ± 10-15 %.
+     *
+     * - [MASS_KG] : masse en ordre de marche avec le conducteur (≈ 1 360 kg à vide + 80 kg).
+     * - [CDA] : coefficient de traînée × surface frontale (Cx ≈ 0,31 × ≈ 2,12 m² pour la 308 T7).
+     * - [ROLL_RESIST] : coefficient de résistance au roulement des pneus sur route sèche.
+     * - [DRIVETRAIN_EFF] : rendement de la transmission (boîte + différentiel, traction).
+     * - [ROTATING_MASS] : majoration de la masse pour l'inertie des roues et de la boîte en accélération (approximatif,
+     *   un peu plus fort sur les petits rapports).
+     */
+    const val MASS_KG = 1440.0
+    const val CDA = 0.66
+    const val ROLL_RESIST = 0.012
+    const val DRIVETRAIN_EFF = 0.90
+    const val ROTATING_MASS = 1.07
+
     /** Filtre à particules (diesel récent) : détection des régénérations. false pour une essence ou un diesel sans FAP. */
     const val HAS_DPF = true
 

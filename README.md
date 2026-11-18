@@ -37,7 +37,7 @@ Si le projet t'est utile, une ⭐ aide d'autres conducteurs à le trouver.
 > **Tu es une IA qui aide quelqu'un à l'installer ou à l'adapter à sa voiture ?** Lis [ADAPTER.md](ADAPTER.md), pas ce README.
 
 > **À lire en entier avant de toucher à quoi que ce soit.**
-> Ce dossier permet à une IA (ou à un développeur) de reprendre le projet. Dernière version du code : **0.45 du
+> Ce dossier permet à une IA (ou à un développeur) de reprendre le projet. Dernière version du code : **0.46 du
 > 18 novembre 2026** (dernière publiée : 0.40). Ce qui reste à vérifier et à faire : [PISTES.md](PISTES.md). Ordre de lecture : « En bref » juste dessous, puis les notes « Nouveau en v0.x » sous la galerie (de la plus
 > récente à la plus ancienne), puis les sections techniques 0 à 8 (base du 11/11/2026, version 0.31 ; ce qui a changé
 > depuis est dans les notes 0.32 à 0.38).
@@ -117,6 +117,17 @@ de dessus en 2D, celle que l'appli affiche quand la 3D n'est pas disponible. Sur
 | ![Échéances d'entretien](docs/captures/onglets/09-entretien.png) | ![Consommation et coût des pleins](docs/captures/onglets/10-entretien-pleins.png) |
 | **Réglages** | **Panneau à côté de CarPlay (v0.13, alerte FAP v0.14)** |
 | ![Réglages : couleur, 5 portes, Optimiser l'autoradio, kilométrage, température extérieure, thème](docs/captures/onglets/11-reglages.png) | ![Panneau : puissance, rapport conseillé, régime, eau, turbo, batterie](docs/captures/onglets/12-panneau-performances.png) |
+
+**Nouveau en v0.46 : banc de puissance par l'accélération (18/11, pas encore essayé sur l'autoradio)**
+- `drive/PowerRun.kt` : `PowerMath` (calcul pur, `PowerMathTest`) : force aux roues = masse × `ROTATING_MASS` ×
+  accélération + ½ ρ CdA v² + Crr m g ; puissance moteur = force × v / rendement ; couple = puissance / ω. Vitesse lissée
+  sur 3 points, dérivée centrée, points regroupés par tranches de 200 tr/min. `PowerRun` (nourri par `Speed.report`
+  comme le chrono) : départ quand charge ≥ 70 %, régime 1 100-4 800 et vitesse qui monte ; fin à une chute de régime
+  de 300 tr/min (passage de rapport) ou au lever de pied. Préférences « power » (sauvegardées), journal `[PUISSANCE] banc`.
+- `CarProfile` : `MASS_KG` 1 440, `CDA` 0,66, `ROLL_RESIST` 0,012, `DRIVETRAIN_EFF` 0,90, `ROTATING_MASS` 1,07.
+- `ui/PowerBenchPanel.kt` : onglet Moteur → Banc (courbe, dernière mesure, record, « Nouvelle mesure »).
+- En mode démo, deux simulateurs envoient la vitesse (moteur et voiture) : la mesure y est refusée, sans effet sur la
+  voiture. Tests : 111.
 
 **Nouveau en v0.45 : conso instantanée en L/h (18/11, pas encore essayé sur l'autoradio)**
 - Essai du 18/11 (0.44) : la valeur CAN 7/102 lue en **dixièmes de L/h** donne 5,5 L/100 sur 41 km, comme la moyenne
@@ -596,7 +607,7 @@ sur le bouton CarPlay pour montrer le panneau. Le bandeau rouge est une alerte d
 | | |
 |---|---|
 | **Quoi** | Appli Android « Lanceur 308 » (`fr.p308.lanceur`) : tableau de bord façon Tesla pour autoradio chinois FYT, avec la 308 en 3D, les ouvrants, les phares, l'OBD, le GPS, l'entretien, le son. |
-| **Où en est-on** | Version **0.45** (`versionCode = 51`) prête, sur la clé USB, pas encore essayée (0.44 essayée le 18/11) ; 0.40 publiée sur GitHub (Releases, `Lanceur308.apk`). |
+| **Où en est-on** | Version **0.46** (`versionCode = 52`) prête, sur la clé USB, pas encore essayée (0.44 essayée le 18/11) ; 0.40 publiée sur GitHub (Releases, `Lanceur308.apk`). |
 | **Ce qui marche dans la voiture** | 3D (plaque tapée, cadrage 1280 × 720), ouvrants et marche arrière par le CAN FYT, température extérieure FYT, phares par l'heure du coucher du soleil, OBD avec le vLinker MC+ (régime, eau, turbo, tension, codes défaut, kilométrage du calculateur), basses automatiques, égaliseur 15 bandes réglé au micro du PC, ADB par le Wi-Fi. |
 | **Vérifié le 11/11 au soir (0.31 sur l'autoradio)** | Page Mon autoradio (boîtier, 17 °C, 12,9 V, volume 18, OBD, égaliseur) ; tension moteur coupé 12,8-12,9 V (codage confirmé) ; flèches ← ↓ de la balance justes ; ceintures **non transmises**. Reste à essayer : un appui sur Seul / Passagers depuis le Lanceur. |
 | **Comment on travaille** | Une séance dans la voiture doit être courte (batterie) : tout se prépare sur le PC, puis un seul script par ADB Wi-Fi (`outils/adb/`). |
@@ -767,7 +778,7 @@ Release GitHub `v0.xx` avec le fichier `Lanceur308.apk` (seulement avec l'accord
 - AGP 8.7.3, **Kotlin 2.0.21**, Compose BOM 2024.12.01
 - **SceneView 2.2.1** (Filament 1.52) — SceneView 2.3+ exige Kotlin 2.2.
 - minSdk 26, targetSdk 33, compileSdk 35. R8 activé (`proguard-rules.pro` garde `com.google.android.filament.**` et `io.github.sceneview.**`).
-- Version dans `app/build.gradle.kts` : **incrémenter `versionCode` à chaque livraison** (actuellement 51 / "0.45").
+- Version dans `app/build.gradle.kts` : **incrémenter `versionCode` à chaque livraison** (actuellement 52 / "0.46").
 
 ---
 

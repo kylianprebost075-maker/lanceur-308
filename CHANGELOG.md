@@ -4,6 +4,14 @@ Les versions publiées se téléchargent sur la page
 [Releases](https://github.com/kylianprebost075-maker/lanceur-308/releases). Une mise à jour s'installe par-dessus
 l'ancienne version et garde les réglages. Le détail technique de chaque version est dans le [README](README.md).
 
+## 0.46 — 18 novembre 2026 (pas encore essayée sur l'autoradio)
+- **Banc de puissance** (Moteur → Banc) : la vraie puissance et le vrai couple, mesurés pendant une accélération à
+  fond. Le Lanceur repère tout seul l'accélération (pied au plancher, un seul rapport), relève vitesse et régime, puis
+  trace la courbe puissance / couple selon le régime, avec la dernière mesure et le record. Calcul : la force aux roues
+  sert à accélérer la voiture et à vaincre l'air et le roulement (masse, aérodynamique et rendement de la 308 dans
+  `CarProfile.kt`). C'est une estimation à ± 10-15 % : à faire sur route plate, sans vent, en 3e ou 4e depuis
+  1 500 tr/min jusqu'à la zone rouge. Rien n'est envoyé à la voiture.
+
 ## 0.45 — 18 novembre 2026 (pas encore essayée sur l'autoradio)
 - **Conso juste** : la conso instantanée envoyée par la voiture est en litres par heure, pas en L/100 (essai du
   18/11 : 5,5 L/100 sur 41 km en la lisant ainsi, comme la moyenne de l'ordinateur de bord). Corrigé pour la conso
