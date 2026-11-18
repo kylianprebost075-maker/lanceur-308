@@ -30,3 +30,6 @@ __pycache__/
 .venv/
 outils/son/mesures/
 *.wav
+
+# Journaux du compilateur Kotlin
+.kotlin/
