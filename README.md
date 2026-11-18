@@ -126,7 +126,7 @@ de dessus en 2D, celle que l'appli affiche quand la 3D n'est pas disponible. Sur
   Affichage : `AlertBanner.live` (bandeau qui se met à jour sans clignoter), accueil, `PerfOverlay.alertFor`, voix.
 - Banc de puissance : `PowerRun.feed(rpm, kmh, chargeUtile, nanos)` appelé par la boucle OBD (plus par `Speed.report`),
   seuil `FULL_LOAD` = 85 % de charge utile (`netLoadPct`), mesure à chaque accélération, trou de plus de 2,5 s = fin,
-  courbe lissée entre tranches ; `PowerRunTest`. Tests : 123.
+  courbe lissée entre tranches, échelle adaptée à la mesure, plus de mesure en mode démo (le record n'est jamais touché par la démo) ; `PowerRunTest`. Tests : 123.
 
 **Nouveau en v0.46 : banc de puissance par l'accélération (18/11, pas encore essayé sur l'autoradio)**
 - `drive/PowerRun.kt` : `PowerMath` (calcul pur, `PowerMathTest`) : force aux roues = masse × `ROTATING_MASS` ×

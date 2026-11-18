@@ -13,7 +13,7 @@ l'ancienne version et garde les réglages. Le détail technique de chaque versio
 - **Banc de puissance corrigé** (relecture de la 0.46) : une accélération ordinaire ne compte plus comme une mesure
   (il faut le pied au plancher : charge utile ≥ 85 %, alors que la 0.46 prenait 70 % de charge brute, atteinte en
   roulant normalement) ; chaque accélération à fond est mesurée (la 0.46 s'arrêtait après la première) ; régime et
-  vitesse pris au même instant ; courbe lissée pour ne pas surestimer le pic ; mesure close si le boîtier OBD décroche.
+  vitesse pris au même instant ; courbe lissée pour ne pas surestimer le pic ; mesure close si le boîtier OBD décroche ; le mode démo ne touche plus au record.
 
 ## 0.46 — 18 novembre 2026 (pas encore essayée sur l'autoradio)
 - **Banc de puissance** (Moteur → Banc) : la vraie puissance et le vrai couple, mesurés pendant une accélération à
