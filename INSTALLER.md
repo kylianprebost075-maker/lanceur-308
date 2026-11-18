@@ -67,6 +67,8 @@ Android demande d'abord l'accès à la position (vitesse GPS, heure, phares au c
   restants s'affichent tout seuls sur l'accueil, et un plein est annoncé avec les litres ajoutés. Sinon : Entretien →
   Pleins → **Niveau du réservoir** → touche le niveau de ta jauge ; le Lanceur recalcule ensuite en roulant (il lui
   faut le kilométrage : Réglages → Kilométrage, une fois). Ce sont des estimations, pas une mesure de la jauge.
+- **Attendre avant de partir (moteurs turbo)** : au démarrage, un compte à rebours dit combien de secondes attendre
+  avant de partir, le temps que l'huile graisse le turbo. Réglages → « Attente turbo au démarrage » (durée, ou couper).
 - **Redémarrer l'autoradio** : Applis → « ⟳ Redémarrer l'autoradio » en haut (si ton autoradio le refuse, l'appli
   te le dit : passe alors par son bouton marche).
 - **Garder cet écran au démarrage** : Réglages → **Utiliser comme écran d'accueil**. Décoche pour revenir à

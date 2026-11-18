@@ -585,6 +585,9 @@ object Engine {
             }
             // Régime et vitesse du même tour : sert à apprendre l'étagement réel de la boîte.
             if (rpm != null && speed != null) GearCalib.feed(rpm, speed)
+            // v0.47 : banc de puissance nourri ici, régime, vitesse et charge du même tour (charge de ralenti retirée).
+            if (rpm != null && speed != null) fr.p308.lanceur.drive.PowerRun.feed(rpm, speed.toFloat(),
+                netLoadPct(load ?: 0, IdleLoad.pct), System.nanoTime())
             // v0.42 : charge de ralenti (frottements), retirée ensuite de la charge pour estimer la puissance utile.
             if (rpm != null && load != null && IdleLoad.feed(rpm, load, speed ?: _state.value.speedKmh, _state.value.coolantC)) {
                 // Les trajets déjà enregistrés gardent leur gazole estimé sur l'ancienne échelle : il est ramené une

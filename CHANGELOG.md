@@ -4,6 +4,17 @@ Les versions publiées se téléchargent sur la page
 [Releases](https://github.com/kylianprebost075-maker/lanceur-308/releases). Une mise à jour s'installe par-dessus
 l'ancienne version et garde les réglages. Le détail technique de chaque version est dans le [README](README.md).
 
+## 0.47 — 18 novembre 2026 (pas encore essayée sur l'autoradio)
+- **Attente turbo au démarrage** (Réglages, activée par défaut) : au démarrage, un compte à rebours dit d'attendre
+  avant de partir, le temps que l'huile remonte jusqu'au turbo (30 s par défaut, 20 à 60 s au choix, 15 s de plus
+  quand il gèle), puis « tu peux partir, doucement tant que le moteur est froid ». Bandeau par-dessus tout (CarPlay
+  compris, un appui le ferme), accueil, panneau à côté de CarPlay, voix si les annonces sont activées. Rien après un
+  arrêt de moins de 5 min. Bouton « Voir » pour l'essayer à l'arrêt.
+- **Banc de puissance corrigé** (relecture de la 0.46) : une accélération ordinaire ne compte plus comme une mesure
+  (il faut le pied au plancher : charge utile ≥ 85 %, alors que la 0.46 prenait 70 % de charge brute, atteinte en
+  roulant normalement) ; chaque accélération à fond est mesurée (la 0.46 s'arrêtait après la première) ; régime et
+  vitesse pris au même instant ; courbe lissée pour ne pas surestimer le pic ; mesure close si le boîtier OBD décroche.
+
 ## 0.46 — 18 novembre 2026 (pas encore essayée sur l'autoradio)
 - **Banc de puissance** (Moteur → Banc) : la vraie puissance et le vrai couple, mesurés pendant une accélération à
   fond. Le Lanceur repère tout seul l'accélération (pied au plancher, un seul rapport), relève vitesse et régime, puis

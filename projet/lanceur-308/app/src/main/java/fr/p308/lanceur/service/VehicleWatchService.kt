@@ -121,8 +121,10 @@ class VehicleWatchService : Service(), LocationListener {
                     Vehicle.state.value.outsideTempC)
                 AutoBackup.tick(this@VehicleWatchService)
                 checkBattery()
-                if (fr.p308.lanceur.vehicle.CarProfile.HAS_TURBO)
+                if (fr.p308.lanceur.vehicle.CarProfile.HAS_TURBO) {
                     fr.p308.lanceur.vehicle.TurboCool.tick(Engine.state.value, fr.p308.lanceur.drive.Trip.state.value.currentKmh)
+                    turboStartTick()
+                }
                 if (fr.p308.lanceur.vehicle.CarProfile.HAS_DPF) fr.p308.lanceur.vehicle.FapRegen.tick(Engine.state.value, fr.p308.lanceur.drive.Trip.state.value.currentKmh,
                     Vehicle.state.value.odometerKm)
                 fr.p308.lanceur.sound.BassAuto.tick(this@VehicleWatchService)
@@ -308,6 +310,54 @@ class VehicleWatchService : Service(), LocationListener {
             .setStyle(NotificationCompat.BigTextStyle().bigText(msg))
             .setAutoCancel(true)
             .build())
+    }
+
+    private var turboBanner = false
+    private var turboDismissed = false
+
+    /**
+     * v0.47 : attente au démarrage pour le graissage du turbo. Le moteur tourne si l'OBD lit un régime, ou si le CAN
+     * voit l'alternateur charger (le boîtier OBD met 5 à 11 s à se connecter, le CAN donne la tension dès le contact).
+     * Compte à rebours dans un bandeau par-dessus tout (CarPlay compris ; un appui le ferme), sur l'accueil, dans le
+     * panneau à côté de CarPlay, et à la voix si les annonces sont activées.
+     */
+    private fun turboStartTick() {
+        val e = Engine.state.value
+        val sign = !Vehicle.demo && ((e.connected && (e.rpm ?: 0) > 400) ||
+            (Vehicle.state.value.batteryV ?: 0f) >= CrankWatch.CHARGING_V)
+        val kmh = fr.p308.lanceur.drive.Trip.state.value.currentKmh
+        val ev = fr.p308.lanceur.vehicle.TurboStart.tick(sign, kmh, UiPrefs.turboStart, UiPrefs.turboStartS,
+            Vehicle.state.value.outsideTempC)
+        when (ev?.kind) {
+            fr.p308.lanceur.vehicle.TurboStart.Kind.STARTED -> {
+                turboDismissed = false
+                fr.p308.lanceur.vehicle.ObdLog.log("TURBO", "démarrage : attente de ${ev.seconds} s conseillée avant de partir (graissage)")
+                fr.p308.lanceur.sound.Voice.say("Attends ${ev.seconds} secondes avant de partir, le temps que l'huile arrive au turbo.")
+            }
+            fr.p308.lanceur.vehicle.TurboStart.Kind.READY -> {
+                fr.p308.lanceur.vehicle.ObdLog.log("TURBO", "attente de ${ev.seconds} s terminée à l'arrêt")
+                fr.p308.lanceur.sound.Voice.say("C'est bon, tu peux partir. Roule doucement tant que le moteur est froid.")
+            }
+            fr.p308.lanceur.vehicle.TurboStart.Kind.LEFT_EARLY ->
+                fr.p308.lanceur.vehicle.ObdLog.log("TURBO", "parti après ${ev.seconds} s sur ${ev.totalS} s conseillées")
+            null -> Unit
+        }
+        val s = fr.p308.lanceur.vehicle.TurboStart.state.value
+        // Bandeau fermé d'un appui : on ne le remet pas avant le prochain démarrage.
+        if (turboBanner && !banner.isLive) turboDismissed = true
+        when {
+            s.waitS > 0 && !turboDismissed -> {
+                banner.live("🛢  Turbo : attends ${s.waitS} s avant de partir", 0xE6C77700.toInt()); turboBanner = true
+            }
+            s.ready && !turboDismissed -> {
+                banner.live("✓  Tu peux partir — doucement tant que le moteur est froid", 0xE62E7D32.toInt()); turboBanner = true
+            }
+            else -> {
+                if (turboBanner && banner.isLive) banner.hide()
+                turboBanner = false
+                if (s.waitS == 0 && !s.ready) turboDismissed = false
+            }
+        }
     }
 
     private var wasCooled = false

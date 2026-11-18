@@ -126,6 +126,10 @@ class PerfOverlay(private val ctx: Context, private val onClose: () -> Unit) {
             c != null && c >= 105 -> Alert("Surchauffe : eau $c °C", RED, true)
             running && v != null && v < 12.8f -> Alert("Batterie ne charge pas (%.1f V)".format(Locale.FRANCE, v), ORANGE, true)
             running && v != null && v > 15.2f -> Alert("Surtension (%.1f V)".format(Locale.FRANCE, v), ORANGE, true)
+            // v0.47 : attente au démarrage, le temps que l'huile graisse le turbo.
+            fr.p308.lanceur.vehicle.TurboStart.state.value.waitS > 0 ->
+                Alert("Turbo : attends ${fr.p308.lanceur.vehicle.TurboStart.state.value.waitS} s avant de partir", ORANGE, false)
+            fr.p308.lanceur.vehicle.TurboStart.state.value.ready -> Alert("✓ Tu peux partir (doucement)", GREEN, false)
             // À l'arrêt après un effort : laisser tourner avant de couper (huile qui refroidit le turbo).
             // Régénération du FAP probable : la laisser finir (ne pas couper le moteur si possible).
             fr.p308.lanceur.vehicle.FapRegen.state.value.active ->

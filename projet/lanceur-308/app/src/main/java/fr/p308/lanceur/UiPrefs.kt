@@ -89,6 +89,15 @@ object UiPrefs {
     var readyScreen by mutableStateOf(true)
         private set
 
+    /** v0.47 : attente au démarrage pour le graissage du turbo (TurboStart), et sa durée en secondes. */
+    var turboStart by mutableStateOf(true)
+        private set
+    var turboStartS by mutableIntStateOf(30)
+        private set
+
+    fun updateTurboStart(v: Boolean) { turboStart = v; prefs.edit().putBoolean("turboStart", v).apply() }
+    fun updateTurboStartS(v: Int) { turboStartS = v.coerceIn(10, 90); prefs.edit().putInt("turboStartS", turboStartS).apply() }
+
     val carColor get() = CAR_COLORS[colorIndex.coerceIn(CAR_COLORS.indices)]
 
     fun updateReadyScreen(v: Boolean) {
@@ -129,6 +138,8 @@ object UiPrefs {
         plate = prefs.getString("plate", "") ?: ""
         welcomed = prefs.getBoolean("welcomed", false)
         readyScreen = prefs.getBoolean("readyScreen", true)
+        turboStart = prefs.getBoolean("turboStart", true)
+        turboStartS = prefs.getInt("turboStartS", 30).coerceIn(10, 90)
         Slot.entries.forEach { s -> prefs.getString("slot_${s.name}", null)?.let { slots[s] = it } }
     }
 

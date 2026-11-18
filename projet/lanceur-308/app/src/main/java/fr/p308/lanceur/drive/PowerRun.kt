@@ -82,11 +82,15 @@ object PowerMath {
         }
         if (raw.size < 4) return null
         if ((raw.maxOf { it.rpm } - raw.minOf { it.rpm }) < 900) return null
-        // Regroupement par tranches de 200 tr/min : une courbe lisse malgré le bruit point à point.
-        val points = raw.groupBy { it.rpm / 200 }
+        // Regroupement par tranches de 200 tr/min, puis moyenne avec les tranches voisines (v0.47) : la vitesse OBD est
+        // au km/h près, et sans ce lissage le pic serait pris sur la tranche la plus bruitée, donc surestimé.
+        val bins = raw.groupBy { it.rpm / 200 }
             .map { (bin, g) -> PowerPoint(bin * 200 + 100, g.map { it.ch }.average().toFloat(), g.map { it.nm }.average().toFloat()) }
             .sortedBy { it.rpm }
-        if (points.size < 3) return null
+        if (bins.size < 3) return null
+        val ch = smooth(bins.map { it.ch.toDouble() })
+        val nm = smooth(bins.map { it.nm.toDouble() })
+        val points = bins.indices.map { PowerPoint(bins[it].rpm, ch[it].toFloat(), nm[it].toFloat()) }
         val pCh = points.maxBy { it.ch }
         val pNm = points.maxBy { it.nm }
         return PowerResult(points, pCh.ch.roundToInt(), pCh.rpm, pNm.nm.roundToInt(), pNm.rpm, nowMs)
@@ -98,18 +102,27 @@ data class PowerState(
     val last: PowerResult? = null,
     val best: PowerResult? = null,
     val collecting: Boolean = false,
-    val status: String = "Accélère à fond en 3e ou 4e sur route plate",
+    val status: String = PowerRun.IDLE_STATUS,
 )
 
 /**
- * Banc de puissance par accélération (v0.46), nourri comme le chrono par la vitesse (OBD ou GPS). Il repère tout seul
- * une accélération à fond dans un seul rapport (charge forte, régime et vitesse qui montent), relève vitesse + régime
- * tout du long, puis calcule la courbe à la fin. Rien n'est envoyé à la voiture : lecture seule.
+ * Banc de puissance par accélération (v0.46). Nourri par la boucle OBD à chaque tour où régime, vitesse et charge
+ * ont été lus ensemble (v0.47 : avant, la vitesse arrivait avec le régime du tour précédent). Chaque accélération pied
+ * au plancher dans un seul rapport est mesurée toute seule : dernière mesure et record. Lecture seule.
+ * La logique est vérifiée par PowerRunTest (sans Android : préférences et journal facultatifs).
  */
 object PowerRun {
-    private const val FULL_LOAD = 70        // charge moteur (%) au-dessus de laquelle on considère « pied au plancher »
-    private const val SHIFT_DROP = 300      // chute de régime (tr/min) = passage de rapport : fin de la mesure
-    private const val MIN_POINTS = 6
+    /**
+     * Charge UTILE (ralenti retiré, voir netLoadPct) au-dessus de laquelle on est « pied au plancher ». v0.47 : la
+     * 0.46 prenait 70 % de charge brute, or ce calculateur lit déjà 60-70 % en roulant normalement (journal du 18/11) :
+     * une accélération ordinaire passait pour une mesure.
+     */
+    const val FULL_LOAD = 85f
+    /** Chute de régime (tr/min) = passage de rapport : fin de la mesure. */
+    private const val SHIFT_DROP = 300
+    /** Trou entre deux relevés (boîtier OBD qui décroche) : la mesure s'arrête là. */
+    private const val MAX_GAP_MS = 2_500L
+    const val IDLE_STATUS = "Mesure automatique : accélère à fond en 3e ou 4e sur route plate"
 
     private var prefs: SharedPreferences? = null
     private val _state = MutableStateFlow(PowerState())
@@ -119,47 +132,43 @@ object PowerRun {
     private var active = false
     private var lastKmh = -1f
     private var lastRpm = 0
-    private var armed = true
+    private var lastMs = 0L
 
-    /** Fournis par l'app au moment de calculer (évite de dépendre d'Android dans le calcul). */
-    var rpmNow: () -> Int? = { null }
-    var loadNow: () -> Int? = { null }
+    /** Température extérieure (densité de l'air) et journal : branchés par init, absents dans les tests. */
     var tempNow: () -> Float? = { null }
+    var log: (String) -> Unit = {}
 
     fun init(ctx: Context) {
         val p = ctx.getSharedPreferences("power", Context.MODE_PRIVATE)
         prefs = p
-        rpmNow = { fr.p308.lanceur.vehicle.Engine.state.value.rpm }
-        loadNow = { fr.p308.lanceur.vehicle.Engine.state.value.loadPct }
         tempNow = { fr.p308.lanceur.vehicle.Vehicle.state.value.outsideTempC }
-        val best = decode(p.getString("best", null))
-        _state.value = PowerState(last = decode(p.getString("last", null)), best = best)
+        log = { fr.p308.lanceur.vehicle.ObdLog.log("PUISSANCE", it) }
+        _state.value = PowerState(last = decode(p.getString("last", null)), best = decode(p.getString("best", null)))
     }
 
-    /** Prépare une nouvelle mesure : la prochaine accélération à fond sera relevée (le record est gardé). */
-    fun arm() {
-        armed = true
-        active = false
-        samples.clear()
-        _state.value = _state.value.copy(collecting = false, status = "Prêt : accélère à fond en 3e ou 4e sur route plate")
-    }
-
-    /** Efface le record (et la dernière mesure). */
-    fun resetBest() {
+    /** Efface la dernière mesure et le record. */
+    @Synchronized
+    fun clearAll() {
         prefs?.edit()?.remove("best")?.remove("last")?.apply()
+        samples.clear()
+        active = false
         _state.value = PowerState()
     }
 
+    /**
+     * Un tour de la boucle OBD : régime, vitesse (km/h) et charge utile (%) lus ensemble. Commence une mesure quand
+     * le pied est au plancher et que la vitesse monte ; la termine au passage de rapport, au lever de pied, ou si les
+     * relevés s'interrompent.
+     */
     @Synchronized
-    fun feed(kmh: Float, nanos: Long) {
-        val rpm = rpmNow() ?: return
-        val load = loadNow() ?: 0
+    fun feed(rpm: Int, kmh: Float, netLoadPct: Float, nanos: Long) {
         val ms = nanos / 1_000_000
-        val rising = kmh > lastKmh + 0.2f
-        val pulling = load >= FULL_LOAD && rpm > 1000
-
+        val gap = lastMs != 0L && ms - lastMs > MAX_GAP_MS
+        if (active && gap) finish()
+        val pulling = netLoadPct >= FULL_LOAD && rpm > 1000
         if (!active) {
-            if (armed && pulling && rising && rpm in 1100..4800) {
+            val rising = lastKmh >= 0f && !gap && kmh > lastKmh + 0.2f
+            if (pulling && rising && rpm in 1100..4800) {
                 active = true
                 samples.clear()
                 samples += Triple(ms, kmh, rpm)
@@ -167,32 +176,32 @@ object PowerRun {
             }
         } else {
             val shifted = rpm < lastRpm - SHIFT_DROP
-            if (pulling && !shifted && kmh >= lastKmh - 1f && rpm <= 5200) {
-                samples += Triple(ms, kmh, rpm)
-            } else {
-                finish()
-            }
+            if (pulling && !shifted && kmh >= lastKmh - 1f && rpm <= 5200) samples += Triple(ms, kmh, rpm) else finish()
         }
         lastKmh = kmh
         lastRpm = rpm
+        lastMs = ms
     }
 
     private fun finish() {
-        val result = PowerMath.curve(samples.toList(), tempNow())
+        val taken = samples.toList()
         active = false
         samples.clear()
+        val result = PowerMath.curve(taken, tempNow())
         if (result == null) {
-            _state.value = _state.value.copy(collecting = false, status = "Mesure trop courte : recommence, pied au plancher jusqu'à la zone rouge")
+            // Un coup d'accélérateur bref (1 ou 2 relevés) ne mérite pas de message.
+            val status = if (taken.size >= 3) "Mesure trop courte : garde le pied au plancher jusqu'à la zone rouge, sans changer de rapport"
+            else _state.value.status.takeIf { it != "Mesure en cours…" } ?: IDLE_STATUS
+            _state.value = _state.value.copy(collecting = false, status = status)
             return
         }
-        armed = false
         val best = _state.value.best
         val newBest = if (best == null || result.peakCh > best.peakCh) result else best
         _state.value = PowerState(last = result, best = newBest, collecting = false,
             status = "Mesure : ${result.peakCh} ch à ${result.peakChRpm} tr/min, ${result.peakNm} Nm")
         prefs?.edit()?.putString("last", encode(result))?.putString("best", encode(newBest))?.apply()
-        fr.p308.lanceur.vehicle.ObdLog.log("PUISSANCE", "banc : %d ch à %d tr/min, %d Nm à %d tr/min (%d points)"
-            .format(result.peakCh, result.peakChRpm, result.peakNm, result.peakNmRpm, result.points.size))
+        log("banc : %d ch à %d tr/min, %d Nm à %d tr/min (%d relevés, %d points)"
+            .format(result.peakCh, result.peakChRpm, result.peakNm, result.peakNmRpm, taken.size, result.points.size))
     }
 
     private fun encode(r: PowerResult?): String? = r?.let {

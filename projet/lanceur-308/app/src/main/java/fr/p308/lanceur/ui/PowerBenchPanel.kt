@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -74,9 +73,9 @@ fun PowerBenchPanel() {
             Tile(Modifier.weight(1.1f).fillMaxWidth()) {
                 Text("Annoncé : ${CarProfile.ENGINE_LABEL}", fontSize = 12.sp, color = C.Sub)
                 Text("Estimation ± 10-15 %. Route plate, sans vent.", fontSize = 11.sp, color = C.Sub)
+                Text("Chaque accélération pied au plancher est mesurée toute seule.", fontSize = 11.sp, color = C.Sub)
                 Spacer(Modifier.weight(1f))
-                Button(onClick = { PowerRun.arm() }, modifier = Modifier.fillMaxWidth()) { Text("Nouvelle mesure") }
-                TextButton(onClick = { PowerRun.resetBest() }, modifier = Modifier.fillMaxWidth()) { Text("Effacer le record", fontSize = 12.sp) }
+                TextButton(onClick = { PowerRun.clearAll() }, modifier = Modifier.fillMaxWidth()) { Text("Effacer les mesures", fontSize = 13.sp) }
             }
         }
     }
@@ -93,10 +92,13 @@ private fun PowerCurve(r: PowerResult, modifier: Modifier) {
         Canvas(Modifier.weight(1f).fillMaxWidth().padding(top = 6.dp)) {
             val w = size.width
             val h = size.height
+            // Échelle haute adaptée à la mesure (v0.47) : une valeur au-delà de 130 ch ou 280 Nm n'est plus coupée net.
+            val maxCh = maxOf(BENCH_MAX_CH, r.peakCh * 1.15f)
+            val maxNm = maxOf(BENCH_MAX_NM, r.peakNm * 1.15f)
             // Échelle de 1 000 à 5 000 tr/min, alignée sur les graduations écrites dessous (aux deux bords et tous les 1 000).
             fun x(rpm: Int) = ((rpm - BENCH_MIN_RPM) / (BENCH_MAX_RPM - BENCH_MIN_RPM)).coerceIn(0f, 1f) * w
-            fun yCh(ch: Float) = h - (ch / BENCH_MAX_CH).coerceIn(0f, 1f) * h
-            fun yNm(nm: Float) = h - (nm / BENCH_MAX_NM).coerceIn(0f, 1f) * h
+            fun yCh(ch: Float) = h - (ch / maxCh).coerceIn(0f, 1f) * h
+            fun yNm(nm: Float) = h - (nm / maxNm).coerceIn(0f, 1f) * h
             // Repères verticaux à 2 000, 3 000 et 4 000 tr/min.
             for (k in 2..4) {
                 val xv = x(k * 1000)

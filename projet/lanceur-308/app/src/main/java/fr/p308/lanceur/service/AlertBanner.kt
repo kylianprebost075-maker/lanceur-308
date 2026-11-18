@@ -16,6 +16,7 @@ class AlertBanner(private val ctx: Context) {
     private val wm = ctx.getSystemService(WindowManager::class.java)
     private val handler = Handler(Looper.getMainLooper())
     private var view: TextView? = null
+    private val LIVE = "live"
 
     fun show(text: String, color: Int, durationMs: Long = 10_000) {
         if (!Settings.canDrawOverlays(ctx)) return
@@ -37,6 +38,27 @@ class AlertBanner(private val ctx: Context) {
         view = v
         handler.postDelayed(::hide, durationMs)
     }
+
+    /**
+     * v0.47 : bandeau qui reste affiché et dont le texte change (compte à rebours du turbo), sans clignoter : il est
+     * créé la première fois puis seulement mis à jour. Enlevé par [hide].
+     */
+    fun live(text: String, color: Int) {
+        if (!Settings.canDrawOverlays(ctx)) return
+        handler.removeCallbacksAndMessages(null)
+        val current = view
+        if (current != null && current.tag == LIVE) {
+            if (current.text != text) current.text = text
+            (current.background as? GradientDrawable)?.setColor(color)
+            return
+        }
+        show(text, color, Long.MAX_VALUE / 4)
+        handler.removeCallbacksAndMessages(null)
+        view?.tag = LIVE
+    }
+
+    /** Vrai si le bandeau affiché est celui de [live]. */
+    val isLive: Boolean get() = view?.tag == LIVE
 
     fun hide() {
         handler.removeCallbacksAndMessages(null)

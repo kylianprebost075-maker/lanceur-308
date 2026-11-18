@@ -294,7 +294,13 @@ fun HomeAndMaintenanceScreen(vs: VehicleState, items: List<MaintenanceItem>, int
                         // Conseil turbo à l'arrêt après un effort, sinon la source des données.
                         val turbo by fr.p308.lanceur.vehicle.TurboCool.state.collectAsStateWithLifecycle()
                         val regen by fr.p308.lanceur.vehicle.FapRegen.state.collectAsStateWithLifecycle()
+                        val start by fr.p308.lanceur.vehicle.TurboStart.state.collectAsStateWithLifecycle()
                         when {
+                            // v0.47 : attente au démarrage (graissage du turbo).
+                            start.waitS > 0 -> Text("Turbo : attends ${start.waitS} s avant de partir (graissage)",
+                                fontSize = 15.sp, fontWeight = FontWeight.Bold, color = C.Orange)
+                            start.ready -> Text("✓ Tu peux partir — doucement tant que le moteur est froid",
+                                fontSize = 15.sp, fontWeight = FontWeight.Bold, color = C.Green)
                             regen.active -> Text("Régénération du FAP probable : évite de couper, roule encore si tu peux",
                                 fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = C.Orange)
                             turbo.stopped && turbo.waitS >= 5 -> Text("Turbo chaud : laisse tourner ${turbo.waitS} s avant de couper",

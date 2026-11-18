@@ -22,7 +22,6 @@ object Speed {
         Trip.feed(clean, nanos)
         TripLog.feed(clean, nanos)
         Chrono.feed(clean, nanos)
-        PowerRun.feed(clean, nanos)
     }
 
     /** Remet la vitesse courante à 0 si ni l'OBD ni le GPS n'ont envoyé de mesure depuis 3,5 s (arrêt / garage). */
@@ -33,7 +32,6 @@ object Speed {
             Trip.feed(0f, nanos)
             TripLog.feed(0f, nanos)
             Chrono.feed(0f, nanos)
-            PowerRun.feed(0f, nanos)
         }
     }
 }

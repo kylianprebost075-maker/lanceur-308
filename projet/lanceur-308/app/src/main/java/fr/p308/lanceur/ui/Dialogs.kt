@@ -334,6 +334,18 @@ fun SettingsDialog(onDismiss: () -> Unit) {
                     TextButton(onClick = { readyNow = true }) { Text("Voir") }
                     Switch(UiPrefs.readyScreen, UiPrefs::updateReadyScreen)
                 }
+                // v0.47 : compte à rebours au démarrage, le temps que l'huile monte jusqu'au turbo.
+                if (fr.p308.lanceur.vehicle.CarProfile.HAS_TURBO) {
+                    SettingRow("Attente turbo au démarrage",
+                        "Au démarrage, attends avant de partir : l'huile graisse le turbo (+15 s s'il gèle ; rien après un arrêt de moins de 5 min)") {
+                        TextButton(onClick = { fr.p308.lanceur.vehicle.TurboStart.preview(UiPrefs.turboStartS, vs.outsideTempC) }) { Text("Voir") }
+                        Switch(UiPrefs.turboStart, UiPrefs::updateTurboStart)
+                    }
+                    if (UiPrefs.turboStart) {
+                        Segmented(listOf(20 to "20 s", 30 to "30 s", 45 to "45 s", 60 to "60 s"), UiPrefs.turboStartS,
+                            Modifier.fillMaxWidth()) { UiPrefs.updateTurboStartS(it) }
+                    }
+                }
                 SettingRow("Optimiser l'autoradio", "Mémoire, applis inutiles, mode CarPlay, réglages qui accélèrent Android") {
                     Button(onClick = { optim = true }) { Text("Ouvrir") }
                 }
