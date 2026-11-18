@@ -511,9 +511,11 @@ class PerfOverlay(private val ctx: Context, private val onClose: () -> Unit) {
         val lph = if (e.powerCh != null && (e.rpm ?: 0) > 400) {
             fr.p308.lanceur.drive.FuelModel.litersPerHour(e.powerCh) * fr.p308.lanceur.drive.FuelModel.factor
         } else null
-        // v0.42 : en roulant, la conso instantanée de l'ordinateur de bord (CAN) passe devant l'estimation.
-        val canInst = fr.p308.lanceur.vehicle.Vehicle.state.value.instantL100
-        val inst = if (kmh >= 8 && canInst != null) canInst.toDouble() else lph?.let { if (kmh >= 8) it / kmh * 100 else it }
+        // v0.42 : la conso instantanée de l'ordinateur de bord (CAN) passe devant l'estimation. v0.45 : elle est en L/h,
+        // convertie en L/100 en roulant, affichée telle quelle à l'arrêt.
+        val canLph = fr.p308.lanceur.vehicle.Vehicle.state.value.instantLph?.toDouble()
+        val bestLph = canLph ?: lph
+        val inst = bestLph?.let { if (kmh >= 8) it / kmh * 100 else it }
         fuelSmooth = inst?.let { v -> fuelSmooth?.let { it + (v - it) * 0.15 } ?: v }
         val fs = fuelSmooth
         when {

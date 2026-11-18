@@ -19,7 +19,10 @@ object CanBusSource {
     private const val U_LAMPLET = 4
     private const val U_BACKCAR = 12
     private const val U_DRIVING_MILEAGE = 103
-    /** v0.39 : conso moyenne et instantanée de l'ordinateur de bord, en dixièmes de L/100 (journal [CAN7] du 16/11). */
+    /**
+     * v0.39 : conso de l'ordinateur de bord (journal [CAN7] du 16/11) : moyenne en dixièmes de L/100, instantanée en
+     * dixièmes de L/h (v0.45 : 5,5 L/100 sur 41 km le 18/11 en la lisant ainsi, comme la moyenne de la voiture).
+     */
     private const val U_AVG_CONSO = 99
     private const val U_INSTANT_CONSO = 102
     /** Distances des trajets 1 et 2 de l'ordinateur de bord (km, relevé du 16/11) : notées au départ, pas utilisées. */
@@ -120,8 +123,8 @@ object CanBusSource {
                     if (code == U_DRIVING_MILEAGE && v in 15..1999 && Vehicle.state.value.fuelRangeKm != v) {
                         Vehicle.update { s -> s.copy(fuelRangeKm = v, source = "CAN (FYT)") }
                     }
-                    // v0.39 : ordinateur de bord (relevé du 16/11) : 99 = conso moyenne, 102 = conso instantanée,
-                    // en dixièmes de L/100 ; 65535 = pas de valeur (voiture à l'arrêt).
+                    // v0.39 : ordinateur de bord (relevé du 16/11) : 99 = conso moyenne en dixièmes de L/100,
+                    // 102 = conso instantanée en dixièmes de L/h (v0.45, essai du 18/11) ; 65535 = pas de valeur.
                     if (code == U_AVG_CONSO) decodeConso(v)?.let { l ->
                         CarFeatures.mark(Feature.RANGE, "conso moyenne %.1f L/100".format(java.util.Locale.FRANCE, l))
                         if (Vehicle.state.value.boardAvgL100 != l) Vehicle.update { s -> s.copy(boardAvgL100 = l) }
@@ -131,7 +134,7 @@ object CanBusSource {
                     if (code in TRIP_BC_CODES) tripComputer[code] = v
                     if (code == U_INSTANT_CONSO) {
                         val l = if (v == 65535) null else v / 10f
-                        if (Vehicle.state.value.instantL100 != l) Vehicle.update { s -> s.copy(instantL100 = l?.takeIf { it <= 50f }) }
+                        if (Vehicle.state.value.instantLph != l) Vehicle.update { s -> s.copy(instantLph = l?.takeIf { it <= 50f }) }
                     }
                 }
                 MODULE_MAIN -> when (code) {

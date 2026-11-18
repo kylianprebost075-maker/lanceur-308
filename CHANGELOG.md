@@ -4,7 +4,14 @@ Les versions publiées se téléchargent sur la page
 [Releases](https://github.com/kylianprebost075-maker/lanceur-308/releases). Une mise à jour s'installe par-dessus
 l'ancienne version et garde les réglages. Le détail technique de chaque version est dans le [README](README.md).
 
-## 0.44 — 17 novembre 2026 (pas encore essayée sur l'autoradio)
+## 0.45 — 18 novembre 2026 (pas encore essayée sur l'autoradio)
+- **Conso juste** : la conso instantanée envoyée par la voiture est en litres par heure, pas en L/100 (essai du
+  18/11 : 5,5 L/100 sur 41 km en la lisant ainsi, comme la moyenne de l'ordinateur de bord). Corrigé pour la conso
+  des trajets, le panneau à côté de CarPlay (en L/h à l'arrêt) et l'indice « gazole en trop » du FAP, qui réapprend
+  de zéro. Les trajets des versions 0.43-0.44 sont relus avec la bonne valeur.
+- Le journal `[CONSO]` note aussi la moyenne affichée par la voiture, pour comparer d'un coup d'œil.
+
+## 0.44 — 17 novembre 2026 (essayée le 18/11 : lecture du FAP refusée par le calculateur, conso tranchée en L/h)
 - **FAP lu dans le calculateur moteur** : charge du filtre (%), pression différentielle, km depuis la dernière
   régénération et distance moyenne entre deux, comme les applis de diagnostic. Décodage tiré de
   [PSA-RE](https://github.com/prototux/PSA-RE) (licence Apache 2.0). Lu à chaque connexion du boîtier OBD, puis toutes

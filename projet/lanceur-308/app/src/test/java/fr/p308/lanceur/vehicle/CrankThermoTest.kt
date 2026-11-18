@@ -78,8 +78,9 @@ class CrankThermoTest {
     }
 
     @Test fun fapFuelFlowFromInstantConsumption() {
-        assertEquals(4.95f, FapRegen.fuelLph(5.5f, 90f)!!, 0.001f) // 5,5 L/100 à 90 km/h = 4,95 L/h
-        assertNull(FapRegen.fuelLph(5.5f, 10f)) // trop lent : L/100 × vitesse ne veut plus rien dire
+        // v0.45 : la voiture donne des L/h, pris tels quels (plus de multiplication par la vitesse).
+        assertEquals(4.9f, FapRegen.fuelLph(4.9f, 90f)!!, 0.001f)
+        assertNull(FapRegen.fuelLph(0.6f, 10f)) // ralenti et manœuvres : pas comparés
         assertNull(FapRegen.fuelLph(null, 90f))
     }
 

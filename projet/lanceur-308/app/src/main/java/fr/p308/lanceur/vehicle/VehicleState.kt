@@ -24,8 +24,12 @@ data class VehicleState(
     val outsideTempEstimated: Boolean = false,
     val batteryV: Float? = null,
     val fuelRangeKm: Int? = null,
-    /** v0.39 : conso instantanée de l'ordinateur de bord (L/100, CAN 7/102), null à l'arrêt ou inconnue. */
-    val instantL100: Float? = null,
+    /**
+     * Conso instantanée de l'ordinateur de bord en L/h (CAN 7/102, dixièmes), null si inconnue. v0.45 : lue en L/h et
+     * non plus en L/100 (essai du 18/11 : 5,5 L/100 sur 41 km en L/h, comme la moyenne de l'ordinateur de bord ; 4 à 7
+     * au ralenti, impossible en L/100).
+     */
+    val instantLph: Float? = null,
     /** v0.39 : conso moyenne de l'ordinateur de bord (L/100, CAN 7/99). */
     val boardAvgL100: Float? = null,
     val reverse: Boolean = false,

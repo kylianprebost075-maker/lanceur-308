@@ -42,16 +42,14 @@ data class TripRecord(
     val fuelRawL: Double = 0.0,
     /** Secondes à 70 km/h ou plus (voie rapide : le FAP peut se régénérer). -1 = trajet d'avant la v0.12. */
     val fastS: Int = -1,
-    /** v0.39 : gazole d'après la conso instantanée de l'ordinateur de bord (CAN), et km couverts par cette mesure. */
+    /**
+     * Gazole d'après la conso instantanée de l'ordinateur de bord (CAN 7/102 en L/h × heures), et km couverts par
+     * cette mesure. v0.45 : la lecture en L/h est la bonne (essai du 18/11, voir VehicleState.instantLph).
+     */
     val canFuelL: Double = 0.0,
     val canKm: Double = 0.0,
-    /**
-     * v0.43 : même mesure en lisant la valeur CAN 7/102 comme des L/h (dixièmes) et non des L/100 : litres = valeur ×
-     * heures. Le 17/11, la lecture en L/100 donnait 4,4 L/100 le matin et 3,8 sur les 11 premiers km du soir, moteur
-     * froid en ville, ce qui est invraisemblable (un diesel froid en ville consomme plus, pas moins). Les deux sont notées
-     * au journal ([CONSO]) en face de l'ordinateur de bord, jusqu'à savoir laquelle est juste.
-     */
-    val canFuelHourL: Double = 0.0,
+    /** v0.45 : l'ancienne lecture (valeur prise pour des L/100 × km), gardée une version pour le journal [CONSO]. */
+    val canFuelOldL: Double = 0.0,
 ) {
     /**
      * Litres du trajet. v0.39 : d'abord l'ordinateur de bord (conso instantanée × km, si elle couvre au moins 60 % du
@@ -222,15 +220,16 @@ object TripLog {
         val moving = lastKmh > 5f
         // Gazole (moteur tournant, même à l'arrêt) et temps sur voie rapide, avant le détail OBD ci-dessous.
         val engineOn = e.connected && (e.rpm ?: 0) > 400
-        // v0.39 : conso instantanée de l'ordinateur de bord (L/100) × km parcourus dans la seconde.
-        val inst = if (moving) fr.p308.lanceur.vehicle.Vehicle.state.value.instantL100 else null
+        // v0.45 : conso instantanée de l'ordinateur de bord en L/h, comptée chaque seconde où elle est connue (ralenti
+        // compris, comme l'ordinateur de bord), avec les km parcourus pendant ce temps.
+        val lph = fr.p308.lanceur.vehicle.Vehicle.state.value.instantLph
         val kmThisSecond = lastKmh / 3600.0
         val base = t.copy(
             fuelRawL = t.fuelRawL + if (engineOn) FuelModel.litersPerHour(e.powerCh) / 3600.0 else 0.0,
             fastS = t.fastS.coerceAtLeast(0) + if (lastKmh >= 70f) 1 else 0,
-            canFuelL = t.canFuelL + (inst?.let { it / 100.0 * kmThisSecond } ?: 0.0),
-            canKm = t.canKm + if (inst != null) kmThisSecond else 0.0,
-            canFuelHourL = t.canFuelHourL + (inst?.let { it / 3600.0 } ?: 0.0),
+            canFuelL = t.canFuelL + (lph?.let { it / 3600.0 } ?: 0.0),
+            canKm = t.canKm + if (lph != null) kmThisSecond else 0.0,
+            canFuelOldL = t.canFuelOldL + (lph?.takeIf { moving }?.let { it / 100.0 * kmThisSecond } ?: 0.0),
         )
         _current.value = if (moving && e.connected && e.rpm != null) {
             val t = base
@@ -322,12 +321,13 @@ object TripLog {
         // v0.39 : conso du trajet au journal, ordinateur de bord (CAN) et estimation OBD côte à côte.
         val loc = java.util.Locale.FRANCE
         val can = if (t.canKm >= 1.0) "%.1f L/100 sur %.1f km".format(loc, t.canFuelL / t.canKm * 100, t.canKm) else "—"
-        val canH = if (t.canKm >= 1.0) "%.1f L/100".format(loc, t.canFuelHourL / t.canKm * 100) else "—"
+        val old = if (t.canKm >= 1.0) "%.1f L/100".format(loc, t.canFuelOldL / t.canKm * 100) else "—"
         val obd = if (t.fuelRawL > 0.05 && t.distanceKm >= 1.0)
             "%.1f L/100".format(loc, t.fuelRawL * FuelModel.factor / t.distanceKm * 100) else "—"
+        val avg = fr.p308.lanceur.vehicle.Vehicle.state.value.boardAvgL100?.let { "%.1f L/100".format(loc, it) } ?: "—"
         val board = boardTripText(boardStart, listOf(1, 2).associateWith { fr.p308.lanceur.vehicle.CanBusSource.boardTrip(it) })
-        fr.p308.lanceur.vehicle.ObdLog.log("CONSO", "trajet de %.1f km : instantanée lue en L/100 %s, lue en L/h %s, estimation OBD %s ; %s"
-            .format(loc, t.distanceKm, can, canH, obd, board))
+        fr.p308.lanceur.vehicle.ObdLog.log("CONSO", ("trajet de %.1f km : ordinateur de bord (L/h) %s, ancienne lecture %s, " +
+            "estimation OBD %s, moyenne affichée par la voiture %s ; %s").format(loc, t.distanceKm, can, old, obd, avg, board))
         boardStart = emptyMap()
         _history.value = (listOf(t) + _history.value).take(MAX_TRIPS)
         prefs?.edit()?.putString("list", encodeList(_history.value))?.apply()
@@ -377,15 +377,24 @@ object TripLog {
         .put("obd", t.obdS).put("haut", t.overRevS).put("froid", t.coldRevS)
         .put("passages", t.shifts).put("tard", t.lateShifts).put("tot", t.earlyShifts).put("rpmPassages", t.shiftRpmSum)
         .put("peine", t.lugS).put("gazole", t.fuelRawL).put("rapide", t.fastS)
-        .put("gazoleCan", t.canFuelL).put("kmCan", t.canKm).put("gazoleCanH", t.canFuelHourL)
+        .put("gazoleLh", t.canFuelL).put("kmCan", t.canKm).put("gazoleL100", t.canFuelOldL)
 
     private fun decode(o: JSONObject) = TripRecord(
         o.getLong("s"), o.getLong("e"), o.getDouble("km"), o.getDouble("mv"), o.getDouble("max").toFloat(),
         o.optInt("ch"), o.optInt("acc"), o.optInt("frein"), o.optInt("obd"), o.optInt("haut"), o.optInt("froid"),
         o.optInt("passages", -1), o.optInt("tard"), o.optInt("tot"), o.optLong("rpmPassages"), o.optInt("peine"),
         o.optDouble("gazole", 0.0), o.optInt("rapide", -1),
-        o.optDouble("gazoleCan", 0.0), o.optDouble("kmCan", 0.0), o.optDouble("gazoleCanH", 0.0),
+        // v0.45 : gazole lu en L/h. Trajets des versions 0.43-0.44 : « gazoleCanH » (même lecture, ralenti non compté).
+        // Avant la 0.43, seule la lecture fausse en L/100 existait : laissée de côté, l'estimation OBD prend le relais.
+        canFuelForKm(o), o.optDouble("kmCan", 0.0), o.optDouble("gazoleL100", o.optDouble("gazoleCan", 0.0)),
     )
+
+    /** Gazole CAN d'un trajet enregistré, selon la version qui l'a écrit (voir decode). */
+    internal fun canFuelForKm(o: JSONObject): Double = when {
+        o.has("gazoleLh") -> o.optDouble("gazoleLh", 0.0)
+        o.has("gazoleCanH") -> o.optDouble("gazoleCanH", 0.0)
+        else -> 0.0
+    }
 
     private fun encodeList(list: List<TripRecord>) = JSONArray(list.map(::encode)).toString()
 

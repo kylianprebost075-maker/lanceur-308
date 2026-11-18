@@ -64,9 +64,12 @@ object FapRegen {
     private var instChanges = 0
     private var fuelAloneLogMs = 0L
 
-    /** Litres par heure d'après la conso instantanée (L/100) et la vitesse ; null à basse vitesse ou sans valeur. */
-    fun fuelLph(instL100: Float?, kmh: Float): Float? =
-        if (instL100 == null || kmh < FUEL_MIN_KMH) null else instL100 * kmh / 100f
+    /**
+     * Litres par heure de la conso instantanée. v0.45 : la voiture les donne directement (CAN 7/102 en L/h) ; avant,
+     * la valeur était prise pour des L/100 et multipliée par la vitesse, ce qui la faussait. Gardé au-dessus de
+     * [FUEL_MIN_KMH] pour comparer des situations semblables (ralenti et manœuvres à part).
+     */
+    fun fuelLph(instLph: Float?, kmh: Float): Float? = if (instLph == null || kmh < FUEL_MIN_KMH) null else instLph
 
     /**
      * v0.41 : eau minimale pour apprendre et détecter. 75 °C normalement ; avec un thermostat resté ouvert l'eau
@@ -107,7 +110,8 @@ object FapRegen {
             base[i] = b
             count[i] = c
         }
-        p.getString("fuelBase", null)?.split(';')?.forEachIndexed { i, s ->
+        // v0.45 : nouvelle clé, la table d'avant (apprise avec la mauvaise lecture de la conso) repart de zéro.
+        p.getString("fuelBaseLh", null)?.split(';')?.forEachIndexed { i, s ->
             if (i >= fuelBase.size) return@forEachIndexed
             val f = s.split(':')
             fuelBase[i] = f.getOrNull(0)?.toFloatOrNull() ?: 0f
@@ -183,7 +187,7 @@ object FapRegen {
         }
         val highShare = if (window.size >= 40) window.sum().toFloat() / window.size else 0f
         // v0.41 : gazole en trop (post-injection), à toutes les charges.
-        val inst = Vehicle.state.value.instantL100
+        val inst = Vehicle.state.value.instantLph
         if (inst != lastInst) { lastInst = inst; instChanges++ }
         val lph = fuelLph(inst, kmh)
         val fc = fuelCell(rpm, load)
@@ -265,7 +269,8 @@ object FapRegen {
         lastSaveMs = nowMs
         prefs?.edit()
             ?.putString("base", base.indices.joinToString(";") { "${"%.2f".format(java.util.Locale.US, base[it])}:${count[it]}" })
-            ?.putString("fuelBase", fuelBase.indices.joinToString(";") { "${"%.2f".format(java.util.Locale.US, fuelBase[it])}:${fuelCount[it]}" })
+            ?.remove("fuelBase")
+            ?.putString("fuelBaseLh", fuelBase.indices.joinToString(";") { "${"%.2f".format(java.util.Locale.US, fuelBase[it])}:${fuelCount[it]}" })
             ?.putString("records", _state.value.records.joinToString(";", transform = ::encode))
             ?.apply()
     }

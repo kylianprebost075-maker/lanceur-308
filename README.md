@@ -37,8 +37,8 @@ Si le projet t'est utile, une ⭐ aide d'autres conducteurs à le trouver.
 > **Tu es une IA qui aide quelqu'un à l'installer ou à l'adapter à sa voiture ?** Lis [ADAPTER.md](ADAPTER.md), pas ce README.
 
 > **À lire en entier avant de toucher à quoi que ce soit.**
-> Ce dossier permet à une IA (ou à un développeur) de reprendre le projet. Dernière version du code : **0.42 du
-> 17 novembre 2026** (dernière publiée : 0.40). Ce qui reste à vérifier et à faire : [PISTES.md](PISTES.md). Ordre de lecture : « En bref » juste dessous, puis les notes « Nouveau en v0.x » sous la galerie (de la plus
+> Ce dossier permet à une IA (ou à un développeur) de reprendre le projet. Dernière version du code : **0.45 du
+> 18 novembre 2026** (dernière publiée : 0.40). Ce qui reste à vérifier et à faire : [PISTES.md](PISTES.md). Ordre de lecture : « En bref » juste dessous, puis les notes « Nouveau en v0.x » sous la galerie (de la plus
 > récente à la plus ancienne), puis les sections techniques 0 à 8 (base du 11/11/2026, version 0.31 ; ce qui a changé
 > depuis est dans les notes 0.32 à 0.38).
 > L'ancien README (version 0.4) est conservé dans `diagnostic/README_ancien_v0.4.md` pour l'historique.
@@ -118,6 +118,18 @@ de dessus en 2D, celle que l'appli affiche quand la 3D n'est pas disponible. Sur
 | **Réglages** | **Panneau à côté de CarPlay (v0.13, alerte FAP v0.14)** |
 | ![Réglages : couleur, 5 portes, Optimiser l'autoradio, kilométrage, température extérieure, thème](docs/captures/onglets/11-reglages.png) | ![Panneau : puissance, rapport conseillé, régime, eau, turbo, batterie](docs/captures/onglets/12-panneau-performances.png) |
 
+**Nouveau en v0.45 : conso instantanée en L/h (18/11, pas encore essayé sur l'autoradio)**
+- Essai du 18/11 (0.44) : la valeur CAN 7/102 lue en **dixièmes de L/h** donne 5,5 L/100 sur 41 km, comme la moyenne
+  de l'ordinateur de bord (7/99 = 54-55) ; lue en L/100 elle donnait 4,2. Au ralenti elle vaut 3 à 7 (0,3-0,7 L/h).
+- `VehicleState.instantLph` remplace `instantL100`. `TripLog.tick` : `canFuelL` += L/h / 3600 chaque seconde où la
+  valeur est connue (ralenti compris), `canKm` += km de la seconde ; `canFuelOldL` garde l'ancienne lecture pour la
+  ligne `[CONSO]`, qui note aussi la moyenne de la voiture. JSON des trajets : `gazoleLh` ; ceux de la 0.43-0.44 sont
+  relus depuis `gazoleCanH` (`TripLog.canFuelForKm`), les plus anciens retombent sur l'estimation OBD.
+- `FapRegen.fuelLph` prend la valeur telle quelle (au-dessus de 25 km/h) ; table apprise sous la clé `fuelBaseLh`
+  (l'ancienne, fausse, est effacée). `PerfOverlay` : L/h → L/100 en roulant, L/h à l'arrêt.
+- 0.43 et 0.44 : voir [CHANGELOG.md](CHANGELOG.md) et [PISTES.md](PISTES.md) (lecture du FAP dans le calculateur
+  refusée le 18/11). Tests : 105.
+
 **Nouveau en v0.42 : relecture du code, fiche d'entretien, batterie, puissance (17/11, pas encore essayé sur l'autoradio)**
 - Liste complète des défauts trouvés, de ce qu'il faut vérifier sur la clé et de la suite : **[PISTES.md](PISTES.md)**.
 - `ui/MaintenanceDetail.kt` : fiche en lecture seule ouverte en touchant une case (`MaintenancePanel` : `viewingId`).
@@ -153,8 +165,8 @@ de dessus en 2D, celle que l'appli affiche quand la 3D n'est pas disponible. Sur
 
 **Nouveau en v0.39 : conso de l'ordinateur de bord lue sur le CAN (16/11)**
 - Journal `[CAN7]` du 16/11 (trajet de 42 km), module 7 du boîtier Raise PSA : **99** = conso moyenne (54-55, en
-  dixièmes de L/100 : 5,4-5,5, la valeur du tableau de bord) ; **102** = conso instantanée (dixièmes de L/100, 65535 à
-  l'arrêt, 0 au frein moteur) ; **105** et **108** = compteurs des trajets 1 et 2 (km, +42 sur le trajet) ; **106** et
+  dixièmes de L/100 : 5,4-5,5, la valeur du tableau de bord) ; **102** = conso instantanée (dixièmes de L/h, établi le
+  18/11 en v0.45 ; d'abord pris pour des L/100 ; 65535 sans valeur, 0 au frein moteur) ; **105** et **108** = compteurs des trajets 1 et 2 (km, +42 sur le trajet) ; **106** et
   **109** = leur conso moyenne (59 et 58) ; **101** ≈ vitesse moyenne (70-71) ; 100, 104 (6553), 107, 110 à préciser.
 - `CanBusSource` : 99 → `Fuel.onCanBoardL100` (remplace la valeur tapée), 102 → `VehicleState.instantL100`.
   `TripLog.tick` cumule `canFuelL` += conso instantanée × km de la seconde, et `canKm` ; `TripRecord.fuelL` les prend
@@ -584,7 +596,7 @@ sur le bouton CarPlay pour montrer le panneau. Le bandeau rouge est une alerte d
 | | |
 |---|---|
 | **Quoi** | Appli Android « Lanceur 308 » (`fr.p308.lanceur`) : tableau de bord façon Tesla pour autoradio chinois FYT, avec la 308 en 3D, les ouvrants, les phares, l'OBD, le GPS, l'entretien, le son. |
-| **Où en est-on** | Version **0.36** (`versionCode = 42`) prête, pas encore essayée ; 0.31 publiée sur GitHub (Releases, `Lanceur308.apk`) et installée sur l'autoradio le 11/11. |
+| **Où en est-on** | Version **0.45** (`versionCode = 51`) prête, sur la clé USB, pas encore essayée (0.44 essayée le 18/11) ; 0.40 publiée sur GitHub (Releases, `Lanceur308.apk`). |
 | **Ce qui marche dans la voiture** | 3D (plaque tapée, cadrage 1280 × 720), ouvrants et marche arrière par le CAN FYT, température extérieure FYT, phares par l'heure du coucher du soleil, OBD avec le vLinker MC+ (régime, eau, turbo, tension, codes défaut, kilométrage du calculateur), basses automatiques, égaliseur 15 bandes réglé au micro du PC, ADB par le Wi-Fi. |
 | **Vérifié le 11/11 au soir (0.31 sur l'autoradio)** | Page Mon autoradio (boîtier, 17 °C, 12,9 V, volume 18, OBD, égaliseur) ; tension moteur coupé 12,8-12,9 V (codage confirmé) ; flèches ← ↓ de la balance justes ; ceintures **non transmises**. Reste à essayer : un appui sur Seul / Passagers depuis le Lanceur. |
 | **Comment on travaille** | Une séance dans la voiture doit être courte (batterie) : tout se prépare sur le PC, puis un seul script par ADB Wi-Fi (`outils/adb/`). |
@@ -755,7 +767,7 @@ Release GitHub `v0.xx` avec le fichier `Lanceur308.apk` (seulement avec l'accord
 - AGP 8.7.3, **Kotlin 2.0.21**, Compose BOM 2024.12.01
 - **SceneView 2.2.1** (Filament 1.52) — SceneView 2.3+ exige Kotlin 2.2.
 - minSdk 26, targetSdk 33, compileSdk 35. R8 activé (`proguard-rules.pro` garde `com.google.android.filament.**` et `io.github.sceneview.**`).
-- Version dans `app/build.gradle.kts` : **incrémenter `versionCode` à chaque livraison** (actuellement 42 / "0.36").
+- Version dans `app/build.gradle.kts` : **incrémenter `versionCode` à chaque livraison** (actuellement 51 / "0.45").
 
 ---
 

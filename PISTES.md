@@ -54,6 +54,18 @@ connexion. À lire à la prochaine clé : lignes `[FAP-CMM]`.
   connue dans PSA-RE) — **à ne faire qu'avec l'accord de l'auteur**, c'est hors de la lecture simple ; ou le
   calculateur d'additif par le câble des broches 3 et 8.
 
+## 1 quater. Résultats de l'essai du 18/11 (0.44) et correction de la 0.45
+
+| Point | Résultat | Suite |
+|---|---|---|
+| Conso instantanée (CAN 7/102) | Trajet de 41,4 km : **5,5 L/100 en la lisant en L/h**, 4,2 en L/100, 6,8 estimée par l'OBD. La moyenne de l'ordinateur de bord (7/99) est à 5,4-5,5. Trajet de 1,3 km moteur froid : 8,1 en L/h contre 3,4 en L/100. Le 16/11, la valeur tombait à 3-7 au ralenti, ce qui n'a de sens qu'en L/h. | **Tranché : dixièmes de L/h.** Corrigé en 0.45 partout (trajets, panneau à côté de CarPlay, indice « gazole en trop » du FAP, dont la table apprise repart de zéro). Les trajets enregistrés par la 0.43-0.44 sont relus avec la bonne valeur ; ceux d'avant gardent l'estimation OBD. Les compteurs de trajet de la voiture (2 414 km) n'ont pas été remis à zéro : la preuve vient de la moyenne et du ralenti, pas du test prévu. |
+| FAP dans le calculateur (21 CA) | Refusé : `81` → « NO DATA », `10 C0` → `7F 10 12`, `21 CA` → `7F 21 12`. | La session PSA ne s'ouvre pas ainsi. Suite possible : `27 83` (accès sécurisé) — **seulement avec l'accord de l'auteur**. La détection au débit d'air reste la méthode. |
+| Batterie | 8,7 V au démarreur par 12 °C → Faible, 4e matin de suite sous 9 V. | Rien à corriger dans l'appli : la batterie est à faire tester. |
+| Thermostat | L'eau plafonne à 72 °C, alerte « 4 trajets sur 4 ». | Thermostat à changer. |
+| Rafraîchissement 7/102 | 331 à 378 changements en 10 min moteur chaud. | OK pour l'indice du FAP. |
+| Journal | 202 octets nuls au milieu du fichier du 18/11 (contact coupé pendant une écriture). | Sans gravité (fichier texte) ; à nettoyer à la lecture si ça gêne un jour. |
+| OBD le soir | Trajet de 18 h : connexion commencée, jamais terminée (« Broken pipe » puis Bluetooth inactif). | À surveiller ; le trajet de 19 h 30 s'est connecté en 4,8 s. |
+
 ## 2. À vérifier dans la voiture
 
 Les versions 0.39 à 0.42 n'ont jamais tourné sur l'autoradio. À la prochaine clé USB, regarder dans `journal/` :
