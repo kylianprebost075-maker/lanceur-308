@@ -99,7 +99,7 @@ object FapEcu {
     fun onReading(r: FapEcuReading, odometerKm: Int?) {
         val prev = _last.value
         _last.value = r
-        prefs?.edit()?.putString("ecuLast", encodePref(r))?.apply()
+        prefs?.edit()?.putString("ecuLast", encodePref(r))?.putInt("ecuRefusals", 0)?.apply()
         ObdLog.log("FAP-CMM", "charge ${r.loadPct} %, pression différentielle ${r.pressureMbar} mbar, " +
             "${r.kmSinceRegen} km depuis la dernière régénération (moyenne ${r.avgKmBetween} km), aval catalyseur ${r.cataC} °C")
         if (regenDone(prev, r)) {
@@ -108,12 +108,24 @@ object FapEcu {
         }
     }
 
-    /** Refus du calculateur : noté, plus d'essai pendant 24 h. */
+    /** Refus d'affilée avant d'abandonner (v0.48). */
+    const val MAX_REFUSALS = 3
+
+    /** Attente après un refus : 1 jour, puis 60 jours au 3e refus d'affilée (pur, vérifié par FapEcuTest). */
+    fun retryDelayMs(refusals: Int): Long = if (refusals >= MAX_REFUSALS) 60L * 24 * 3_600_000L else 24 * 3_600_000L
+
+    /**
+     * Refus du calculateur. v0.48 : du 18 au 22/11, refusé chaque jour avec les mêmes réponses (10C0 → 7F 10 12) :
+     * ce calculateur n'ouvre pas cette lecture. Après [MAX_REFUSALS] refus d'affilée, plus d'essai pendant 60 jours
+     * (chaque essai rallongeait la connexion OBD).
+     */
     @Synchronized
     fun onRefused(detail: String, nowMs: Long = System.currentTimeMillis()) {
-        refusedUntilMs = nowMs + 24 * 3_600_000L
-        prefs?.edit()?.putLong("ecuRefusedUntil", refusedUntilMs)?.apply()
-        ObdLog.log("FAP-CMM", "lecture du FAP refusée ($detail) : nouvel essai demain")
+        val n = (prefs?.getInt("ecuRefusals", 0) ?: 0) + 1
+        refusedUntilMs = nowMs + retryDelayMs(n)
+        prefs?.edit()?.putLong("ecuRefusedUntil", refusedUntilMs)?.putInt("ecuRefusals", n)?.apply()
+        ObdLog.log("FAP-CMM", "lecture du FAP refusée ($detail) : " +
+            if (n >= MAX_REFUSALS) "$n refus d'affilée, plus d'essai pendant 60 jours" else "nouvel essai demain")
     }
 
     private fun encodePref(r: FapEcuReading) =

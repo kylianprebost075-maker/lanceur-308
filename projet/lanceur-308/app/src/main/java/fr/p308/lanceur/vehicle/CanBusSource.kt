@@ -27,6 +27,10 @@ object CanBusSource {
     private const val U_INSTANT_CONSO = 102
     /** Distances des trajets 1 et 2 de l'ordinateur de bord (km, relevé du 16/11) : notées au départ, pas utilisées. */
     private val TRIP_KM_CODES = setOf(105, 108)
+    /** v0.48 : affichage de l'ordinateur de bord demandé par le bouton du commodo (appli FYT, canal 115). */
+    private const val U_COMMODO_BC = 115
+    @Volatile
+    private var lastCommodo: Int? = null
 
     /**
      * v0.43 : trajets 1 et 2 de l'ordinateur de bord (relevé du 16/11) : 105 / 108 = km, 106 / 109 = conso moyenne en
@@ -107,7 +111,13 @@ object CanBusSource {
 
             when (module) {
                 MODULE_CANBUS -> {
-                    logUnknown(code, ints)
+                    // v0.48 : bouton de l'ordinateur de bord au bout du commodo. Dans l'appli FYT (Callback_0339,
+                    // boîtier Raise PSA), le canal 115 à 1 ouvre la page de l'ordinateur de bord, à 0 la ferme. Chaque
+                    // changement est noté pour le confirmer avant de s'en servir dans le Lanceur.
+                    if (code == U_COMMODO_BC) {
+                        if (lastCommodo != v) ObdLog.log("COMMODO", "bouton ordinateur de bord : ${lastCommodo ?: "—"} → $v")
+                        lastCommodo = v
+                    } else logUnknown(code, ints)
                     DOORS[code]?.let { opening ->
                         val isOpen = v != 0
                         if (isOpen) CarFeatures.mark(Feature.DOORS, "vu : ${opening.label.lowercase()}")

@@ -181,7 +181,13 @@ data class GaugeState(val canKm: Int? = null, val liters: Double? = null, val l1
  * Calculs purs vérifiés par TankGaugeTest.
  */
 object TankGauge {
-    const val FILL_MIN_KM = 100
+    /**
+     * v0.48 : 150 km (avant : 100). Au-dessus de 1 000 km, l'ordinateur de bord donne l'autonomie par paliers de
+     * 100 km et elle saute de l'un à l'autre (20/11 : 1 100 ↔ 1 200, 1 180 → 1 300) : à l'arrêt, un saut de 100 km
+     * aurait été pris pour un plein. Un plein de moins de ≈ 8 L n'est plus repéré.
+     */
+    const val FILL_MIN_KM = 150
+    private var movingLogMs = 0L
     const val STOPPED_KMH = 5f
 
     fun litersFromRange(rangeKm: Int, l100: Double): Double = (rangeKm * l100 / 100).coerceIn(0.0, FuelRange.TANK_L)
@@ -217,8 +223,11 @@ object TankGauge {
         val (l100, _) = FuelRange.consumption(fr.p308.lanceur.maintenance.Fuel.entries.value, TripLog.history.value)
         val prev = _state.value.canKm ?: p?.getInt("gaugeKm", -1)?.takeIf { it >= 0 }
         val isMoving = moving()
-        if (isMoving && prev != null && km - prev >= FILL_MIN_KM)
+        // v0.48 : une ligne toutes les 10 min au plus (le 20/11 : 9 lignes en une heure pour la même valse 1 100 ↔ 1 300).
+        if (isMoving && prev != null && km - prev >= FILL_MIN_KM && nowMs - movingLogMs >= 10 * 60_000L) {
+            movingLogMs = nowMs
             fr.p308.lanceur.vehicle.ObdLog.log("PLEIN", "Autonomie $prev → $km km en roulant : pas un plein (recalcul de l'ordinateur)")
+        }
         val fill = detectFill(prev, km, l100, nowMs, isMoving)
         if (prev != km) p?.edit()?.putInt("gaugeKm", km)?.apply()
         if (fill != null) {

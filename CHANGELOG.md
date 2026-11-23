@@ -4,6 +4,18 @@ Les versions publiées se téléchargent sur la page
 [Releases](https://github.com/kylianprebost075-maker/lanceur-308/releases). Une mise à jour s'installe par-dessus
 l'ancienne version et garde les réglages. Le détail technique de chaque version est dans le [README](README.md).
 
+## 0.48 — 23 novembre 2026 (pas encore essayée sur l'autoradio)
+Corrections après l'essai du 19 au 23/11 (0.47) :
+- **Plein : plus de faux plein à l'arrêt.** Au-dessus de 1 000 km, l'ordinateur de bord donne l'autonomie par
+  paliers de 100 km et elle saute de l'un à l'autre : le seuil passe de 100 à 150 km. Le journal n'écrit plus qu'une
+  ligne toutes les 10 min quand l'autonomie remonte en roulant (9 lignes en une heure le 20/11).
+- **FAP lu dans le calculateur : abandon après 3 refus.** Refusé chaque jour du 18 au 22/11 avec les mêmes réponses :
+  ce calculateur n'ouvre pas cette lecture. Plus d'essai pendant 60 jours après 3 refus d'affilée (chaque essai
+  rallongeait la connexion OBD). La détection des régénérations par le débit d'air et le gazole reste en place.
+- **Bouton de l'ordinateur de bord (commodo)** : chaque appui est noté au journal (`[COMMODO]`, canal CAN 115, celui
+  qui ouvre la page de l'ordinateur de bord dans l'appli FYT), pour le confirmer avant de s'en servir.
+- Confirmé par l'essai : conso lue en L/h juste (5,8 L/100 contre 5,8 au compteur trajet 1 remis à zéro le 20/11).
+
 ## 0.47 — 18 novembre 2026 (pas encore essayée sur l'autoradio)
 - **Attente turbo au démarrage** (Réglages, activée par défaut) : au démarrage, un compte à rebours dit d'attendre
   avant de partir, le temps que l'huile remonte jusqu'au turbo (30 s par défaut, 20 à 60 s au choix, 15 s de plus

@@ -30,6 +30,14 @@ class FapEcuTest {
         assertEquals(listOf(0x61, 0xCA, 0x01), FapEcu.elmBytes("61 CA 01"))
     }
 
+    @Test fun givesUpAfterThreeRefusals() {
+        val day = 24 * 3_600_000L
+        assertEquals(day, FapEcu.retryDelayMs(1))
+        assertEquals(day, FapEcu.retryDelayMs(2))
+        assertEquals(60 * day, FapEcu.retryDelayMs(3))
+        assertEquals(60 * day, FapEcu.retryDelayMs(7))
+    }
+
     @Test fun regenerationSeenWhenKmSinceDropsToZero() {
         fun r(km: Int) = FapEcuReading(0, 40, 50, 300, km, 500)
         assertTrue(FapEcu.regenDone(r(436), r(0)))

@@ -32,6 +32,14 @@ class TankGaugeTest {
         assertEquals(FuelRange.TANK_L, TankGauge.detectFill(20, 1500, 9.0, 0)!!.liters, 0.01)
     }
 
+    @Test fun hundredKmStepAboveThousandIsNotAFill() {
+        // 20/11 : au-dessus de 1 000 km, l'autonomie saute par paliers de 100 (1 100 ↔ 1 200, 1 180 → 1 300).
+        assertNull(TankGauge.detectFill(1100, 1200, 5.5, 0, moving = false))
+        assertNull(TankGauge.detectFill(1180, 1300, 5.5, 0, moving = false))
+        // Le plein du 20/11 (105 → 1 000 km) reste vu.
+        assertEquals(49.2, TankGauge.detectFill(105, 1000, 5.5, 0, moving = false)!!.liters, 0.1)
+    }
+
     @Test fun jumpWhileDrivingIsNotAFill() {
         // 13/11 : 920 → 1020 km sur autoroute, l'ordinateur a recalculé avec une conso plus basse.
         assertNull(TankGauge.detectFill(920, 1020, 5.5, 0, moving = true))
