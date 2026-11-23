@@ -66,9 +66,11 @@ fun PowerBenchPanel() {
                 Text(s.last?.let { "à ${it.peakChRpm} tr/min · ${it.peakNm} Nm à ${it.peakNmRpm}" } ?: "", fontSize = 12.sp, color = C.Sub)
             }
             Tile(Modifier.weight(1f).fillMaxWidth()) {
-                Text("Record", fontSize = 12.sp, color = C.Sub)
+                // v0.49 : la médiane des dernières mesures, pas le record (le pic le plus haut est le plus bruité).
+                Text("Valeur retenue", fontSize = 12.sp, color = C.Sub)
                 Text(s.best?.let { "${it.peakCh} ch" } ?: "—", fontSize = 30.sp, fontWeight = FontWeight.Bold, color = C.Accent)
-                Text(s.best?.let { "${it.peakNm} Nm" } ?: "", fontSize = 12.sp, color = C.Sub)
+                Text(s.best?.let { "${it.peakNm} Nm · médiane de ${s.count} mesure${if (s.count > 1) "s" else ""}" } ?: "",
+                    fontSize = 12.sp, color = C.Sub)
             }
             Tile(Modifier.weight(1.1f).fillMaxWidth()) {
                 Text("Annoncé : ${CarProfile.ENGINE_LABEL}", fontSize = 12.sp, color = C.Sub)

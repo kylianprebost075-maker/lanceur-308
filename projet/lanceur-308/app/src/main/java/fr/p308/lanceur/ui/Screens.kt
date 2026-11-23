@@ -178,7 +178,9 @@ fun HomeAndMaintenanceScreen(vs: VehicleState, items: List<MaintenanceItem>, int
     val dues = remember(items, vs.odometerKm) { items.map { it.due(vs.odometerKm) } }
     val urgent = remember(dues) { dues.count { it.level == DueLevel.SOON || it.level == DueLevel.LATE } }
     val worst = remember(dues) { dues.maxOfOrNull { it.level } ?: DueLevel.NOT_SET }
-    val open = vs.visibleOpen()
+    // v0.49 : même ensemble d'ouvrants tant qu'ils ne changent pas, pour que la voiture 3D ne soit pas recalculée
+    // à chaque mise à jour du véhicule (tension, autonomie…).
+    val open = remember(vs.open, UiPrefs.fiveDoors) { vs.visibleOpen() }
     val lightsOn = vs.effectiveHeadlights()
     val ctx = LocalContext.current
     var model3d by remember(UiPrefs.plate, PlateModel.revision) { mutableStateOf(CarModel.location(ctx)) }

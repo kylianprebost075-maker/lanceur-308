@@ -4,6 +4,24 @@ Les versions publiées se téléchargent sur la page
 [Releases](https://github.com/kylianprebost075-maker/lanceur-308/releases). Une mise à jour s'installe par-dessus
 l'ancienne version et garde les réglages. Le détail technique de chaque version est dans le [README](README.md).
 
+## 0.49 — 23 novembre 2026 (pas encore essayée sur l'autoradio)
+Optimisation : précision, rapidité, code.
+- **Banc de puissance bien plus précis.** L'accélération est tirée du régime (au quart de tour près) et du rapport
+  de boîte, au lieu de la vitesse OBD (au km/h près, ≈ 3 fois par seconde) dont la dérivée était très bruitée : du
+  21 au 23/11, il trouvait de 91 à 127 ch et jusqu'à 329 N·m pour un moteur de 110 ch. La « valeur retenue » est la
+  médiane des 5 dernières mesures, au lieu du record (le pic le plus haut, donc le plus bruité). Les mesures des
+  versions précédentes ne comptent pas dans la médiane.
+- **Régénérations du FAP : moins de fausses alertes.** Seuils relevés quand le débit d'air et le gazole sont d'accord
+  (l'appli en voyait une tous les 100 à 150 km). Une régénération coupée par l'arrêt du moteur puis reprise au trajet
+  suivant (moins de 24 h et 80 km après) n'est plus comptée deux fois : du 21 au 22/11, une seule régénération avait
+  donné trois lignes.
+- **Appli plus légère.** La conso instantanée de la voiture change toutes les 2 à 3 s ; elle faisait recalculer toute
+  l'interface, accueil et voiture 3D compris. Elle est maintenant à part, et la voiture 3D n'est plus recalculée quand
+  rien ne change pour elle.
+- **Code** : `Engine.kt` coupé en trois (`EngineModel.kt` pour les calculs, `ElmTransport.kt` pour les liaisons
+  Bluetooth, `Engine.kt` pour la boucle de lecture), sans changement de comportement ; nouveaux tests du banc et des
+  régénérations reprises.
+
 ## 0.48 — 23 novembre 2026 (pas encore essayée sur l'autoradio)
 Corrections après l'essai du 19 au 23/11 (0.47) :
 - **Plein : plus de faux plein à l'arrêt.** Au-dessus de 1 000 km, l'ordinateur de bord donne l'autonomie par

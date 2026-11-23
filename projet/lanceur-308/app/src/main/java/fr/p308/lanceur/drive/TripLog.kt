@@ -44,7 +44,7 @@ data class TripRecord(
     val fastS: Int = -1,
     /**
      * Gazole d'après la conso instantanée de l'ordinateur de bord (CAN 7/102 en L/h × heures), et km couverts par
-     * cette mesure. v0.45 : la lecture en L/h est la bonne (essai du 18/11, voir VehicleState.instantLph).
+     * cette mesure. v0.45 : la lecture en L/h est la bonne (essai du 18/11, voir Vehicle.instantLph).
      */
     val canFuelL: Double = 0.0,
     val canKm: Double = 0.0,
@@ -222,7 +222,7 @@ object TripLog {
         val engineOn = e.connected && (e.rpm ?: 0) > 400
         // v0.45 : conso instantanée de l'ordinateur de bord en L/h, comptée chaque seconde où elle est connue (ralenti
         // compris, comme l'ordinateur de bord), avec les km parcourus pendant ce temps.
-        val lph = fr.p308.lanceur.vehicle.Vehicle.state.value.instantLph
+        val lph = fr.p308.lanceur.vehicle.Vehicle.instantLph.value
         val kmThisSecond = lastKmh / 3600.0
         val base = t.copy(
             fuelRawL = t.fuelRawL + if (engineOn) FuelModel.litersPerHour(e.powerCh) / 3600.0 else 0.0,

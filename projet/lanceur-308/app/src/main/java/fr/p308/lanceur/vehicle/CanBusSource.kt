@@ -144,7 +144,7 @@ object CanBusSource {
                     if (code in TRIP_BC_CODES) tripComputer[code] = v
                     if (code == U_INSTANT_CONSO) {
                         val l = if (v == 65535) null else v / 10f
-                        if (Vehicle.state.value.instantLph != l) Vehicle.update { s -> s.copy(instantLph = l?.takeIf { it <= 50f }) }
+                        Vehicle.instantLph.value = l?.takeIf { it <= 50f }
                     }
                 }
                 MODULE_MAIN -> when (code) {

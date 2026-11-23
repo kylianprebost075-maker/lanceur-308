@@ -187,7 +187,7 @@ object FapRegen {
         }
         val highShare = if (window.size >= 40) window.sum().toFloat() / window.size else 0f
         // v0.41 : gazole en trop (post-injection), à toutes les charges.
-        val inst = Vehicle.state.value.instantLph
+        val inst = Vehicle.instantLph.value
         if (inst != lastInst) { lastInst = inst; instChanges++ }
         val lph = fuelLph(inst, kmh)
         val fc = fuelCell(rpm, load)
@@ -212,7 +212,9 @@ object FapRegen {
         }
         // Départ : débit d'air seul (comme avant), ou les deux indices d'accord avec des seuils plus bas.
         val airAlone = window.size >= 60 && highShare >= 0.7f
-        val both = window.size >= 40 && fuelWindow.size >= 40 && highShare >= 0.4f && fuelShare >= 0.6f
+        // v0.49 : seuils relevés (0,4 / 0,6 avant) : du 17 au 22/11 l'appli voyait une régénération tous les 100 à
+        // 150 km, bien plus souvent que les ≈ 500 km habituels sur ce moteur.
+        val both = window.size >= 40 && fuelWindow.size >= 40 && highShare >= 0.5f && fuelShare >= 0.7f
         if (startMs == 0L && learnPct() >= 100 && (airAlone || both)) {
             startMs = nowMs - 60_000L
             startKm = odometerKm
@@ -252,17 +254,43 @@ object FapRegen {
         window.clear()
         fuelWindow.clear()
         val dur = endMs - s
-        if (dur < MIN_REGEN_MS && !interrupted) {
+        val r = RegenRecord(s, endMs, startKm, interrupted)
+        val resumed = isResume(_state.value.records.firstOrNull(), r)
+        // Une reprise courte compte (la fin d'une régénération coupée au trajet d'avant), un départ isolé court non.
+        if (dur < MIN_REGEN_MS && !interrupted && !resumed) {
             ObdLog.log("FAP", "débit haut pendant ${dur / 60_000L} min seulement : ignoré")
             _state.value = _state.value.copy(active = false, activeSinceMs = null)
             return
         }
-        val r = RegenRecord(s, endMs, startKm, interrupted)
-        ObdLog.log("FAP", if (interrupted) "régénération interrompue : moteur coupé après ${r.minutes} min"
-            else "régénération terminée en ${r.minutes} min")
-        val list = (listOf(r) + _state.value.records).take(30)
+        val list = mergeRecords(_state.value.records, r).take(30)
+        val total = list.first().minutes
+        ObdLog.log("FAP", when {
+            interrupted -> "régénération interrompue : moteur coupé après ${r.minutes} min" + if (resumed) " (reprise, $total min en tout)" else ""
+            resumed -> "régénération terminée en ${r.minutes} min (reprise de celle coupée avant, $total min en tout)"
+            else -> "régénération terminée en ${r.minutes} min"
+        })
         _state.value = _state.value.copy(active = false, activeSinceMs = null, records = list)
         save(System.currentTimeMillis())
+    }
+
+    /**
+     * v0.49 : une régénération coupée (moteur arrêté) reprend au trajet suivant. Du 21 au 22/11, une seule régénération
+     * a donné 3 lignes : coupée après 25 min, reprise 2 min puis coupée, finie au 3e trajet (35 min). C'est la même
+     * si elle repart moins de 24 h et moins de 80 km après la coupure (pur, vérifié par FapRegenTest).
+     */
+    fun isResume(prev: RegenRecord?, next: RegenRecord): Boolean =
+        prev != null && prev.interrupted && next.startMs - prev.endMs in 0..24 * 3_600_000L &&
+            (prev.km == null || next.km == null || next.km - prev.km in 0..80)
+
+    /**
+     * Ajoute [r] en tête, ou le fusionne avec la régénération coupée qu'il reprend : km de celle-ci, durée = somme des
+     * deux morceaux (le début est reculé d'autant : le moteur coupé entre les deux ne compte pas).
+     */
+    fun mergeRecords(list: List<RegenRecord>, r: RegenRecord): List<RegenRecord> {
+        val prev = list.firstOrNull()
+        if (!isResume(prev, r)) return listOf(r) + list
+        val activeMs = (prev!!.endMs - prev.startMs) + (r.endMs - r.startMs)
+        return listOf(RegenRecord(r.endMs - activeMs, r.endMs, prev.km ?: r.km, r.interrupted)) + list.drop(1)
     }
 
     private fun save(nowMs: Long) {

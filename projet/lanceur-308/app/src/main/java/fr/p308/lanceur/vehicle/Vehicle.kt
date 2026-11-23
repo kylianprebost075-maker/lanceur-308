@@ -27,6 +27,13 @@ object Vehicle {
     private val _state = MutableStateFlow(VehicleState())
     val state: StateFlow<VehicleState> = _state.asStateFlow()
 
+    /**
+     * Conso instantanée de l'ordinateur de bord en L/h (CAN 7/102, dixièmes), null si inconnue. v0.45 : lue en L/h et
+     * non plus en L/100 (essai du 18/11, confirmé le 21/11 par le compteur trajet 1 : 5,8 contre 5,8 L/100).
+     * v0.49 : à part de [state], car elle change toutes les 2 à 3 s (voir VehicleState).
+     */
+    val instantLph = MutableStateFlow<Float?>(null)
+
     private lateinit var prefs: SharedPreferences
     private lateinit var appContext: Context
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -138,6 +145,7 @@ object Vehicle {
         if (!on) {
             Speed.report(0f, fromObd = true)
             Trip.reset()
+            instantLph.value = null
             _state.update {
                 it.copy(open = emptySet(), reverse = false, fogLights = false, headlights = null, rearRadarCm = emptyList(),
                     outsideTempC = null, outsideTempEstimated = false, batteryV = null, fuelRangeKm = null, source = "Aucune")

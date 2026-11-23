@@ -64,10 +64,29 @@ object PowerMath {
      * Courbe de puissance d'après les points d'une accélération (temps en ms, vitesse en km/h, régime).
      * Renvoie null si la mesure est trop courte ou trop bruitée pour être exploitable.
      */
+    /**
+     * v0.49 : rapport de boîte de la mesure, en km/h pour 1 tr/min (médiane vitesse / régime sur les relevés). Dans un
+     * seul rapport la vitesse est exactement proportionnelle au régime ; null si la vitesse est trop basse.
+     */
+    internal fun gearKmhPerRpm(samples: List<Triple<Long, Float, Int>>): Double? {
+        val r = samples.filter { it.second >= 15f && it.third > 800 }.map { it.second.toDouble() / it.third }.sorted()
+        if (r.size < 4) return null
+        val med = r[r.size / 2]
+        // Rapport stable (écart entre quartiles sous 6 %, l'arrondi de la vitesse au km/h compris) : un seul rapport
+        // engagé. Sinon (embrayage qui patine, relevés incohérents) on garde la vitesse OBD.
+        val spread = (r[r.size * 3 / 4] - r[r.size / 4]) / med
+        return if (spread <= 0.06) med else null
+    }
+
     fun curve(samples: List<Triple<Long, Float, Int>>, tempC: Float?, nowMs: Long = System.currentTimeMillis()): PowerResult? {
         if (samples.size < 6) return null
         val ts = samples.map { it.first / 1000.0 }
-        val vs = smooth(samples.map { it.second / 3.6 })
+        // v0.49 : vitesse tirée du régime × rapport de boîte, pas de la vitesse OBD. Celle-ci est au km/h près et lue
+        // ≈ 3 fois par seconde : sa dérivée (l'accélération) était très bruitée, et le pic, pris sur le point le plus
+        // haut, surestimé (du 21 au 23/11 : 91 à 127 ch et jusqu'à 329 N·m pour un moteur de 110 ch et ≈ 250 N·m).
+        // Le régime, lui, est au quart de tour près.
+        val k = gearKmhPerRpm(samples)
+        val vs = if (k != null) samples.map { it.third * k / 3.6 } else smooth(samples.map { it.second / 3.6 })
         val rpms = samples.map { it.third }
         // Puissance et couple à chaque point intérieur (dérivée centrée de la vitesse).
         val raw = ArrayList<PowerPoint>()
@@ -97,12 +116,16 @@ object PowerMath {
     }
 }
 
-/** État affiché par l'écran du banc de puissance. */
+/**
+ * État affiché par l'écran du banc de puissance. v0.49 : [best] n'est plus le record (le pic le plus haut, donc le plus
+ * bruité) mais la mesure médiane des [PowerRun.KEEP] dernières ; [count] = nombre de mesures gardées.
+ */
 data class PowerState(
     val last: PowerResult? = null,
     val best: PowerResult? = null,
     val collecting: Boolean = false,
     val status: String = PowerRun.IDLE_STATUS,
+    val count: Int = 0,
 )
 
 /**
@@ -124,9 +147,16 @@ object PowerRun {
     private const val MAX_GAP_MS = 2_500L
     const val IDLE_STATUS = "Mesure automatique : accélère à fond en 3e ou 4e sur route plate"
 
+    /** Mesures gardées pour la valeur retenue (médiane). */
+    const val KEEP = 5
+
+    /** Mesure médiane (par puissance) d'une liste, ou null si vide (pur). */
+    fun median(list: List<PowerResult>): PowerResult? = list.sortedBy { it.peakCh }.let { if (it.isEmpty()) null else it[it.size / 2] }
+
     private var prefs: SharedPreferences? = null
     private val _state = MutableStateFlow(PowerState())
     val state: StateFlow<PowerState> = _state.asStateFlow()
+    private val history = ArrayList<PowerResult>()
 
     private val samples = ArrayList<Triple<Long, Float, Int>>()
     private var active = false
@@ -143,14 +173,20 @@ object PowerRun {
         prefs = p
         tempNow = { fr.p308.lanceur.vehicle.Vehicle.state.value.outsideTempC }
         log = { fr.p308.lanceur.vehicle.ObdLog.log("PUISSANCE", it) }
-        _state.value = PowerState(last = decode(p.getString("last", null)), best = decode(p.getString("best", null)))
+        history.clear()
+        p.getString("hist", null)?.let { s ->
+            runCatching { JSONArray(s).let { a -> (0 until a.length()).mapNotNull { decode(a.getString(it)) } } }.getOrNull()
+        }?.let { history.addAll(it) }
+        // Mesures de la 0.46-0.48 (vitesse OBD bruitée) : pas reprises dans la médiane, la dernière reste affichée.
+        _state.value = PowerState(last = decode(p.getString("last", null)), best = median(history), count = history.size)
     }
 
-    /** Efface la dernière mesure et le record. */
+    /** Efface les mesures. */
     @Synchronized
     fun clearAll() {
-        prefs?.edit()?.remove("best")?.remove("last")?.apply()
+        prefs?.edit()?.remove("best")?.remove("last")?.remove("hist")?.apply()
         samples.clear()
+        history.clear()
         active = false
         _state.value = PowerState()
     }
@@ -195,11 +231,13 @@ object PowerRun {
             _state.value = _state.value.copy(collecting = false, status = status)
             return
         }
-        val best = _state.value.best
-        val newBest = if (best == null || result.peakCh > best.peakCh) result else best
-        _state.value = PowerState(last = result, best = newBest, collecting = false,
-            status = "Mesure : ${result.peakCh} ch à ${result.peakChRpm} tr/min, ${result.peakNm} Nm")
-        prefs?.edit()?.putString("last", encode(result))?.putString("best", encode(newBest))?.apply()
+        history.add(result)
+        while (history.size > KEEP) history.removeAt(0)
+        val retained = median(history)
+        _state.value = PowerState(last = result, best = retained, collecting = false,
+            status = "Mesure : ${result.peakCh} ch à ${result.peakChRpm} tr/min, ${result.peakNm} Nm", count = history.size)
+        prefs?.edit()?.putString("last", encode(result))?.remove("best")
+            ?.putString("hist", JSONArray(history.mapNotNull { encode(it) }).toString())?.apply()
         log("banc : %d ch à %d tr/min, %d Nm à %d tr/min (%d relevés, %d points)"
             .format(result.peakCh, result.peakChRpm, result.peakNm, result.peakNmRpm, taken.size, result.points.size))
     }

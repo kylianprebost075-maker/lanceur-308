@@ -517,7 +517,7 @@ class PerfOverlay(private val ctx: Context, private val onClose: () -> Unit) {
         } else null
         // v0.42 : la conso instantanée de l'ordinateur de bord (CAN) passe devant l'estimation. v0.45 : elle est en L/h,
         // convertie en L/100 en roulant, affichée telle quelle à l'arrêt.
-        val canLph = fr.p308.lanceur.vehicle.Vehicle.state.value.instantLph?.toDouble()
+        val canLph = fr.p308.lanceur.vehicle.Vehicle.instantLph.value?.toDouble()
         val bestLph = canLph ?: lph
         val inst = bestLph?.let { if (kmh >= 8) it / kmh * 100 else it }
         fuelSmooth = inst?.let { v -> fuelSmooth?.let { it + (v - it) * 0.15 } ?: v }

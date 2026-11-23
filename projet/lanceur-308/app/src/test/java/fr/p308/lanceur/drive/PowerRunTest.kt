@@ -50,6 +50,23 @@ class PowerRunTest {
         assertTrue(!PowerRun.state.value.collecting)
     }
 
+    @Test fun vitesseTireeDuRegimeBienPlusPrecise() {
+        // v0.49 : même pull, vitesse OBD au km/h près. En dérivant le régime (× rapport de boîte) au lieu de la vitesse,
+        // le pic tombe à moins de 5 % de la physique (avant : jusqu'à 20 %).
+        pull(netLoad = 98f)
+        val r = PowerRun.state.value.last!!
+        // Physique au régime du pic (centre de sa tranche de 200 tr/min), en 3e : 22,9 km/h pour 1 000 tr/min.
+        val vPic = r.peakChRpm * 22.9 / 1000 / 3.6
+        val attendu = PowerMath.engineCh(PowerMath.wheelForceN(1.2, vPic, 15f), vPic)
+        assertTrue("pic ${r.peakCh} ch à moins de 5 % de ${attendu.roundToInt()} ch", kotlin.math.abs(r.peakCh - attendu) < attendu * 0.05)
+    }
+
+    @Test fun valeurRetenueEstLaMediane() {
+        fun res(ch: Int) = PowerResult(emptyList(), ch, 3500, 250, 2000, 0)
+        assertEquals(112, PowerRun.median(listOf(res(127), res(103), res(112), res(119), res(91)))!!.peakCh)
+        assertNull(PowerRun.median(emptyList()))
+    }
+
     @Test fun accelerationOrdinaireIgnoree() {
         // Charge utile 60 % : on accélère, mais pas à fond (cas courant en roulant).
         pull(netLoad = 60f)
