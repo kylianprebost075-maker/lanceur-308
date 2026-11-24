@@ -83,6 +83,39 @@ class TurboStartTest {
         assertTrue("le compte continue", TurboStart.state.value.waitS in 1..30)
     }
 
+    @Test fun reveilPuisDemarreurToutDeSuite() {
+        // Cas du 24/11 au soir : contact coupé, autoradio endormi 5 s après (arrêt pas encore confirmé), 7 h plus tard
+        // contact puis démarreur 2 s après le réveil. Avant la v0.50 : rien ne s'affichait.
+        run(60, engine = true)
+        events.clear()
+        run(5, engine = false)
+        now += 7 * 3_600_000L
+        run(2, engine = false)
+        run(6, engine = true)
+        assertEquals(TurboStart.Kind.STARTED, events.single().kind)
+        assertTrue(TurboStart.state.value.waitS > 0)
+    }
+
+    @Test fun reveilAvecValeursPerimees() {
+        // Au réveil, la tension gardée d'avant la veille dit encore « moteur tournant » : pas de faux départ, une seule
+        // attente, qui commence une fois les valeurs relues.
+        run(60, engine = true)
+        events.clear()
+        now += 7 * 3_600_000L
+        run(10, engine = true)
+        assertEquals(1, events.size)
+        assertEquals(TurboStart.Kind.STARTED, events.single().kind)
+    }
+
+    @Test fun arretCourtAvecVeille() {
+        // Plein d'essence : contact coupé 2 min, autoradio endormi entre-temps : pas d'attente au redémarrage.
+        run(60, engine = true)
+        events.clear()
+        now += 2 * 60_000L
+        run(8, engine = true)
+        assertTrue(events.isEmpty())
+    }
+
     @Test fun desactiveOuDejaEnRoute() {
         run(1, engine = true, enabled = false)
         assertTrue(events.isEmpty())

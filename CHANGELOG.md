@@ -4,6 +4,15 @@ Les versions publiées se téléchargent sur la page
 [Releases](https://github.com/kylianprebost075-maker/lanceur-308/releases). Une mise à jour s'installe par-dessus
 l'ancienne version et garde les réglages. Le détail technique de chaque version est dans le [README](README.md).
 
+## 0.50 — 24 novembre 2026 (pas encore essayée sur l'autoradio)
+- **Attente turbo au démarrage réparée.** Du 19 au 24/11, elle ne s'est affichée que 2 fois sur 17 démarrages : les
+  deux fois où le démarreur venait 45 s après le contact. L'autoradio s'endort quelques secondes après la coupure du
+  contact, avant que le Lanceur ait confirmé l'arrêt du moteur (20 s) ; au réveil, il le croyait encore tournant. Un
+  réveil de l'autoradio compte maintenant comme un moteur coupé, et les valeurs gardées d'avant la veille sont ignorées
+  quelques secondes. Toujours rien après un arrêt de moins de 5 min.
+- Résultats de l'essai du 24/11 dans [PISTES.md](PISTES.md) : banc de puissance régulier (114 à 125 ch, valeur
+  retenue 119 ch et 278 Nm), conso juste, thermostat et batterie toujours à vérifier au garage.
+
 ## 0.49 — 23 novembre 2026 (pas encore essayée sur l'autoradio)
 Optimisation : précision, rapidité, code.
 - **Banc de puissance bien plus précis.** L'accélération est tirée du régime (au quart de tour près) et du rapport

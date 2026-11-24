@@ -45,7 +45,14 @@ object TurboStart {
     private val _state = MutableStateFlow(TurboStartState())
     val state: StateFlow<TurboStartState> = _state.asStateFlow()
 
+    /** Plus de 30 s sans appel (une par seconde normalement) : l'autoradio dormait, contact coupé. */
+    const val SLEEP_GAP_MS = 30_000L
+    /** Après le réveil, signes de marche ignorés le temps que la tension et le régime soient relus. */
+    const val WAKE_GRACE_MS = 4_000L
+
     private var running = false
+    private var lastTickMs = 0L
+    private var wakeUntilMs = 0L
     private var lastRunMs = 0L
     private var stoppedAtMs = 0L
     private var startMs = 0L
@@ -76,8 +83,20 @@ object TurboStart {
     fun tick(engineSign: Boolean, kmh: Float, enabled: Boolean, baseS: Int, outsideC: Float?,
              nowMs: Long = System.currentTimeMillis()): Event? {
         var event: Event? = null
+        // v0.50 : l'autoradio s'endort quelques secondes après la coupure du contact, avant les 20 s qui confirment
+        // l'arrêt du moteur. Au réveil, le Lanceur le croyait donc toujours tournant et n'affichait rien : du 19 au
+        // 24/11, attente montrée 2 fois sur 17 démarrages (seulement quand le démarreur venait 45 s après le contact).
+        // Un trou de plus de [SLEEP_GAP_MS] entre deux secondes = autoradio endormi = moteur coupé pendant ce temps.
+        if (lastTickMs != 0L && nowMs - lastTickMs > SLEEP_GAP_MS) {
+            if (running) { running = false; stoppedAtMs = lastRunMs }
+            if (!preview) { endMs = 0L; readyAtMs = 0L }
+            // Au réveil, la tension et le régime gardés d'avant la veille sont périmés : on attend des valeurs neuves.
+            wakeUntilMs = nowMs + WAKE_GRACE_MS
+        }
+        lastTickMs = nowMs
+        val sign = engineSign && nowMs >= wakeUntilMs
         // Marche / arrêt du moteur, avec un délai avant de le croire arrêté.
-        if (engineSign) {
+        if (sign) {
             lastRunMs = nowMs
             if (!running) {
                 running = true
@@ -120,7 +139,7 @@ object TurboStart {
     /** Oublie tout (tests, restauration). */
     @Synchronized
     fun reset() {
-        running = false; lastRunMs = 0L; stoppedAtMs = 0L
+        running = false; lastTickMs = 0L; wakeUntilMs = 0L; lastRunMs = 0L; stoppedAtMs = 0L
         startMs = 0L; endMs = 0L; totalS = 0; readyAtMs = 0L; preview = false
         _state.value = TurboStartState()
     }

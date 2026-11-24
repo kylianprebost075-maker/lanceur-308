@@ -66,6 +66,18 @@ connexion. À lire à la prochaine clé : lignes `[FAP-CMM]`.
 | Journal | 202 octets nuls au milieu du fichier du 18/11 (contact coupé pendant une écriture). | Sans gravité (fichier texte) ; à nettoyer à la lecture si ça gêne un jour. |
 | OBD le soir | Trajet de 18 h : connexion commencée, jamais terminée (« Broken pipe » puis Bluetooth inactif). | À surveiller ; le trajet de 19 h 30 s'est connecté en 4,8 s. |
 
+## 1 quinquies. Résultats du 19 au 24/11 (0.47 puis 0.49) et correction de la 0.50
+
+| Point | Résultat | Suite |
+|---|---|---|
+| Attente turbo au démarrage | Montrée **2 fois sur 17 démarrages** (23/11 et 24/11 au matin : 30 s, terminée à l'arrêt). Les deux fois, le démarreur venait 45 s après le contact. Les 15 autres (démarrage vu par le CAN, démarreur juste après le contact) : rien. | **Cause** : l'autoradio s'endort quelques secondes après la coupure du contact, avant les 20 s qui confirment l'arrêt du moteur ; au réveil le Lanceur le croyait toujours tournant. **Corrigé en 0.50** : plus de 30 s sans relevé = autoradio endormi = moteur coupé ; valeurs du réveil ignorées 4 s (périmées). 3 tests de plus. |
+| Banc de puissance (0.49, accélération tirée du régime) | 24/11 : 120, 114, 120, 115, 125, 119 ch ; 302, 272, 278, 265, 293, 279 Nm. Valeur retenue (médiane des 5 dernières) : **119 ch, 278 Nm**. Avant la 0.49 : 91 à 127 ch. | Bien plus régulier (± 5 %). Au-dessus de la fiche (110 ch, 240 Nm) de 8 % et 15 % environ, dans la marge annoncée (± 10-15 %). Pas de correction sans mesure de référence (banc de garage) : masse, rendement et rapports de boîte décalent tout d'un même pourcentage. |
+| Conso | Trajet du 24/11 : 5,9 L/100 (CAN en L/h), moyenne affichée 5,3, estimation OBD 4,8. | OK (confirmée le 20/11 par le compteur trajet 1 remis à zéro : 5,8 contre 5,8). |
+| Batterie | Démarreur : 8,1 V le 23/11 (10 °C, Faible), 9,8 V le 24/11 (6 °C, Bonne). | Très variable d'un matin à l'autre : toujours à faire tester. |
+| Thermostat | Eau plafonnée à 70-72 °C, alerte 4 trajets sur 4. | Thermostat à changer. |
+| FAP dans le calculateur | Refusé encore le 24/11 (`81` répond maintenant `C1 D0 8F`, mais `10 C0` et `21 CA` toujours refusés). | Abandon automatique après 3 refus (0.48). |
+| Bouton de l'ordinateur de bord (`[COMMODO]`) | Une seule ligne « — → 0 » au réveil, aucun appui noté. | À appuyer une fois en roulant pour le confirmer. |
+
 ## 2. À vérifier dans la voiture
 
 Les versions 0.39 à 0.42 n'ont jamais tourné sur l'autoradio. À la prochaine clé USB, regarder dans `journal/` :
